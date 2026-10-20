@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, saldo %}
+{% block title %}Export {{ d.partei_name }}{% endblock %}
+{% block content %}
+<p class="brotkrumen"><a href="{{ url_for('wohnung', wid=wid) }}#abrechnung">{{ icon('left', 15) }} {{ d.immo.name }} · {{ d.w.bezeichnung }}</a></p>
+<div class="kopf">
+  <div>
+    <h1>Export – Betriebskostenabrechnung {{ d.jahr }}</h1>
+    <p class="leise">{{ 'Eigentümer-Abrechnung' if d.partei == 'eigentuemer' else 'Mieter-Abrechnung' }}: {{ d.partei_name }} · Ergebnis {{ saldo(d.saldo) }}</p>
+  </div>
+</div>
+
+<div class="export">
+  <div class="export-vorschau">
+    <iframe src="{{ url_for('export_brief', wid=wid, partei=d.partei) }}" title="Vorschau Deckblatt"></iframe>
+  </div>
+  <form class="export-auswahl" method="post" action="{{ url_for('export_pdf', wid=wid) }}">
+    <input type="hidden" name="partei" value="{{ d.partei }}">
+    <h2>Anlagen</h2>
+    <p class="leise">Welche Belege aus {{ d.jahr }} sollen hinter dem Deckblatt angehängt werden?</p>
+    {% for doc in dokumente %}
+    <label class="haken">
+      <input type="checkbox" name="dokumente" value="{{ doc.id }}" {{ 'checked' if doc.vorauswahl }}>
+      <span>{{ doc.titel }}<br><small class="leise">{% if doc.bereich == 'vermieter' %}Vermieter{% elif doc.bereich == 'mieterordner' %}{{ doc.mv_ordner }}{% else %}Mieter{% endif %}{% if doc.kostenart %} · {{ doc.kostenart }}{% endif %}</small></span>
+    </label>
+    {% else %}
+    <p class="leise">Für {{ d.jahr }} sind keine Dokumente hochgeladen.</p>
+    {% endfor %}
+    {% if not d.iban %}<p class="warnung">Hinweis: Bei der Immobilie ist keine IBAN hinterlegt.</p>{% endif %}
+    <div class="knopfleiste senkrecht">
+      <button class="btn hell" name="aktion" value="vorschau" formtarget="_blank">{{ icon('eye') }}<span>PDF-Vorschau</span></button>
+      <button class="btn" name="aktion" value="speichern">{{ icon('save') }}<span>PDF speichern</span></button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "auth/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Passwort festlegen{% endblock %}
+{% block karte %}
+<h1>Passwort festlegen</h1>
+<p class="leise">Benutzername: <strong>{{ b.benutzername }}</strong></p>
+<form method="post">
+  <label>Neues Passwort<input type="password" name="passwort" autocomplete="new-password" minlength="8" required autofocus></label>
+  <label>Wiederholen<input type="password" name="passwort2" autocomplete="new-password" minlength="8" required></label>
+  <button class="btn voll">{{ icon('save') }}<span>Speichern</span></button>
+</form>
+{% endblock %}

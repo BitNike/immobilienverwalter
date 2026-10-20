@@ -1,0 +1,25 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Mietobjekte{% endblock %}
+{% block panel %}
+<div class="kopf">
+  <h1>Mietobjekte</h1>
+  <a class="btn" href="{{ url_for('wohnung_stamm') }}">{{ icon('plus') }}<span>Mietobjekt anlegen</span></a>
+</div>
+<p class="leise">Vorgefertigte Wohnungen mit Fläche, MEA und Zählern. In der Immobilie wählst du sie über das + aus.</p>
+<table>
+  <thead><tr><th>Immobilie</th><th>Mietobjekt</th><th>Eigentümer</th><th class="zahl">Wohnfläche</th><th class="zahl">MEA</th><th></th></tr></thead>
+  <tbody>
+  {% for w in wohnungen %}
+  <tr>
+    <td>{{ w.immobilie or '–' }}</td>
+    <td>{{ w.bezeichnung }}</td>
+    <td>{{ ((w.vorname or '') ~ ' ' ~ (w.eig_name or '')).strip() or w.benutzername or '–' }}</td>
+    <td class="zahl">{{ w.wohnflaeche|num }} m²</td>
+    <td class="zahl">{{ w.mea|num }}/{{ w.mea_basis|num(0) }}</td>
+    <td class="aktionen"><a href="{{ url_for('wohnung_stamm', wid=w.id) }}">{{ icon('edit', 15) }} Bearbeiten</a></td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="leise">Noch keine Mietobjekte.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

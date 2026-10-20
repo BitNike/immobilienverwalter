@@ -1,0 +1,145 @@
+{% macro icon(name, groesse=18) -%}
+<svg class="i" width="{{ groesse }}" height="{{ groesse }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ICONS[name]|safe }}</svg>
+{%- endmacro %}
+
+{% macro speichern(label="Speichern", form=None) -%}
+<button class="btn" {% if form %}form="{{ form }}"{% endif %} title="{{ label }}">{{ icon('save') }}<span>{{ label }}</span></button>
+{%- endmacro %}
+
+{% macro loeschen(action, frage, label="") -%}
+<form method="post" action="{{ action }}" class="inline" onsubmit="return confirm('{{ frage }}')">
+  <button class="btn-icon gefahr" title="Löschen">{{ icon('trash', 16) }}{% if label %}<span>{{ label }}</span>{% endif %}</button>
+</form>
+{%- endmacro %}
+
+{% macro jahr_umschalter(j) -%}
+<div class="jahr" aria-label="Abrechnungsjahr">
+  <a href="?jahr={{ j - 1 }}" title="Vorjahr">{{ icon('left') }}</a>
+  <strong>{{ j }}</strong>
+  <a href="?jahr={{ j + 1 }}" title="Folgejahr">{{ icon('right') }}</a>
+</div>
+{%- endmacro %}
+
+{% macro feld(name, label, wert="", typ="text", pflicht=False, hinweis="", attrs="", breit=False) -%}
+<label class="{{ 'breit' if breit }}">{{ label }}{% if pflicht %} *{% endif %}
+  <input type="{{ typ }}" name="{{ name }}" value="{{ wert if wert is not none else '' }}" {{ 'required' if pflicht }} {{ attrs|safe }}>
+  {% if hinweis %}<small>{{ hinweis }}</small>{% endif %}
+</label>
+{%- endmacro %}
+
+{% macro immobilie_felder(i={}) -%}
+<fieldset><legend>Immobilie</legend>
+<div class="raster">
+  {{ feld('name', 'Bezeichnung', i.name, pflicht=True, attrs='placeholder="z. B. Mühlenstraße 11"') }}
+  {{ feld('strasse', 'Straße', i.strasse) }}
+  {{ feld('hausnummer', 'Hausnummer', i.hausnummer) }}
+  {{ feld('plz', 'Postleitzahl', i.plz) }}
+  {{ feld('ort', 'Ort', i.ort) }}
+  {{ feld('gesamtflaeche', 'Gesamtwohnfläche (m²)', i.gesamtflaeche|num if i.gesamtflaeche else '', attrs='inputmode="decimal"', hinweis='leer = Summe der Mietobjekte') }}
+  {{ feld('einheiten_gesamt', 'Anzahl Einheiten', i.einheiten_gesamt or '', typ='number', attrs='min="0"', hinweis='leer = Anzahl der Mietobjekte') }}
+</div>
+</fieldset>
+<fieldset><legend>Abrechnung</legend>
+<div class="raster">
+  {{ feld('absender', 'Absender', i.absender, breit=True, hinweis='z. B. „Hausverwaltung, Straße, PLZ Ort“ – leer = Eigentümer') }}
+  {{ feld('kontoinhaber', 'Kontoinhaber', i.kontoinhaber) }}
+  {{ feld('iban', 'IBAN', i.iban, attrs='autocomplete="off"') }}
+  {{ feld('bank', 'Bank', i.bank) }}
+</div>
+</fieldset>
+<label class="breit">Notiz<textarea name="notiz" rows="2">{{ i.notiz }}</textarea></label>
+{%- endmacro %}
+
+{% macro wohnung_felder(w={}, benutzer=[], immobilien=None, zaehler_neu=True) -%}
+<div class="raster">
+  {{ feld('bezeichnung', 'Bezeichnung', w.bezeichnung, pflicht=True, attrs='placeholder="z. B. 1. OG links"') }}
+  {% if immobilien is not none %}
+  <label>Immobilie
+    <select name="immobilie_id">
+      <option value="">– noch nicht zugeordnet –</option>
+      {% for i in immobilien %}<option value="{{ i.id }}" {{ 'selected' if w.immobilie_id == i.id }}>{{ i.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label>Eigentümer (Vermieter)
+    <select name="eigentuemer_id">
+      <option value="">– keiner –</option>
+      {% for b in benutzer %}<option value="{{ b.id }}" {{ 'selected' if w.eigentuemer_id == b.id }}>{{ person_name(b) }}</option>{% endfor %}
+    </select>
+  </label>
+  {{ feld('wohnflaeche', 'Wohnfläche (m²)', w.wohnflaeche|num if w.wohnflaeche else '', pflicht=True, attrs='inputmode="decimal"') }}
+  {{ feld('mea', 'MEA', w.mea|num if w.mea else '', attrs='inputmode="decimal" placeholder="86,13"', hinweis='Miteigentumsanteil, z. B. 86,13') }}
+  {{ feld('mea_basis', 'MEA-Basis', w.mea_basis|num(0) if w.mea_basis else '1.000', attrs='inputmode="decimal"', hinweis='z. B. 1.000 (für 86,13/1.000)') }}
+  {{ feld('umlageschluessel', 'Umlageschlüssel (Text für die Abrechnung)', w.umlageschluessel, breit=True, attrs='placeholder="z. B. Heizung nach Verbrauch und Fläche laut Abrechnung der Eigentümergemeinschaft"') }}
+  {{ feld('iban', 'Abweichende IBAN', w.iban, hinweis='nur falls anders als bei der Immobilie') }}
+  {% if zaehler_neu %}
+  {{ feld('wasser_nummer', 'Wasseruhr (Nummer)', '') }}
+  {{ feld('strom_nummer', 'Stromzähler (Nummer)', '') }}
+  {{ feld('gas_nummer', 'Gaszähler (Nummer)', '') }}
+  {% endif %}
+</div>
+<label class="breit">Notiz<textarea name="notiz" rows="2">{{ w.notiz }}</textarea></label>
+{%- endmacro %}
+
+{% macro upload_felder(jahr, kostenarten, mvs=[], wohnungen=[], mit_vermieter=True) -%}
+<div class="raster">
+  <label class="breit">Dateien (PDF, JPG, PNG) *<input type="file" name="dateien" accept=".pdf,.jpg,.jpeg,.png" multiple></label>
+  <label>Jahr *
+    <select name="dok_jahr" required>
+      {% for j in range(jahr + 1, jahr - 6, -1) %}<option value="{{ j }}" {{ 'selected' if j == jahr }}>{{ j }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Ablage *
+    <select name="bereich" required onchange="this.form.querySelector('.mv-wahl').hidden = this.value !== 'mieterordner'">
+      <option value="mieter">Mieter – Nebenkostenbelege</option>
+      {% if mvs %}<option value="mieterordner">Mieterordner (Nr. – Name)</option>{% endif %}
+      {% if mit_vermieter %}<option value="vermieter">Vermieter – z. B. Sanierung, Steuer</option>{% endif %}
+    </select>
+  </label>
+  {% if mvs %}
+  <label class="mv-wahl" hidden>Mieterordner
+    <select name="mv_id">
+      {% for m in mvs %}<option value="{{ m.id }}">{{ m.ordner }}{% if m.wohnung %} ({{ m.wohnung }}){% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label>Kostenart (optional)
+    <select name="kostenart_id">
+      <option value="">–</option>
+      {% for k in kostenarten %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if wohnungen %}
+  <label>Nur für Mietobjekt (optional)
+    <select name="dok_wohnung_id">
+      <option value="">– alle –</option>
+      {% for w in wohnungen %}<option value="{{ w.id }}">{{ w.bezeichnung }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {{ feld('titel', 'Titel (optional)', '', hinweis='bei einer Datei; sonst der Dateiname') }}
+</div>
+{%- endmacro %}
+
+{% macro dokumentliste(dokumente, darf_loeschen=False) -%}
+{% if dokumente %}
+<table>
+  <thead><tr><th>Ordner</th><th>Dokument</th><th>Kostenart</th><th class="zahl">Größe</th><th></th></tr></thead>
+  <tbody>
+  {% for d in dokumente %}
+  <tr>
+    <td class="leise">{{ icon('folder', 15) }} {% if d.bereich == 'vermieter' %}Vermieter{% elif d.bereich == 'mieterordner' %}Mieter / {{ d.mv_ordner }}{% else %}Mieter{% endif %}</td>
+    <td><a href="{{ url_for('dokument_anzeigen', did=d.id) }}" target="_blank">{{ icon('file', 15) }} {{ d.titel }}</a></td>
+    <td>{{ d.kostenart or '' }}</td>
+    <td class="zahl leise">{{ [(d.groesse / 1024)|round|int, 1]|max }} KB</td>
+    <td class="aktionen">{% if darf_loeschen %}{{ loeschen(url_for('dokument_loeschen', did=d.id), 'Dokument löschen?') }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="leise">Keine Dokumente für dieses Jahr.</p>{% endif %}
+{%- endmacro %}
+
+{% macro saldo(v) -%}
+<span class="{{ 'nachzahlung' if v > 0 else 'gutschrift' }}">{{ v|abs|eur }} {{ 'Nachzahlung' if v > 0 else 'Gutschrift' }}</span>
+{%- endmacro %}

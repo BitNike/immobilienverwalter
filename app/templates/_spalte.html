@@ -1,0 +1,11 @@
+{% from "_ui.html" import icon %}
+<nav class="spalte" aria-label="Mietobjekte">
+  <div class="spalten-titel">Mietobjekte</div>
+  <a class="kachel klein {{ 'aktiv' if not aktiv_wohnung and request.endpoint == 'immobilie' }}" href="{{ url_for('immobilie', iid=immo.id) }}">{{ icon('list') }}<span>Übersicht Immobilie</span></a>
+  {% for w in spalte_wohnungen %}
+  <a class="kachel {{ 'aktiv' if aktiv_wohnung == w.id }}" href="{{ url_for('wohnung', wid=w.id) }}">{{ icon('home') }}<span>{{ w.bezeichnung }}</span></a>
+  {% endfor %}
+  {% if ist_admin %}
+  <a class="kachel plus {{ 'aktiv' if request.endpoint == 'wohnung_hinzufuegen' }}" href="{{ url_for('wohnung_hinzufuegen', iid=immo.id) }}" title="Mietobjekt hinzufügen">{{ icon('plus', 20) }}</a>
+  {% endif %}
+</nav>

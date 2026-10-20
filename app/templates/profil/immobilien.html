@@ -1,0 +1,15 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Meine Immobilien{% endblock %}
+{% block panel %}
+<h1>Immobilien</h1>
+{% for i in immobilien %}
+<section class="block">
+  <h2><a href="{{ url_for('immobilie', iid=i.id) }}">{{ icon('building') }} {{ i.name }}</a></h2>
+  <p class="leise">{{ adresse(i)|select|join(', ') }}</p>
+  <ul class="liste">{% for w in i.wohnungen %}<li><a href="{{ url_for('wohnung', wid=w.id) }}">{{ icon('home', 15) }} {{ w.bezeichnung }}</a> <span class="leise">{{ w.wohnflaeche|num }} m²</span></li>{% endfor %}</ul>
+</section>
+{% else %}
+<p class="leise">Dir sind noch keine Mietobjekte zugewiesen. Die Zuweisung übernimmt der Administrator.</p>
+{% endfor %}
+{% endblock %}

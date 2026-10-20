@@ -1,0 +1,23 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Vermieter{% endblock %}
+{% block panel %}
+<div class="kopf">
+  <h1>Vermieter</h1>
+  {% if ist_admin %}<a class="btn" href="{{ url_for('vermieter_neu') }}">{{ icon('plus') }}<span>Vermieter anlegen</span></a>{% endif %}
+</div>
+<table>
+  <thead><tr><th></th><th>Name</th><th>Ort</th><th>Gruppe</th><th></th></tr></thead>
+  <tbody>
+  {% for b in benutzer %}
+  <tr>
+    <td class="mini-avatar">{% if b.foto %}<img src="{{ url_for('foto', uid=b.id) }}?v={{ b.foto }}" alt="">{% else %}{{ icon('user', 20) }}{% endif %}</td>
+    <td>{{ person_name(b) }} {% if b.rolle == 'admin' %}<span class="marke admin">Admin</span>{% endif %}</td>
+    <td>{{ b.ort }}</td>
+    <td class="leise">{{ ROLLEN[b.rolle] }}</td>
+    <td class="aktionen">{% if ist_admin %}<a href="{{ url_for('vermieter_bearbeiten', uid=b.id) }}">{{ icon('edit', 15) }} Bearbeiten</a>{% elif b.id == user.id %}<a href="{{ url_for('profil') }}">Mein Profil</a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}SMTP{% endblock %}
+{% block panel %}
+<h1>SMTP / E-Mail</h1>
+<p class="leise">Die Zugangsdaten stehen in der Datei <code>.env</code> neben der <code>docker-compose.yml</code>.
+  Nach einer Änderung den Container neu starten: <code>docker compose up -d</code>.</p>
+<table class="schmal">
+  <tr><th>Status</th><td>{% if konfiguriert %}<span class="gutschrift">eingerichtet</span>{% else %}<span class="nachzahlung">nicht eingerichtet</span>{% endif %}</td></tr>
+  <tr><th>Server (SMTP_HOST)</th><td>{{ k.host or '–' }}</td></tr>
+  <tr><th>Port (SMTP_PORT)</th><td>{{ k.port }}</td></tr>
+  <tr><th>Verschlüsselung (SMTP_SECURITY)</th><td>{{ k.sicherheit }}</td></tr>
+  <tr><th>Benutzer (SMTP_USER)</th><td>{{ k.benutzer or '–' }}</td></tr>
+  <tr><th>Passwort (SMTP_PASSWORD)</th><td>{{ '••••••••' if k.passwort else '–' }}</td></tr>
+  <tr><th>Absender (SMTP_FROM)</th><td>{{ k.absender or '–' }}</td></tr>
+  <tr><th>Adresse der App (APP_URL)</th><td>{{ app_url or '– (wird aus dem Aufruf ermittelt)' }}</td></tr>
+</table>
+{% if konfiguriert %}
+<form method="post" class="zeile">
+  <label>Testmail an<input type="email" name="an" value="{{ user.email }}" required></label>
+  <button class="btn">{{ icon('mail') }}<span>Testmail senden</span></button>
+</form>
+{% endif %}
+{% endblock %}

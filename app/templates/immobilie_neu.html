@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, speichern, immobilie_felder, upload_felder %}
+{% block title %}Neue Immobilie{% endblock %}
+{% block content %}
+<h1>Neue Immobilie</h1>
+<form method="post" enctype="multipart/form-data" class="block">
+  {{ immobilie_felder() }}
+  <fieldset><legend>Dokumente hochladen (optional)</legend>
+    {{ upload_felder(jahr, kostenarten) }}
+  </fieldset>
+  <div class="knopfleiste">{{ speichern("Immobilie anlegen") }}</div>
+</form>
+{% endblock %}

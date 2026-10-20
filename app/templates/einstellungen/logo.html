@@ -1,0 +1,23 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, speichern, feld %}
+{% block title %}Logo{% endblock %}
+{% block panel %}
+<h1>Logo</h1>
+<p class="leise">Das Logo erscheint oben links. Ideal ist ein Querformat (z. B. 600 × 120 Pixel), PNG mit transparentem Hintergrund oder JPG.</p>
+<div class="logo-vorschau">
+  {% if logo.typ == 'bild' %}<img src="{{ url_for('logo_datei') }}?v={{ logo.version }}" alt="">{% else %}<span class="logo-text">{{ logo.text }}</span>{% endif %}
+</div>
+<form method="post" enctype="multipart/form-data">
+  <div class="raster">
+    <label>Darstellung
+      <select name="logo_typ">
+        <option value="text" {{ 'selected' if logo.typ == 'text' }}>Nur Text</option>
+        <option value="bild" {{ 'selected' if logo.typ == 'bild' }} {{ 'disabled' if not logo_datei }}>Bild</option>
+      </select>
+    </label>
+    {{ feld('logo_text', 'Text (auch Alternativtext)', logo.text) }}
+    <label class="breit">Neues Bild (PNG oder JPG, max. 2 MB)<input type="file" name="logo" accept=".png,.jpg,.jpeg"><small>Wird auf 160 Pixel Höhe begrenzt.</small></label>
+  </div>
+  <div class="knopfleiste">{{ speichern() }}</div>
+</form>
+{% endblock %}

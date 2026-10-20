@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon %}
+{% macro eintrag(endpoint, text, symbol, aktiv) -%}
+<a class="{{ 'aktiv' if aktiv }}" href="{{ url_for(endpoint) }}">{{ icon(symbol, 16) }}<span>{{ text }}</span></a>
+{%- endmacro %}
+{% block content %}
+<div class="einstellungen">
+  <nav class="baum">
+    {% if bereich.startswith('profil') %}
+      <div class="baum-titel">Profil</div>
+      {{ eintrag('profil', 'Benutzerinformation', 'user', bereich == 'profil_info') }}
+      {{ eintrag('profil_immobilien', 'Immobilien', 'building', bereich == 'profil_immobilien') }}
+      {{ eintrag('profil_passwort', 'Passwort ändern', 'lock', bereich == 'profil_passwort') }}
+      <form method="post" action="{{ url_for('logout') }}"><button class="baum-knopf">{{ icon('logout', 16) }}<span>Abmelden</span></button></form>
+    {% else %}
+      <div class="baum-titel">Einstellungen</div>
+      {{ eintrag('vermieter_liste', 'Vermieter', 'users', bereich == 'vermieter') }}
+      <div class="baum-gruppe {{ '' if ist_admin else 'gesperrt' }}">
+        <div class="baum-untertitel">{{ icon('lock', 14) }} Administration</div>
+        {% if ist_admin %}
+          {{ eintrag('vermieter_neu', 'Vermieter anlegen', 'plus', bereich == 'admin_vermieter') }}
+          {{ eintrag('wohnungen_liste', 'Mietobjekte (Wohnungen)', 'home', bereich == 'admin_wohnungen') }}
+          {{ eintrag('kostenarten_admin', 'Kostenarten', 'list', bereich == 'admin_kostenarten') }}
+          {{ eintrag('logo_admin', 'Logo', 'image', bereich == 'admin_logo') }}
+          {{ eintrag('smtp_admin', 'SMTP / E-Mail', 'mail', bereich == 'admin_smtp') }}
+        {% else %}
+          {% for t in ['Vermieter anlegen', 'Mietobjekte (Wohnungen)', 'Kostenarten', 'Logo', 'SMTP / E-Mail'] %}<span>{{ t }}</span>{% endfor %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </nav>
+  <div class="panel">{% block panel %}{% endblock %}</div>
+</div>
+{% endblock %}

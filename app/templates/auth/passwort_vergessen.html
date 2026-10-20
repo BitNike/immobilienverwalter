@@ -1,0 +1,16 @@
+{% extends "auth/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Passwort vergessen{% endblock %}
+{% block karte %}
+<h1>Passwort vergessen</h1>
+{% if smtp %}
+<p class="leise">Gib die E-Mail-Adresse aus deinem Profil ein. Du erhältst einen Link, um ein neues Passwort festzulegen.</p>
+<form method="post">
+  <label>E-Mail<input type="email" name="email" required autofocus></label>
+  <button class="btn voll">{{ icon('mail') }}<span>Link senden</span></button>
+</form>
+{% else %}
+<p>Der E-Mail-Versand ist nicht eingerichtet. Bitte wende dich an den Administrator.</p>
+{% endif %}
+<p class="leise"><a href="{{ url_for('login') }}">Zurück zur Anmeldung</a></p>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "auth/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Einrichtung{% endblock %}
+{% block karte %}
+<h1>Ersteinrichtung</h1>
+<p class="leise">Der erste Zugang wird automatisch Administrator.</p>
+<form method="post">
+  <label>Benutzername *<input name="benutzername" autocomplete="username" required autofocus></label>
+  <label>Vorname<input name="vorname"></label>
+  <label>Name<input name="name"></label>
+  <label>E-Mail<input type="email" name="email"><small>für „Passwort vergessen“</small></label>
+  <label>Passwort *<input type="password" name="passwort" autocomplete="new-password" minlength="8" required></label>
+  <label>Passwort wiederholen *<input type="password" name="passwort2" autocomplete="new-password" minlength="8" required></label>
+  <button class="btn voll">{{ icon('save') }}<span>Einrichten</span></button>
+</form>
+{% endblock %}

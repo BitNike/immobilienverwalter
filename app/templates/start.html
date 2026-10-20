@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Übersicht{% endblock %}
+{% block content %}
+<h1>Übersicht</h1>
+{% if immobilien %}
+<div class="karten">
+  {% for i in immobilien %}
+  <a class="karte" href="{{ url_for('immobilie', iid=i.id) }}">
+    <h3>{{ icon('building') }} {{ i.name }}</h3>
+    <p class="leise">{{ adresse(i)|select|join(', ') }}</p>
+    <p>{{ i.wohnungen|length }} Mietobjekt{{ 'e' if i.wohnungen|length != 1 }}</p>
+  </a>
+  {% endfor %}
+</div>
+{% elif ist_admin %}
+<div class="leer">
+  <p>Noch keine Immobilie angelegt.</p>
+  <a class="btn" href="{{ url_for('immobilie_neu') }}">{{ icon('plus') }}<span>Immobilie anlegen</span></a>
+</div>
+{% else %}
+<p class="leise">Dir sind noch keine Mietobjekte zugewiesen. Bitte wende dich an den Administrator.</p>
+{% endif %}
+{% endblock %}

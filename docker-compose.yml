@@ -1,0 +1,17 @@
+services:
+  nebenkosten:
+    build: .
+    container_name: nebenkosten
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8080:8080"
+    volumes:
+      - nk-daten:/data            # Datenbank, Profilfotos, Logo
+      - nk-dokumente:/dokumente   # hochgeladene Belege: <Immobilie>/<Jahr>/Vermieter|Mieter/...
+
+volumes:
+  nk-daten:
+  nk-dokumente:

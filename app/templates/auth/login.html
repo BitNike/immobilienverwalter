@@ -1,0 +1,12 @@
+{% extends "auth/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Anmelden{% endblock %}
+{% block karte %}
+<h1>Anmelden</h1>
+<form method="post">
+  <label>Benutzername<input name="benutzername" autocomplete="username" required autofocus></label>
+  <label>Passwort<input type="password" name="passwort" autocomplete="current-password" required></label>
+  <button class="btn voll">{{ icon('right') }}<span>Anmelden</span></button>
+</form>
+{% if smtp %}<p class="leise"><a href="{{ url_for('passwort_vergessen') }}">Passwort vergessen?</a></p>{% endif %}
+{% endblock %}

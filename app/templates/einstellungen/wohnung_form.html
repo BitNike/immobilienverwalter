@@ -1,0 +1,40 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, speichern, loeschen, wohnung_felder %}
+{% block title %}{{ w.bezeichnung or 'Neues Mietobjekt' }}{% endblock %}
+{% block panel %}
+<div class="kopf">
+  <h1>{{ w.bezeichnung or 'Neues Mietobjekt' }}</h1>
+  {% if w.id and w.immobilie_id %}<a class="btn hell" href="{{ url_for('wohnung', wid=w.id) }}">{{ icon('home') }}<span>Zum Mietobjekt</span></a>{% endif %}
+</div>
+<form method="post">
+  {{ wohnung_felder(w, benutzer, immobilien, zaehler_neu=not zaehler) }}
+  <div class="knopfleiste">{{ speichern() }}</div>
+</form>
+
+{% if w.id %}
+<section class="block">
+  <h2>Zähler</h2>
+  {% if zaehler %}
+  <table>
+    <thead><tr><th>Art</th><th>Nummer</th><th>Eingebaut</th><th>Ausgebaut</th><th></th></tr></thead>
+    <tbody>
+    {% for z in zaehler %}
+    <tr class="{{ 'leise' if z.ausgebaut }}">
+      <td>{{ ZAEHLERARTEN[z.art] }}</td><td>{{ z.nummer or '–' }}</td><td>{{ z.eingebaut|datum }}</td><td>{{ z.ausgebaut|datum }}</td>
+      <td class="aktionen">{{ loeschen(url_for('zaehler_loeschen', zid=z.id), 'Zähler mit allen Ablesungen löschen?') }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="leise">Ablesungen und Zählertausch erfasst du beim Mietobjekt in der Immobilie.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('zaehler_neu') }}" class="zeile">
+    <input type="hidden" name="wohnung_id" value="{{ w.id }}">
+    <label>Art<select name="art">{% for a, t in ZAEHLERARTEN.items() %}<option value="{{ a }}">{{ t }}</option>{% endfor %}</select></label>
+    <label>Nummer<input name="nummer"></label>
+    <button class="btn hell">{{ icon('plus') }}<span>Zähler hinzufügen</span></button>
+  </form>
+</section>
+{{ loeschen(url_for('wohnung_stamm_loeschen', wid=w.id), 'Mietobjekt mit allen Mietern, Zählern und Kosten löschen?', 'Mietobjekt löschen') }}
+{% endif %}
+{% endblock %}

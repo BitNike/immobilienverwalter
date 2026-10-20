@@ -1,0 +1,16 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, speichern %}
+{% from "einstellungen/_profilfelder.html" import profilfelder %}
+{% block title %}Profil{% endblock %}
+{% block panel %}
+<h1>Benutzerinformation {% if b.rolle == 'admin' %}<span class="marke admin">Admin</span>{% endif %}</h1>
+<p class="leise">Benutzername: {{ b.benutzername }} · Gruppe: {{ ROLLEN[b.rolle] }}</p>
+<form method="post" enctype="multipart/form-data">
+  {{ profilfelder(b) }}
+  <label class="breit">Persönliche Notizen<textarea name="notizen" rows="6">{{ b.notizen }}</textarea><small>nur für dich sichtbar</small></label>
+  <div class="knopfleiste">{{ speichern() }}</div>
+</form>
+{% if b.foto %}
+<form method="post" action="{{ url_for('foto_loeschen') }}" class="inline"><button class="btn-icon gefahr">{{ icon('trash', 16) }}<span>Profilfoto entfernen</span></button></form>
+{% endif %}
+{% endblock %}

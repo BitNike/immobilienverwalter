@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, speichern, wohnung_felder %}
+{% block title %}Mietobjekt hinzufügen{% endblock %}
+{% block content %}
+<h1>Mietobjekt hinzufügen</h1>
+<p class="leise">Zu {{ immo.name }}</p>
+
+{% if frei %}
+<section class="block">
+  <h2>Vorgefertigtes Mietobjekt wählen</h2>
+  <form method="post" class="zeile">
+    <label>Mietobjekt
+      <select name="vorhandene" required>
+        {% for w in frei %}<option value="{{ w.id }}">{{ w.bezeichnung }} · {{ w.wohnflaeche|num }} m² · {{ w.mea|num }}/{{ w.mea_basis|num(0) }} MEA</option>{% endfor %}
+      </select>
+    </label>
+    <button class="btn">{{ icon('plus') }}<span>Zuordnen</span></button>
+  </form>
+  <p class="leise">Vorgefertigte Mietobjekte pflegst du unter {{ icon('gear', 14) }} Einstellungen → Administration → Mietobjekte.</p>
+</section>
+{% endif %}
+
+<section class="block">
+  <h2>{{ 'Oder neu anlegen' if frei else 'Neu anlegen' }}</h2>
+  <form method="post">
+    {{ wohnung_felder({'mea_basis': 1000}, benutzer) }}
+    <div class="knopfleiste">{{ speichern("Anlegen") }}</div>
+  </form>
+</section>
+{% endblock %}

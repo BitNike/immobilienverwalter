@@ -1,0 +1,45 @@
+{% from "_ui.html" import icon %}<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · {{ logo.text }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a class="logo" href="{{ url_for('start') }}" title="Zur Startseite">
+    {% if logo.typ == 'bild' %}<img src="{{ url_for('logo_datei') }}?v={{ logo.version }}" alt="{{ logo.text }}">
+    {% else %}<span>{{ logo.text }}</span>{% endif %}
+  </a>
+  {% if user %}
+  <div class="top-aktionen">
+    <a class="rund {{ 'aktiv' if request.path.startswith('/einstellungen') }}" href="{{ url_for('einstellungen') }}" title="Einstellungen">{{ icon('gear', 22) }}</a>
+    <a class="rund avatar {{ 'aktiv' if request.path.startswith('/profil') }}" href="{{ url_for('profil') }}" title="Profil – {{ person_name(user) }}">
+      {% if user.foto %}<img src="{{ url_for('foto', uid=user.id) }}?v={{ user.foto }}" alt="">{% else %}{{ icon('user', 26) }}{% endif %}
+    </a>
+  </div>
+  {% endif %}
+</header>
+
+<div class="layout">
+  {% if user %}
+  <nav class="spalte sidebar" aria-label="Immobilien">
+    <div class="spalten-titel">Immobilien</div>
+    {% for i in sidebar_immobilien %}
+    <a class="kachel {{ 'aktiv' if immo and immo.id == i.id }}" href="{{ url_for('immobilie', iid=i.id) }}">{{ icon('building') }}<span>{{ i.name }}</span></a>
+    {% endfor %}
+    {% if ist_admin %}
+    <a class="kachel plus {{ 'aktiv' if request.endpoint == 'immobilie_neu' }}" href="{{ url_for('immobilie_neu') }}" title="Immobilie anlegen">{{ icon('plus', 20) }}</a>
+    {% endif %}
+  </nav>
+  {% if immo %}{% include "_spalte.html" %}{% endif %}
+  {% endif %}
+
+  <main class="inhalt">
+    {% for kat, m in get_flashed_messages(with_categories=true) %}<div class="meldung {{ kat }}">{{ m }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

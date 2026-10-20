@@ -1,0 +1,603 @@
+"""Immobilien, Mietobjekte (Wohnungen), Mietverhältnisse, Zähler, Kosten, Vorauszahlungen, Dokumente."""
+import os
+from datetime import date
+
+from flask import abort, flash, g, redirect, render_template, request, send_file, url_for
+
+import dateien
+import db
+from calc import berechne, parse_date, parse_mea, parse_num
+from core import (BEREICHE, ZAEHLERARTEN, admin_noetig, app, exe, immobilie_laden, ist_admin, jahr, one,
+                  person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
+                  wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
+
+IMMOBILIE_FELDER = ("name", "strasse", "hausnummer", "plz", "ort", "absender", "kontoinhaber", "iban", "bank", "notiz")
+WOHNUNG_FELDER = ("bezeichnung", "umlageschluessel", "iban", "notiz")
+
+
+# ---------- Hilfen ----------
+
+def mv_personen(mv_id):
+    return rows("SELECT * FROM mieter_person WHERE mv_id = ? ORDER BY id", (mv_id,))
+
+
+def mv_name(mv):
+    return ", ".join(person_name(p) for p in mv.get("personen") or []) or "(ohne Namen)"
+
+
+app.jinja_env.globals.update(mv_name=mv_name)
+
+
+def kostenarten_aktiv():
+    return rows("SELECT * FROM kostenart WHERE aktiv = 1 ORDER BY sortierung, name")
+
+
+def berechnung(immo, j):
+    """Lädt alle Daten einer Immobilie für ein Jahr und berechnet die Verteilung."""
+    iid = immo["id"]
+    wohnungen = rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung", (iid,))
+    kosten = rows("SELECT k.* FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id "
+                  "WHERE k.immobilie_id = ? AND k.jahr = ? ORDER BY ka.sortierung, ka.name, k.id", (iid, j))
+    kostenarten = {k["id"]: k for k in rows("SELECT * FROM kostenart")}
+    mvs = rows("SELECT m.* FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id "
+               "WHERE w.immobilie_id = ? ORDER BY m.von", (iid,))
+    for mv in mvs:
+        mv["personen"] = mv_personen(mv["id"])
+    zaehler = rows("SELECT z.* FROM zaehler z JOIN wohnung w ON w.id = z.wohnung_id WHERE w.immobilie_id = ?", (iid,))
+    for z in zaehler:
+        z["staende"] = [(s["datum"], s["stand"]) for s in
+                        rows("SELECT datum, stand FROM zaehlerstand WHERE zaehler_id = ?", (z["id"],))]
+    vz = {(r["wohnung_id"], r["mv_id"]): r["betrag"] for r in rows(
+        "SELECT v.* FROM vorauszahlung v JOIN wohnung w ON w.id = v.wohnung_id "
+        "WHERE w.immobilie_id = ? AND v.jahr = ?", (iid, j))}
+    return berechne(date(j, 1, 1), date(j, 12, 31), immo, wohnungen, kosten, kostenarten, mvs, zaehler, vz)
+
+
+def zaehler_mit_staenden(sql, args):
+    zs = rows(sql, args)
+    for z in zs:
+        z["staende"] = rows("SELECT * FROM zaehlerstand WHERE zaehler_id = ? ORDER BY datum DESC", (z["id"],))
+    return zs
+
+
+def dokumente_sichtbar(immo_id, j, wohnung_id=None):
+    """Dokumente eines Jahres; Nicht-Admins sehen gemeinsame Mieterbelege und die ihrer Wohnungen."""
+    docs = rows("""SELECT d.*, ka.name AS kostenart, m.ordner AS mv_ordner, m.wohnung_id AS mv_wohnung
+                   FROM dokument d LEFT JOIN kostenart ka ON ka.id = d.kostenart_id
+                   LEFT JOIN mietverhaeltnis m ON m.id = d.mv_id
+                   WHERE d.immobilie_id = ? AND d.jahr = ? ORDER BY d.bereich, m.ordner, d.titel""", (immo_id, j))
+    eigene = None if ist_admin() else {w["id"] for w in wohnungen_der_immobilie(immo_id)}
+    erg = []
+    for d in docs:
+        wid = d["wohnung_id"] or d["mv_wohnung"]
+        if wohnung_id is not None and wid not in (None, wohnung_id):
+            continue
+        if wohnung_id is not None and wid is None and d["bereich"] != "mieter":
+            continue
+        if eigene is not None and not (wid in eigene or (wid is None and d["bereich"] == "mieter")):
+            continue
+        erg.append(d)
+    return erg
+
+
+def spalte(immo, aktiv_wohnung=None):
+    """Daten für die zweite Spalte (Mietobjekte der Immobilie)."""
+    return {"immo": immo, "spalte_wohnungen": wohnungen_der_immobilie(immo["id"]), "aktiv_wohnung": aktiv_wohnung}
+
+
+def adresse(o):
+    zeile1 = " ".join(x for x in (o.get("strasse"), o.get("hausnummer")) if x)
+    zeile2 = " ".join(x for x in (o.get("plz"), o.get("ort")) if x)
+    return zeile1, zeile2
+
+
+app.jinja_env.globals.update(adresse=adresse)
+
+
+# ---------- Start ----------
+
+@app.get("/")
+def start():
+    immobilien = sichtbare_immobilien()
+    for i in immobilien:
+        i["wohnungen"] = wohnungen_der_immobilie(i["id"])
+    return render_template("start.html", immobilien=immobilien)
+
+
+# ---------- Immobilie ----------
+
+def immobilie_werte():
+    f = request.form
+    vals = {k: f.get(k, "").strip() for k in IMMOBILIE_FELDER}
+    if not vals["name"]:
+        raise ValueError("Bitte einen Namen für die Immobilie angeben.")
+    vals["iban"] = vals["iban"].upper()
+    vals["gesamtflaeche"] = parse_num(f.get("gesamtflaeche"), None)
+    einheiten = parse_num(f.get("einheiten_gesamt"), None)
+    vals["einheiten_gesamt"] = int(einheiten) if einheiten else None
+    return vals
+
+
+@app.route("/immobilien/neu", methods=["GET", "POST"])
+@admin_noetig
+def immobilie_neu():
+    if request.method == "POST":
+        vals = immobilie_werte()
+        basis, n = dateien.ordnername(vals["name"]), 2
+        vals["ordner"] = basis
+        while one("SELECT 1 FROM immobilie WHERE ordner = ?", (vals["ordner"],)):
+            vals["ordner"] = f"{basis} ({n})"
+            n += 1
+        iid = exe(f"INSERT INTO immobilie ({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
+                  list(vals.values()))
+        _dokumente_hochladen(iid)
+        flash("Immobilie angelegt. Füge jetzt über + in der mittleren Spalte die Mietobjekte hinzu.")
+        return redirect(url_for("immobilie", iid=iid))
+    return render_template("immobilie_neu.html", kostenarten=kostenarten_aktiv())
+
+
+@app.get("/immobilien/<int:iid>")
+def immobilie(iid):
+    immo = immobilie_laden(iid)
+    j = jahr()
+    erg = berechnung(immo, j)
+    eigene = {w["id"] for w in wohnungen_der_immobilie(iid)}
+    verteilung = [r for wid, r in erg["wohnungen"].items() if wid in eigene]
+    for r in verteilung:
+        r["eigentuemer"] = one("SELECT * FROM benutzer WHERE id = ?", (r["wohnung"]["eigentuemer_id"],))
+    vorjahr_vorhanden = not erg["gebaeude"] and one(
+        "SELECT 1 FROM kosten WHERE immobilie_id = ? AND jahr = ?", (iid, j - 1))
+    hauptzaehler = zaehler_mit_staenden("SELECT * FROM zaehler WHERE immobilie_id = ? ORDER BY art, id", (iid,))
+    mvs = rows("SELECT m.*, w.bezeichnung AS wohnung FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id "
+               "WHERE w.immobilie_id = ? ORDER BY m.nummer", (iid,))
+    for mv in mvs:
+        mv["personen"] = mv_personen(mv["id"])
+    return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung,
+                           vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
+                           dokumente=dokumente_sichtbar(iid, j), hauptzaehler=hauptzaehler, mvs=mvs,
+                           wohnungen=rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung", (iid,)))
+
+
+@app.post("/immobilien/<int:iid>/stammdaten")
+@admin_noetig
+def immobilie_speichern(iid):
+    vals = immobilie_werte()
+    exe(f"UPDATE immobilie SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), iid])
+    flash("Immobilie gespeichert.")
+    return redirect(url_for("immobilie", iid=iid))
+
+
+@app.post("/immobilien/<int:iid>/loeschen")
+@admin_noetig
+def immobilie_loeschen(iid):
+    exe("DELETE FROM immobilie WHERE id = ?", (iid,))
+    flash("Immobilie gelöscht. Die Mietobjekte bleiben unter Einstellungen erhalten, die Dateien im Dokumentenordner.")
+    return redirect(url_for("start"))
+
+
+# ---------- Kosten ----------
+
+def _kostenart_id(f):
+    kid = int(f.get("kostenart_id") or 0)
+    row("SELECT id FROM kostenart WHERE id = ?", (kid,))
+    return kid
+
+
+@app.post("/immobilien/<int:iid>/kosten")
+@admin_noetig
+def kosten_neu(iid):
+    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
+    f = request.form
+    schl = f.get("schluessel", "mea")
+    if schl not in ("mea", "flaeche", "einheiten", "wasser"):
+        raise ValueError("Unbekannter Umlageschlüssel.")
+    exe("INSERT INTO kosten (immobilie_id, jahr, kostenart_id, betrag, schluessel, notiz) VALUES (?, ?, ?, ?, ?, ?)",
+        (iid, jahr(), _kostenart_id(f), parse_num(f.get("betrag")), schl, f.get("notiz", "").strip()))
+    return redirect(url_for("immobilie", iid=iid) + "#kosten")
+
+
+@app.post("/wohnungen/<int:wid>/kosten")
+def wohnung_kosten_neu(wid):
+    w = wohnung_laden(wid, bearbeiten=True)
+    if not w["immobilie_id"]:
+        abort(400)
+    f = request.form
+    mv_id = int(f["mv_id"]) if f.get("mv_id") else None
+    if mv_id:
+        row("SELECT id FROM mietverhaeltnis WHERE id = ? AND wohnung_id = ?", (mv_id, wid))
+    exe("INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, notiz) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (w["immobilie_id"], jahr(), wid, mv_id, _kostenart_id(f), parse_num(f.get("betrag")),
+         f.get("notiz", "").strip()))
+    return redirect(url_for("wohnung", wid=wid) + "#abrechnung")
+
+
+def _kosten_recht(k):
+    if k["wohnung_id"]:
+        wohnung_laden(k["wohnung_id"], bearbeiten=True)
+    elif not ist_admin():
+        abort(403)
+
+
+@app.post("/kosten/<int:kid>")
+def kosten_speichern(kid):
+    k = row("SELECT * FROM kosten WHERE id = ?", (kid,))
+    _kosten_recht(k)
+    f = request.form
+    schl = f.get("schluessel", k["schluessel"])
+    if schl not in ("mea", "flaeche", "einheiten", "wasser"):
+        raise ValueError("Unbekannter Umlageschlüssel.")
+    exe("UPDATE kosten SET betrag = ?, schluessel = ?, notiz = ? WHERE id = ?",
+        (parse_num(f.get("betrag")), schl, f.get("notiz", k["notiz"]).strip(), kid))
+    return zurueck()
+
+
+@app.post("/kosten/<int:kid>/loeschen")
+def kosten_loeschen(kid):
+    k = row("SELECT * FROM kosten WHERE id = ?", (kid,))
+    _kosten_recht(k)
+    exe("DELETE FROM kosten WHERE id = ?", (kid,))
+    return zurueck()
+
+
+@app.post("/immobilien/<int:iid>/vorjahr")
+@admin_noetig
+def vorjahr_uebernehmen(iid):
+    j = jahr()
+    con = db.get_db()
+    con.execute("""INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, schluessel, notiz)
+                   SELECT immobilie_id, ?, wohnung_id, NULL, kostenart_id, 0, schluessel, notiz
+                   FROM kosten WHERE immobilie_id = ? AND jahr = ? AND mv_id IS NULL ORDER BY id""",
+                (j, iid, j - 1))
+    con.commit()
+    flash(f"Kostenarten aus {j - 1} übernommen (Beträge auf 0). Bitte die neuen Beträge eintragen.")
+    return redirect(url_for("immobilie", iid=iid) + "#kosten")
+
+
+# ---------- Mietobjekte ----------
+
+def wohnung_werte():
+    f = request.form
+    vals = {k: f.get(k, "").strip() for k in WOHNUNG_FELDER}
+    if not vals["bezeichnung"]:
+        raise ValueError("Bitte eine Bezeichnung angeben, z. B. „1. OG links“.")
+    vals["iban"] = vals["iban"].upper()
+    vals["wohnflaeche"] = parse_num(f.get("wohnflaeche"))
+    mea, basis = parse_mea(f.get("mea"))
+    vals["mea"] = mea
+    vals["mea_basis"] = basis or parse_num(f.get("mea_basis"), 1000.0) or 1000.0
+    eig = f.get("eigentuemer_id")
+    vals["eigentuemer_id"] = int(eig) if eig else None
+    if "immobilie_id" in f:
+        vals["immobilie_id"] = int(f["immobilie_id"]) if f["immobilie_id"] else None
+    return vals
+
+
+def zaehler_aus_formular(wid):
+    """Felder wasser_nummer / strom_nummer / gas_nummer aus dem Wohnungsformular anlegen."""
+    for art in ZAEHLERARTEN:
+        nummer = request.form.get(f"{art}_nummer", "").strip()
+        if nummer and not one("SELECT 1 FROM zaehler WHERE wohnung_id = ? AND art = ? AND ausgebaut IS NULL",
+                              (wid, art)):
+            exe("INSERT INTO zaehler (wohnung_id, art, nummer) VALUES (?, ?, ?)", (wid, art, nummer))
+
+
+@app.route("/immobilien/<int:iid>/wohnungen/neu", methods=["GET", "POST"])
+@admin_noetig
+def wohnung_hinzufuegen(iid):
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    if request.method == "POST":
+        if request.form.get("vorhandene"):
+            wid = int(request.form["vorhandene"])
+            exe("UPDATE wohnung SET immobilie_id = ? WHERE id = ? AND immobilie_id IS NULL", (iid, wid))
+        else:
+            vals = wohnung_werte()
+            vals["immobilie_id"] = iid
+            wid = exe(f"INSERT INTO wohnung ({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
+                      list(vals.values()))
+            zaehler_aus_formular(wid)
+        return redirect(url_for("wohnung", wid=wid))
+    frei = rows("SELECT * FROM wohnung WHERE immobilie_id IS NULL ORDER BY bezeichnung")
+    return render_template("wohnung_neu.html", **spalte(immo), frei=frei,
+                           benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname"))
+
+
+@app.get("/wohnungen/<int:wid>")
+def wohnung(wid):
+    w = wohnung_laden(wid)
+    if not w["immobilie_id"]:
+        flash("Dieses Mietobjekt ist keiner Immobilie zugeordnet.", "fehler")
+        return redirect(url_for("wohnung_stamm", wid=wid))
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (w["immobilie_id"],))
+    j = jahr()
+    erg = berechnung(immo, j)
+    r = erg["wohnungen"][wid]
+    mvs = rows("SELECT * FROM mietverhaeltnis WHERE wohnung_id = ? ORDER BY von DESC", (wid,))
+    for mv in mvs:
+        mv["personen"] = mv_personen(mv["id"])
+        a, b = parse_date(mv["von"]), parse_date(mv["bis"])
+        mv["im_jahr"] = a <= date(j, 12, 31) and (b is None or b >= date(j, 1, 1))
+    direkt = {k["id"]: k for k in rows("SELECT * FROM kosten WHERE wohnung_id = ? AND jahr = ?", (wid, j))}
+    return render_template(
+        "wohnung.html", **spalte(immo, wid), w=w, r=r, erg=erg, mvs=mvs, direkt=direkt,
+        darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),
+        eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
+        zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? ORDER BY art, ausgebaut IS NULL, id",
+                                     (wid,)),
+        dokumente=dokumente_sichtbar(immo["id"], j, wid),
+        vz_gespeichert={x["mv_id"]: x["betrag"] for x in
+                        rows("SELECT * FROM vorauszahlung WHERE wohnung_id = ? AND jahr = ?", (wid, j))})
+
+
+@app.post("/wohnungen/<int:wid>/entfernen")
+@admin_noetig
+def wohnung_entfernen(wid):
+    w = row("SELECT * FROM wohnung WHERE id = ?", (wid,))
+    exe("UPDATE wohnung SET immobilie_id = NULL WHERE id = ?", (wid,))
+    flash("Mietobjekt aus der Immobilie entfernt. Es bleibt unter Einstellungen → Mietobjekte erhalten.")
+    return redirect(url_for("immobilie", iid=w["immobilie_id"]))
+
+
+# ---------- Mietverhältnisse ----------
+
+def mv_werte():
+    f = request.form
+    von, bis = f.get("von", ""), f.get("bis", "") or None
+    if not von:
+        raise ValueError("Bitte das Einzugsdatum angeben.")
+    if bis and parse_date(bis) < parse_date(von):
+        raise ValueError("Der Auszug liegt vor dem Einzug.")
+    return {"von": von, "bis": bis, "vorauszahlung_monat": parse_num(f.get("vorauszahlung_monat")),
+            "neue_anschrift": f.get("neue_anschrift", "").strip(), "notiz": f.get("notiz", "").strip()}
+
+
+@app.post("/wohnungen/<int:wid>/mieter")
+def mv_neu(wid):
+    w = wohnung_laden(wid, bearbeiten=True)
+    name = request.form.get("name", "").strip()
+    if not name:
+        raise ValueError("Bitte den Namen des Mieters angeben.")
+    vals = mv_werte()
+    nummer = (one("SELECT MAX(m.nummer) AS n FROM mietverhaeltnis m JOIN wohnung x ON x.id = m.wohnung_id "
+                  "WHERE x.immobilie_id = ?", (w["immobilie_id"],))["n"] or 0) + 1
+    vals.update(wohnung_id=wid, nummer=nummer, ordner=dateien.ordnername(f"{nummer:03d} - {name}"))
+    mid = exe(f"INSERT INTO mietverhaeltnis ({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
+              list(vals.values()))
+    exe("INSERT INTO mieter_person (mv_id, vorname, name) VALUES (?, ?, ?)",
+        (mid, request.form.get("vorname", "").strip(), name))
+    return redirect(url_for("wohnung", wid=wid) + "#mieter")
+
+
+def _mv_laden(mid):
+    mv = row("SELECT * FROM mietverhaeltnis WHERE id = ?", (mid,))
+    wohnung_laden(mv["wohnung_id"], bearbeiten=True)
+    return mv
+
+
+@app.post("/mieter/<int:mid>")
+def mv_speichern(mid):
+    mv = _mv_laden(mid)
+    vals = mv_werte()
+    exe(f"UPDATE mietverhaeltnis SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), mid])
+    flash("Mietverhältnis gespeichert.")
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+
+
+@app.post("/mieter/<int:mid>/loeschen")
+def mv_loeschen(mid):
+    mv = _mv_laden(mid)
+    exe("DELETE FROM mietverhaeltnis WHERE id = ?", (mid,))
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+
+
+@app.post("/mieter/<int:mid>/personen")
+def person_neu(mid):
+    mv = _mv_laden(mid)
+    name = request.form.get("name", "").strip()
+    if not name:
+        raise ValueError("Bitte einen Namen angeben.")
+    exe("INSERT INTO mieter_person (mv_id, vorname, name) VALUES (?, ?, ?)",
+        (mid, request.form.get("vorname", "").strip(), name))
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+
+
+@app.post("/personen/<int:pid>/loeschen")
+def person_loeschen(pid):
+    p = row("SELECT * FROM mieter_person WHERE id = ?", (pid,))
+    mv = _mv_laden(p["mv_id"])
+    exe("DELETE FROM mieter_person WHERE id = ?", (pid,))
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+
+
+# ---------- Vorauszahlungen ----------
+
+@app.post("/wohnungen/<int:wid>/vorauszahlungen")
+def vorauszahlungen_speichern(wid):
+    wohnung_laden(wid, bearbeiten=True)
+    j = jahr()
+    mv_ids = {m["id"] for m in rows("SELECT id FROM mietverhaeltnis WHERE wohnung_id = ?", (wid,))}
+    con = db.get_db()
+    for k, v in request.form.items():
+        if not k.startswith("vz_"):
+            continue
+        mid = None if k == "vz_eigentuemer" else int(k[3:])
+        if mid is not None and mid not in mv_ids:
+            continue
+        con.execute("DELETE FROM vorauszahlung WHERE jahr = ? AND wohnung_id = ? AND mv_id IS ?", (j, wid, mid))
+        if v.strip():
+            con.execute("INSERT INTO vorauszahlung (jahr, wohnung_id, mv_id, betrag) VALUES (?, ?, ?, ?)",
+                        (j, wid, mid, parse_num(v)))
+    con.commit()
+    flash("Vorauszahlungen gespeichert.")
+    return redirect(url_for("wohnung", wid=wid) + "#abrechnung")
+
+
+# ---------- Zähler ----------
+
+def _zaehler_recht(z):
+    if z["wohnung_id"]:
+        wohnung_laden(z["wohnung_id"], bearbeiten=True)
+    elif not ist_admin():
+        abort(403)
+
+
+@app.post("/zaehler")
+def zaehler_neu():
+    f = request.form
+    art = f.get("art")
+    if art not in ZAEHLERARTEN:
+        raise ValueError("Unbekannte Zählerart.")
+    wid = int(f["wohnung_id"]) if f.get("wohnung_id") else None
+    iid = int(f["immobilie_id"]) if f.get("immobilie_id") else None
+    _zaehler_recht({"wohnung_id": wid})
+    zid = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, eingebaut) VALUES (?, ?, ?, ?, ?)",
+              (wid, None if wid else iid, art, f.get("nummer", "").strip(), f.get("eingebaut") or None))
+    if f.get("stand", "").strip() and f.get("eingebaut"):
+        exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Einbau')",
+            (zid, f["eingebaut"], parse_num(f["stand"])))
+    return zurueck()
+
+
+@app.post("/zaehler/<int:zid>/tausch")
+def zaehler_tausch(zid):
+    """Zählerwechsel: alter Zähler bleibt mit Ausbaustand erhalten, neuer Zähler startet mit Einbaustand."""
+    z = row("SELECT * FROM zaehler WHERE id = ?", (zid,))
+    _zaehler_recht(z)
+    f = request.form
+    datum = f.get("datum")
+    if not datum:
+        raise ValueError("Bitte das Datum des Wechsels angeben.")
+    exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Ausbau')",
+        (zid, datum, parse_num(f.get("endstand"))))
+    exe("UPDATE zaehler SET ausgebaut = ? WHERE id = ?", (datum, zid))
+    neu = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, eingebaut) VALUES (?, ?, ?, ?, ?)",
+              (z["wohnung_id"], z["immobilie_id"], z["art"], f.get("nummer", "").strip(), datum))
+    exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Einbau')",
+        (neu, datum, parse_num(f.get("anfangsstand"))))
+    flash("Zähler getauscht. Der alte Zähler bleibt mit seinen Ständen erhalten.")
+    return zurueck()
+
+
+@app.post("/zaehler/<int:zid>/loeschen")
+def zaehler_loeschen(zid):
+    z = row("SELECT * FROM zaehler WHERE id = ?", (zid,))
+    _zaehler_recht(z)
+    exe("DELETE FROM zaehler WHERE id = ?", (zid,))
+    return zurueck()
+
+
+@app.post("/zaehler/<int:zid>/staende")
+def zaehlerstand_neu(zid):
+    z = row("SELECT * FROM zaehler WHERE id = ?", (zid,))
+    _zaehler_recht(z)
+    f = request.form
+    if not f.get("datum") or not f.get("stand", "").strip():
+        raise ValueError("Datum und Zählerstand sind Pflichtfelder.")
+    exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, ?)",
+        (zid, f["datum"], parse_num(f["stand"]), f.get("notiz", "").strip()))
+    return zurueck()
+
+
+@app.post("/zaehlerstaende/<int:sid>/loeschen")
+def zaehlerstand_loeschen(sid):
+    s = row("SELECT * FROM zaehlerstand WHERE id = ?", (sid,))
+    _zaehler_recht(row("SELECT * FROM zaehler WHERE id = ?", (s["zaehler_id"],)))
+    exe("DELETE FROM zaehlerstand WHERE id = ?", (sid,))
+    return zurueck()
+
+
+# ---------- Dokumente ----------
+
+def _dokumente_hochladen(iid, wohnung_id=None):
+    """Speichert hochgeladene Dateien unter <Immobilie>/<Jahr>/Vermieter|Mieter[/<Nr - Name>]."""
+    f = request.form
+    dateiliste = [d for d in request.files.getlist("dateien") if d and d.filename]
+    if not dateiliste:
+        return 0
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    j = int(f.get("dok_jahr") or 0)
+    if not 1990 <= j <= 2200:
+        raise ValueError("Bitte das Jahr für die Dokumente auswählen.")
+    bereich = f.get("bereich", "mieter")
+    mv_id = int(f["mv_id"]) if bereich == "mieterordner" and f.get("mv_id") else None
+    if bereich not in BEREICHE or (bereich == "mieterordner" and not mv_id):
+        raise ValueError("Bitte den Ablageort (Vermieter, Mieter oder Mieterordner) wählen.")
+    ordner = [immo["ordner"], str(j)]
+    if bereich == "vermieter":
+        ordner.append("Vermieter")
+    else:
+        ordner.append("Mieter")
+        if mv_id:
+            mv = row("SELECT m.* FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id "
+                     "WHERE m.id = ? AND w.immobilie_id = ?", (mv_id, iid))
+            if not ist_admin():
+                wohnung_laden(mv["wohnung_id"], bearbeiten=True)
+            ordner.append(mv["ordner"])
+            wohnung_id = None
+    kostenart_id = int(f["kostenart_id"]) if f.get("kostenart_id") else None
+    if f.get("dok_wohnung_id"):
+        wohnung_id = int(f["dok_wohnung_id"])
+    for d in dateiliste:
+        pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(*ordner))
+        titel = (f.get("titel", "").strip() if len(dateiliste) == 1 else "") or os.path.splitext(d.filename)[0]
+        exe("INSERT INTO dokument (immobilie_id, jahr, bereich, mv_id, wohnung_id, kostenart_id, titel, pfad, mime, "
+            "groesse, hochgeladen_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (iid, j, bereich, mv_id, wohnung_id, kostenart_id, titel, pfad, mime, groesse, g.user["id"]))
+    return len(dateiliste)
+
+
+@app.post("/immobilien/<int:iid>/dokumente")
+def dokument_hochladen(iid):
+    wid = int(request.form["wohnung_id"]) if request.form.get("wohnung_id") else None
+    if wid:
+        w = wohnung_laden(wid, bearbeiten=True)
+        if w["immobilie_id"] != iid:
+            abort(400)
+        if request.form.get("bereich") == "vermieter" and not ist_admin():
+            abort(403)
+    elif not ist_admin():
+        abort(403)
+    n = _dokumente_hochladen(iid, wid)
+    flash(f"{n} Dokument(e) hochgeladen." if n else "Keine Datei ausgewählt.", None if n else "fehler")
+    return zurueck()
+
+
+def _dokument_laden(did, bearbeiten=False):
+    d = row("SELECT d.*, m.wohnung_id AS mv_wohnung FROM dokument d "
+            "LEFT JOIN mietverhaeltnis m ON m.id = d.mv_id WHERE d.id = ?", (did,))
+    if ist_admin():
+        return d
+    wid = d["wohnung_id"] or d["mv_wohnung"]
+    if wid:
+        w = wohnung_laden(wid, bearbeiten=bearbeiten)
+        if not w:
+            abort(403)
+    elif bearbeiten or d["bereich"] != "mieter":
+        abort(403)
+    else:
+        immobilie_laden(d["immobilie_id"])
+    return d
+
+
+@app.get("/dokumente/<int:did>")
+def dokument_anzeigen(did):
+    d = _dokument_laden(did)
+    return send_file(dateien.dokument_pfad(d["pfad"]), mimetype=d["mime"],
+                     download_name=os.path.basename(d["pfad"]), as_attachment=bool(request.args.get("download")))
+
+
+@app.post("/dokumente/<int:did>/loeschen")
+def dokument_loeschen(did):
+    d = _dokument_laden(did, bearbeiten=True)
+    try:
+        os.remove(dateien.dokument_pfad(d["pfad"]))
+    except FileNotFoundError:
+        pass
+    exe("DELETE FROM dokument WHERE id = ?", (did,))
+    return zurueck()
+
+
+@app.context_processor
+def _hilfen():
+    return {"wohnung_bearbeitbar": wohnung_bearbeitbar if g.get("user") else (lambda w: False),
+            "wohnung_sichtbar": wohnung_sichtbar if g.get("user") else (lambda w: False)}

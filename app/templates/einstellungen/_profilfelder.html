@@ -1,0 +1,19 @@
+{% from "_ui.html" import icon, feld %}
+{% macro profilfelder(b) -%}
+<div class="profilkopf">
+  <div class="avatar-gross">{% if b.foto %}<img src="{{ url_for('foto', uid=b.id) }}?v={{ b.foto }}" alt="">{% else %}{{ icon('user', 56) }}{% endif %}</div>
+  <label>Profilfoto (JPG, quadratisch, max. 3 MB)
+    <input type="file" name="foto" accept=".jpg,.jpeg,.png">
+    <small>Wird auf 400 × 400 Pixel verkleinert und rund dargestellt.</small>
+  </label>
+</div>
+<div class="raster">
+  {{ feld('vorname', 'Vorname', b.vorname) }}
+  {{ feld('name', 'Name', b.name) }}
+  {{ feld('strasse', 'Straße', b.strasse) }}
+  {{ feld('hausnummer', 'Hausnummer', b.hausnummer) }}
+  {{ feld('plz', 'Postleitzahl', b.plz) }}
+  {{ feld('ort', 'Wohnort', b.ort) }}
+  {{ feld('email', 'E-Mail', b.email, typ='email', hinweis='für „Passwort vergessen“ und Einladungen') }}
+</div>
+{%- endmacro %}

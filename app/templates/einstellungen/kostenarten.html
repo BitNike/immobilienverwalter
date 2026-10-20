@@ -1,0 +1,52 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, loeschen %}
+{% block title %}Kostenarten{% endblock %}
+{% block panel %}
+<h1>Kostenarten</h1>
+<p class="leise">Diese Kostenarten stehen beim Erfassen der Kosten zur Auswahl. Nicht umlagefähige Kosten erscheinen nur in der
+  Eigentümer-Abrechnung, nicht in der Abrechnung für den Mieter.</p>
+<div class="tabelle">
+<table>
+  <thead><tr><th>Name</th><th>Nr. BetrKV</th><th>Umlagefähig</th><th>Standardschlüssel</th><th>Reihenfolge</th><th>Aktiv</th><th></th></tr></thead>
+  <tbody>
+  {% for k in kostenarten %}
+  <tr class="{{ 'leise' if not k.aktiv }}">
+    <td><input name="name" form="ka{{ k.id }}" value="{{ k.name }}" required></td>
+    <td><input name="betrkv_nr" form="ka{{ k.id }}" value="{{ k.betrkv_nr }}" size="3"></td>
+    <td><input type="checkbox" name="umlagefaehig" form="ka{{ k.id }}" {{ 'checked' if k.umlagefaehig }}></td>
+    <td><select name="schluessel" form="ka{{ k.id }}">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}" {{ 'selected' if k.schluessel == s }}>{{ t }}</option>{% endfor %}</select></td>
+    <td><input name="sortierung" form="ka{{ k.id }}" value="{{ k.sortierung }}" size="3" inputmode="numeric"></td>
+    <td><input type="checkbox" name="aktiv" form="ka{{ k.id }}" {{ 'checked' if k.aktiv }}></td>
+    <td class="aktionen">
+      <form id="ka{{ k.id }}" method="post" action="{{ url_for('kostenart_speichern', kid=k.id) }}" class="inline"><button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+      {{ loeschen(url_for('kostenart_loeschen', kid=k.id), 'Kostenart löschen?') }}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<section class="block">
+  <h2>Neue Kostenart</h2>
+  <form method="post" class="zeile">
+    <label>Name *<input name="name" required></label>
+    <label>Nr. BetrKV
+      <select name="betrkv_nr"><option value="">–</option>{% for b in betrkv %}<option value="{{ b.nr }}">{{ b.nr }} – {{ b.titel }}</option>{% endfor %}</select>
+    </label>
+    <label>Standardschlüssel<select name="schluessel">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}">{{ t }}</option>{% endfor %}</select></label>
+    <label>Reihenfolge<input name="sortierung" value="200" size="4"></label>
+    <label class="haken"><input type="checkbox" name="umlagefaehig" checked> umlagefähig</label>
+    <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+  </form>
+</section>
+
+<details class="block">
+  <summary>{{ icon('list') }} Umlagefähige Betriebskosten nach § 2 BetrKV (Übersicht)</summary>
+  <table>
+    {% for b in betrkv %}<tr><td>{{ b.nr }}</td><td>{{ b.titel }}</td><td><small class="leise">{{ b.beschreibung }}</small></td></tr>{% endfor %}
+  </table>
+  <p class="leise">Nicht umlagefähig sind u. a. Verwaltungskosten, Instandhaltung/Reparaturen, Instandhaltungsrücklage
+    und – seit 01.07.2024 – Kabel-TV-Grundgebühren. Arbeitshilfe, keine Rechtsberatung.</p>
+</details>
+{% endblock %}

@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo %}
+{% block title %}{{ w.bezeichnung }}{% endblock %}
+{% block content %}
+<div class="kopf">
+  <div>
+    <h1>{{ w.bezeichnung }}</h1>
+    <p class="leise">{{ immo.name }} · {{ w.wohnflaeche|num }} m² · {{ w.mea|num }}/{{ w.mea_basis|num(0) }} MEA
+      · Eigentümer: {{ person_name(eigentuemer) if eigentuemer else '–' }}
+      {% if ist_admin %} · <a href="{{ url_for('wohnung_stamm', wid=w.id) }}">{{ icon('edit', 14) }} Stammdaten</a>{% endif %}</p>
+  </div>
+  {{ jahr_umschalter(jahr) }}
+</div>
+
+{# ---------- Abrechnung ---------- #}
+<section class="block" id="abrechnung">
+  <h2>Abrechnung {{ jahr }}</h2>
+  <p class="leise">Abrechnungszeitraum 01.01.{{ jahr }} – 31.12.{{ jahr }}. Kosten werden nach Monaten verteilt;
+    auf Leerstand entfallende Kosten trägt der Eigentümer.</p>
+
+  <form method="post" action="{{ url_for('vorauszahlungen_speichern', wid=w.id) }}" id="vz"></form>
+  <div class="tabelle">
+  <table>
+    <thead><tr><th>Partei</th><th>Nutzungszeitraum</th><th class="zahl">Monate</th><th class="zahl">Kosten</th>
+      <th class="zahl">Vorauszahlungen</th><th class="zahl">Ergebnis</th><th></th></tr></thead>
+    <tbody>
+    {% for p in r.parteien %}
+    <tr>
+      <td>{{ mv_name(p.mv) }}<br><small class="leise">{{ p.mv.ordner }}</small></td>
+      <td>{{ p.von|datum }} – {{ p.bis|datum }}</td>
+      <td class="zahl">{{ p.monate|monate }} <small class="leise">({{ p.prozent|num(0) }} %)</small></td>
+      <td class="zahl">{{ p.summe|eur }}</td>
+      <td class="zahl">{% if darf %}<input class="betrag" form="vz" name="vz_{{ p.mv.id }}" inputmode="decimal"
+          value="{{ vz_gespeichert[p.mv.id]|num if p.mv.id in vz_gespeichert else '' }}" placeholder="{{ p.vorauszahlung_soll|num }}"
+          title="Leer = Soll ({{ p.mv.vorauszahlung_monat|eur }} × Monate)">{% else %}{{ p.vorauszahlung|eur }}{% endif %}</td>
+      <td class="zahl">{{ saldo(p.saldo) }}</td>
+      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei=p.mv.id) }}">{{ icon('download', 16) }}<span>Export</span></a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="leise">Kein Mietverhältnis in {{ jahr }}.</td></tr>
+    {% endfor %}
+    {% if r.leerstand.summe %}
+    <tr class="leise">
+      <td>Leerstand / nicht umlagefähig</td><td>trägt der Eigentümer</td>
+      <td class="zahl">{{ r.leerstand.monate|monate }}</td><td class="zahl">{{ r.leerstand.summe|eur }}</td><td></td><td></td><td></td>
+    </tr>
+    {% endif %}
+    </tbody>
+    <tfoot>
+    <tr>
+      <th>Eigentümer (gesamte Wohnung)</th><td>{{ erg.monate|monate }} Monate</td><td></td>
+      <th class="zahl">{{ r.summe|eur }}</th>
+      <td class="zahl">{% if darf %}<input class="betrag" form="vz" name="vz_eigentuemer" inputmode="decimal"
+          value="{{ vz_gespeichert[None]|num if None in vz_gespeichert else '' }}" placeholder="0,00">{% else %}{{ r.vorauszahlung|eur }}{% endif %}</td>
+      <td class="zahl">{{ saldo(r.saldo) }}</td>
+      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}">{{ icon('download', 16) }}<span>Export</span></a></td>
+    </tr>
+    </tfoot>
+  </table>
+  </div>
+  {% if darf %}<div class="knopfleiste">{{ speichern("Vorauszahlungen speichern", form="vz") }}</div>{% endif %}
+
+  <h3>Kostenaufstellung</h3>
+  <div class="tabelle">
+  <table>
+    <thead><tr><th>Kostenart</th><th>Verteilung</th><th class="zahl">Gesamt</th><th class="zahl">Anteil Wohnung</th><th></th></tr></thead>
+    <tbody>
+    {% for po in r.posten %}{% set dk = direkt.get(po.kosten_id) %}
+    <tr>
+      <td>{{ po.kostenart }}{% if not po.umlagefaehig %} <small class="warnung">nicht umlagefähig</small>{% endif %}</td>
+      <td>{% if dk %}{% if dk.mv_id %}direkt für Mieter{% for p in r.parteien if p.mv.id == dk.mv_id %} {{ mv_name(p.mv) }}{% endfor %}{% else %}Kosten der Wohnung, zeitanteilig{% endif %}
+          {% if dk.notiz %}<br><small class="leise">{{ dk.notiz }}</small>{% endif %}
+          {% else %}{{ po.basis }}{% endif %}</td>
+      <td class="zahl">{{ po.gesamt|eur }}</td>
+      <td class="zahl">
+        {% if dk and darf %}
+        <form method="post" action="{{ url_for('kosten_speichern', kid=dk.id) }}" class="inline">
+          <input class="betrag" name="betrag" inputmode="decimal" value="{{ dk.betrag|num }}">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button>
+        </form>
+        {% else %}{{ po.betrag|eur }}{% endif %}
+      </td>
+      <td class="aktionen">{% if dk and darf %}{{ loeschen(url_for('kosten_loeschen', kid=dk.id), 'Kostenposition löschen?') }}{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="leise">Noch keine Kosten für {{ jahr }}.</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th colspan="3">Summe Wohnung</th><th class="zahl">{{ r.summe|eur }}</th><th></th></tr></tfoot>
+  </table>
+  </div>
+
+  {% if darf %}
+  <details>
+    <summary>{{ icon('plus') }} Kosten nur für diese Wohnung erfassen</summary>
+    <p class="leise">Zum Beispiel die Heizkostenabrechnung des Messdienstes oder die Grundsteuer der Wohnung.
+      „Für Mieter …“ = der Betrag gilt bereits für dessen Zeitraum und wird zu 100 % umgelegt.</p>
+    <form method="post" action="{{ url_for('wohnung_kosten_neu', wid=w.id) }}" class="zeile">
+      <label>Kostenart
+        <select name="kostenart_id" required>
+          <option value="">– wählen –</option>
+          {% for k in kostenarten %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
+      <label>Zuordnung
+        <select name="mv_id">
+          <option value="">Wohnung – zeitanteilig auf die Mieter</option>
+          {% for p in r.parteien %}<option value="{{ p.mv.id }}">Für Mieter {{ mv_name(p.mv) }} (100 %)</option>{% endfor %}
+        </select>
+      </label>
+      <label>Notiz<input name="notiz" placeholder="optional"></label>
+      <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+
+{# ---------- Mieter ---------- #}
+<section class="block" id="mieter">
+  <h2>Mieter</h2>
+  {% for mv in mvs %}
+  <div class="karte-flach {{ 'gedimmt' if not mv.im_jahr }}">
+    <div class="karte-kopf">
+      <strong>{{ mv.ordner }}</strong>
+      <span class="leise">{{ mv.von|datum }} – {{ mv.bis|datum if mv.bis else 'laufend' }}</span>
+      {% if not mv.im_jahr %}<span class="marke">nicht in {{ jahr }}</span>{% endif %}
+      {% if darf %}<span class="rechts">{{ loeschen(url_for('mv_loeschen', mid=mv.id), 'Mietverhältnis mit allen Personen löschen?') }}</span>{% endif %}
+    </div>
+    <div class="personen">
+      {% for pe in mv.personen %}
+      <span class="person">{{ icon('user', 14) }} {{ person_name(pe) }}
+        {% if darf and mv.personen|length > 1 %}{{ loeschen(url_for('person_loeschen', pid=pe.id), 'Person entfernen?') }}{% endif %}</span>
+      {% endfor %}
+      {% if darf %}
+      <form method="post" action="{{ url_for('person_neu', mid=mv.id) }}" class="inline person-neu">
+        <input name="vorname" placeholder="Vorname"><input name="name" placeholder="Name" required>
+        <button class="btn-icon" title="Person hinzufügen">{{ icon('plus', 16) }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if darf %}
+    <form method="post" action="{{ url_for('mv_speichern', mid=mv.id) }}">
+      <div class="raster">
+        <label>Einzug *<input type="date" name="von" value="{{ mv.von }}" required></label>
+        <label>Auszug<input type="date" name="bis" value="{{ mv.bis or '' }}"></label>
+        <label>NK-Vorauszahlung / Monat (€)<input name="vorauszahlung_monat" inputmode="decimal" value="{{ mv.vorauszahlung_monat|num }}"></label>
+        <label class="breit">Neue Anschrift nach Auszug (für die Abschlussrechnung)<textarea name="neue_anschrift" rows="2">{{ mv.neue_anschrift }}</textarea></label>
+        <label class="breit">Notiz<input name="notiz" value="{{ mv.notiz }}"></label>
+      </div>
+      <div class="knopfleiste">{{ speichern() }}</div>
+    </form>
+    {% else %}
+    <p>Vorauszahlung {{ mv.vorauszahlung_monat|eur }} / Monat{% if mv.neue_anschrift %} · Neue Anschrift: {{ mv.neue_anschrift }}{% endif %}</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="leise">Noch kein Mietverhältnis erfasst.</p>
+  {% endfor %}
+
+  {% if darf %}
+  <details {{ 'open' if not mvs }}>
+    <summary>{{ icon('plus') }} Neues Mietverhältnis</summary>
+    <form method="post" action="{{ url_for('mv_neu', wid=w.id) }}">
+      <div class="raster">
+        <label>Vorname<input name="vorname"></label>
+        <label>Name *<input name="name" required></label>
+        <label>Einzug *<input type="date" name="von" required></label>
+        <label>Auszug<input type="date" name="bis"></label>
+        <label>NK-Vorauszahlung / Monat (€)<input name="vorauszahlung_monat" inputmode="decimal"></label>
+      </div>
+      <p class="leise">Weitere Personen (z. B. Partner, WG) kannst du danach über + hinzufügen.
+        Das Mietverhältnis erhält eine fortlaufende Nummer und einen eigenen Dokumentenordner.</p>
+      <div class="knopfleiste">{{ speichern("Anlegen") }}</div>
+    </form>
+  </details>
+  {% endif %}
+</section>
+
+{# ---------- Zähler ---------- #}
+<section class="block" id="zaehler">
+  <h2>Zähler &amp; Ablesungen</h2>
+  <p class="leise">Für die Wasserverteilung den Stand am 31.12. sowie am Ein- und Auszugstag eintragen.
+    Wasserverbrauch {{ jahr }}: <strong>{{ (r.wasser|num(1) ~ ' m³') if r.wasser is not none else 'nicht ermittelbar' }}</strong></p>
+  <div class="zaehler-raster">
+  {% for z in zaehler %}
+  <div class="karte-flach {{ 'gedimmt' if z.ausgebaut }}">
+    <div class="karte-kopf">
+      {{ icon('gauge') }} <strong>{{ ZAEHLERARTEN[z.art] }}</strong> Nr. {{ z.nummer or '–' }}
+      {% if z.ausgebaut %}<span class="marke">ausgebaut {{ z.ausgebaut|datum }}</span>{% elif z.eingebaut %}<span class="leise">seit {{ z.eingebaut|datum }}</span>{% endif %}
+    </div>
+    <table class="kompakt">
+      {% for s in z.staende[:8] %}
+      <tr><td>{{ s.datum|datum }}</td><td class="zahl">{{ s.stand|num(2) }}</td><td class="leise">{{ s.notiz }}</td>
+        <td class="aktionen">{% if darf %}{{ loeschen(url_for('zaehlerstand_loeschen', sid=s.id), 'Ablesung löschen?') }}{% endif %}</td></tr>
+      {% else %}<tr><td class="leise">Noch keine Ablesung.</td></tr>{% endfor %}
+    </table>
+    {% if darf and not z.ausgebaut %}
+    <form method="post" action="{{ url_for('zaehlerstand_neu', zid=z.id) }}" class="zeile">
+      <label>Datum<input type="date" name="datum" value="{{ jahr }}-12-31" required></label>
+      <label>Stand<input class="betrag" name="stand" inputmode="decimal" required></label>
+      <label>Notiz<input name="notiz" placeholder="z. B. Auszug"></label>
+      <button class="btn hell">{{ icon('plus') }}<span>Ablesung</span></button>
+    </form>
+    <details>
+      <summary>Zähler tauschen</summary>
+      <form method="post" action="{{ url_for('zaehler_tausch', zid=z.id) }}" class="zeile">
+        <label>Datum<input type="date" name="datum" required></label>
+        <label>Endstand alt<input class="betrag" name="endstand" inputmode="decimal" required></label>
+        <label>Neue Nummer<input name="nummer"></label>
+        <label>Anfangsstand neu<input class="betrag" name="anfangsstand" inputmode="decimal" value="0"></label>
+        <button class="btn">{{ icon('save') }}<span>Tauschen</span></button>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="leise">Keine Zähler erfasst.</p>
+  {% endfor %}
+  </div>
+  {% if darf %}
+  <details>
+    <summary>{{ icon('plus') }} Zähler hinzufügen</summary>
+    <form method="post" action="{{ url_for('zaehler_neu') }}" class="zeile">
+      <input type="hidden" name="wohnung_id" value="{{ w.id }}">
+      <label>Art<select name="art">{% for a, t in ZAEHLERARTEN.items() %}<option value="{{ a }}">{{ t }}</option>{% endfor %}</select></label>
+      <label>Nummer<input name="nummer"></label>
+      <label>Eingebaut am<input type="date" name="eingebaut"></label>
+      <label>Anfangsstand<input class="betrag" name="stand" inputmode="decimal"></label>
+      <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+
+{# ---------- Dokumente ---------- #}
+<section class="block" id="dokumente">
+  <h2>Dokumente {{ jahr }}</h2>
+  {{ dokumentliste(dokumente, darf_loeschen=darf) }}
+  {% if darf %}
+  <details>
+    <summary>{{ icon('upload') }} Dokumente hochladen</summary>
+    <form method="post" action="{{ url_for('dokument_hochladen', iid=immo.id) }}" enctype="multipart/form-data">
+      <input type="hidden" name="wohnung_id" value="{{ w.id }}">
+      <input type="hidden" name="dok_wohnung_id" value="{{ w.id }}">
+      {{ upload_felder(jahr, kostenarten, mvs, [], mit_vermieter=ist_admin) }}
+      <button class="btn">{{ icon('upload') }}<span>Hochladen</span></button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Betriebskostenabrechnung {{ d.jahr }}</title>
+<style>
+  @page { size: A4; margin: 18mm 20mm 18mm 22mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.4; color: #111; }
+  .seite { background: #fff; }
+  .vorschau { background: #e9ebee; padding: 24px; }
+  .vorschau .seite { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 20mm 18mm 22mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .absender { margin: 0 0 6mm; }
+  table.kopf td { vertical-align: top; padding: 0; }
+  .empfaenger { height: 30mm; }
+  .empfaenger div, .infos div { white-space: nowrap; }
+  .infos { width: 62mm; }
+  .infos .datum { text-align: right; margin-bottom: 6mm; }
+  h1 { font-size: 11pt; margin: 6mm 0 0; }
+  h1 span { margin-left: 18mm; }
+  .unter { margin: 0 0 5mm; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 0.6mm 0; text-align: left; vertical-align: top; font-weight: normal; }
+  .zeitraum { width: 125mm; margin-bottom: 2mm; }
+  .zeitraum td:first-child { white-space: nowrap; width: 41mm; }
+  .zeitraum td.w { width: 28mm; text-align: center; }
+  .zeitraum tr.linie td.w { border-bottom: 1px solid #111; }
+  .zahl { text-align: right; white-space: nowrap; }
+  .kosten { margin-top: 6mm; }
+  .kosten thead th { font-weight: bold; vertical-align: bottom; }
+  .kosten .basis { display: block; font-size: 8pt; color: #555; }
+  .kosten tfoot th { font-weight: bold; padding-top: 4mm; }
+  .ergebnis { width: 100mm; margin: 6mm 0 0 auto; }
+  .ergebnis tr.saldo th { border-top: 1px solid #111; font-weight: bold; }
+  .hinweis { margin-top: 10mm; }
+  .hinweis p { margin: 0; }
+  .anlagen { margin-top: 5mm; }
+</style>
+</head>
+<body class="{{ 'vorschau' if vorschau }}">
+<div class="seite">
+  <p class="absender">{{ d.absender }}</p>
+
+  <table class="kopf"><tr>
+    <td class="empfaenger">{% for z in d.empfaenger if z %}<div>{{ z }}</div>{% endfor %}</td>
+    <td class="infos">
+      <div>Erstellt am</div>
+      <div class="datum">{{ d.erstellt|datum(True) }}</div>
+      <div><strong>Objekt</strong></div>
+      {% for z in d.objekt %}<div>{{ z }}</div>{% endfor %}
+    </td>
+  </tr></table>
+
+  <h1>Betriebskostenabrechnung <span>{{ d.jahr }}</span></h1>
+  <p class="unter">Zusammensetzung der Betriebskosten</p>
+
+  <table class="zeitraum">
+    <tr><td>Abrechnungszeitraum</td><td class="w">{{ d.abrechnung_von|datum(True) }}</td><td class="w">bis</td><td class="w">{{ d.abrechnung_bis|datum(True) }}</td></tr>
+    <tr class="linie"><td>Nutzungszeitraum</td><td class="w">{{ d.nutzung_von|datum(True) }}</td><td class="w">bis</td><td class="w">{{ d.nutzung_bis|datum(True) }}</td></tr>
+    <tr><td>Abrechnungsmonate</td><td class="w">{{ d.monate|monate }}</td><td></td><td></td></tr>
+    <tr><td>Abrechnungsmonate %</td><td class="w">{{ d.prozent|num(0) }}%</td><td></td><td></td></tr>
+  </table>
+  <p>Umlageschlüssel: {{ d.umlageschluessel }}</p>
+
+  <table class="kosten">
+    <thead><tr><th>Kostenart</th><th class="zahl">{{ d.spalte_gesamt }}</th><th class="zahl">Ihr Anteil</th></tr></thead>
+    <tbody>
+    {% for p in d.posten %}
+    <tr>
+      <td>{{ p.kostenart }}<span class="basis">{{ p.basis }}</span></td>
+      <td class="zahl">{{ p.gesamt|eur }}</td>
+      <td class="zahl">{{ p.betrag|eur }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th>Nebenkosten</th><th class="zahl">{{ d.summe_gesamt|eur }}</th><th class="zahl">{{ d.summe|eur }}</th></tr></tfoot>
+  </table>
+
+  <table class="ergebnis">
+    <tr><td>geleistete Vorauszahlungen:</td><td class="zahl">{{ d.vorauszahlung|eur }}</td></tr>
+    <tr class="saldo"><th>{{ 'Nachzahlung' if d.saldo > 0 else 'Gutschrift' }}</th><th class="zahl">{{ d.saldo|abs|eur }}</th></tr>
+  </table>
+
+  <div class="hinweis">
+    <p>Hinweis:</p>
+    <p>Sie haben ab sofort die Möglichkeit der Belegeinsicht.</p>
+    <p>Es wird um vorherige Terminvereinbarung gebeten,</p>
+    <p>sofern Sie die originalen Belege einsehen möchten.</p>
+    {% if d.saldo > 0 %}
+    <p>{{ d.hinweis_nachzahlung }}</p>
+    <p>{% if d.kontoinhaber %}{{ d.kontoinhaber }}, {% endif %}IBAN {{ d.iban or '________________' }}{% if d.bank %} ({{ d.bank }}){% endif %}</p>
+    <p>Hinweis: Sie geraten bei nicht fristgerechter Zahlung automatisch in Verzug.</p>
+    {% else %}
+    <p>Die Gutschrift in Höhe von {{ d.saldo|abs|eur }} wird Ihnen erstattet.</p>
+    {% endif %}
+  </div>
+
+  {% if anlagen %}
+  <p class="anlagen">Im Folgenden finden Sie die Anlagen: {{ anlagen|map(attribute='titel')|join(', ') }}</p>
+  {% endif %}
+</div>
+</body>
+</html>

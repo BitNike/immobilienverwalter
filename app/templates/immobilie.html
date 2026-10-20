@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld %}
+{% block title %}{{ immo.name }}{% endblock %}
+{% block content %}
+<div class="kopf">
+  <div>
+    <h1>{{ immo.name }}</h1>
+    <p class="leise">{{ adresse(immo)|select|join(', ') }}</p>
+  </div>
+  {{ jahr_umschalter(jahr) }}
+</div>
+
+<section class="block" id="kosten">
+  <h2>Gebäudekosten {{ jahr }}</h2>
+  <p class="leise">Kosten der gesamten Immobilie. Sie werden nach dem Umlageschlüssel auf die Mietobjekte verteilt.
+    Kosten, die nur eine Wohnung betreffen (z. B. Heizkostenabrechnung), trägst du direkt beim Mietobjekt ein.</p>
+  {% if erg.gebaeude %}
+  <div class="tabelle">
+  <table>
+    <thead><tr><th>Kostenart</th><th>Umlageschlüssel</th><th class="zahl">Betrag</th><th class="zahl">Verteilt</th><th></th></tr></thead>
+    <tbody>
+    {% for gk in erg.gebaeude %}{% set k = gk.kosten %}
+    <tr>
+      <td>{{ gk.kostenart }}{% if k.notiz %}<br><small class="leise">{{ k.notiz }}</small>{% endif %}
+        {% if gk.warnung %}<br><small class="warnung">{{ gk.warnung }}</small>{% endif %}</td>
+      {% if ist_admin %}
+      <td><select name="schluessel" form="k{{ k.id }}">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}" {{ 'selected' if k.schluessel == s }}>{{ t }}</option>{% endfor %}</select></td>
+      <td class="zahl"><input class="betrag" name="betrag" form="k{{ k.id }}" inputmode="decimal" value="{{ k.betrag|num }}"></td>
+      {% else %}
+      <td>{{ SCHLUESSEL[k.schluessel] }}</td>
+      <td class="zahl">{{ k.betrag|eur }}</td>
+      {% endif %}
+      <td class="zahl">{{ gk.verteilt|eur }}{% if gk.rest %}<br><small class="leise">nicht im System: {{ gk.rest|eur }}</small>{% endif %}</td>
+      <td class="aktionen">
+        {% if ist_admin %}
+        <form id="k{{ k.id }}" method="post" action="{{ url_for('kosten_speichern', kid=k.id) }}" class="inline">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        {{ loeschen(url_for('kosten_loeschen', kid=k.id), 'Kostenposition löschen?') }}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th colspan="2">Summe</th><th class="zahl">{{ erg.summe_gebaeude|eur }}</th><th colspan="2"></th></tr></tfoot>
+  </table>
+  </div>
+  {% else %}
+  <p class="leise">Für {{ jahr }} sind noch keine Gebäudekosten erfasst.</p>
+  {% endif %}
+
+  {% if ist_admin %}
+  {% if vorjahr_vorhanden %}
+  <form method="post" action="{{ url_for('vorjahr_uebernehmen', iid=immo.id) }}" class="inline">
+    <button class="btn hell">{{ icon('list') }}<span>Kostenarten aus {{ jahr - 1 }} übernehmen</span></button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('kosten_neu', iid=immo.id) }}" class="zeile">
+    <label>Kostenart
+      <select name="kostenart_id" required onchange="this.form.schluessel.value = this.selectedOptions[0].dataset.s">
+        <option value="">– wählen –</option>
+        {% for k in kostenarten %}<option value="{{ k.id }}" data-s="{{ k.schluessel }}">{{ k.name }}{% if not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
+    <label>Umlageschlüssel
+      <select name="schluessel">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}">{{ t }}</option>{% endfor %}</select>
+    </label>
+    <label>Notiz<input name="notiz" placeholder="optional"></label>
+    <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="block">
+  <h2>Verteilung auf die Mietobjekte {{ jahr }}</h2>
+  {% if verteilung %}
+  <div class="tabelle">
+  <table>
+    <thead><tr><th>Mietobjekt</th><th>Eigentümer</th><th class="zahl">Wohnfläche</th><th class="zahl">MEA</th><th class="zahl">Wasser</th>
+      <th class="zahl">Kosten gesamt</th><th class="zahl">davon Mieter</th><th class="zahl">davon Eigentümer</th></tr></thead>
+    <tbody>
+    {% for r in verteilung %}{% set w = r.wohnung %}
+    <tr>
+      <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a></td>
+      <td>{{ person_name(r.eigentuemer) if r.eigentuemer else '–' }}</td>
+      <td class="zahl">{{ w.wohnflaeche|num }} m²</td>
+      <td class="zahl">{{ w.mea|num }}/{{ w.mea_basis|num(0) }}</td>
+      <td class="zahl">{{ (r.wasser|num(1) ~ ' m³') if r.wasser is not none else '–' }}</td>
+      <td class="zahl">{{ r.summe|eur }}</td>
+      <td class="zahl">{{ (r.summe - r.leerstand.summe)|eur }}</td>
+      <td class="zahl leise">{{ r.leerstand.summe|eur }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="leise">Noch keine Mietobjekte. Lege sie über das + in der mittleren Spalte an.</p>
+  {% endif %}
+</section>
+
+<section class="block" id="dokumente">
+  <h2>Dokumente {{ jahr }}</h2>
+  {{ dokumentliste(dokumente, darf_loeschen=ist_admin) }}
+  {% if ist_admin %}
+  <details>
+    <summary>{{ icon('upload') }} Dokumente hochladen</summary>
+    <form method="post" action="{{ url_for('dokument_hochladen', iid=immo.id) }}" enctype="multipart/form-data">
+      {{ upload_felder(jahr, kostenarten, mvs, wohnungen) }}
+      <button class="btn">{{ icon('upload') }}<span>Hochladen</span></button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+
+{% if ist_admin or hauptzaehler %}
+<section class="block" id="hauptzaehler">
+  <h2>Hauptzähler</h2>
+  {% for z in hauptzaehler %}
+  <div class="zaehler">
+    <strong>{{ ZAEHLERARTEN[z.art] }}</strong> Nr. {{ z.nummer or '–' }}
+    {% if z.staende %}<span class="leise"> · letzter Stand {{ z.staende[0].stand|num(2) }} am {{ z.staende[0].datum|datum }}</span>{% endif %}
+    {% if ist_admin %}
+    <form method="post" action="{{ url_for('zaehlerstand_neu', zid=z.id) }}" class="zeile">
+      <label>Datum<input type="date" name="datum" required></label>
+      <label>Stand<input class="betrag" name="stand" inputmode="decimal" required></label>
+      <button class="btn hell">{{ icon('plus') }}<span>Ablesung</span></button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}<p class="leise">Kein Hauptzähler erfasst.</p>{% endfor %}
+  {% if ist_admin %}
+  <details>
+    <summary>{{ icon('plus') }} Hauptzähler hinzufügen</summary>
+    <form method="post" action="{{ url_for('zaehler_neu') }}" class="zeile">
+      <input type="hidden" name="immobilie_id" value="{{ immo.id }}">
+      <label>Art<select name="art">{% for a, t in ZAEHLERARTEN.items() %}<option value="{{ a }}">{{ t }}</option>{% endfor %}</select></label>
+      <label>Nummer<input name="nummer"></label>
+      <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if ist_admin %}
+<details class="block">
+  <summary>{{ icon('edit') }} Stammdaten der Immobilie</summary>
+  <form method="post" action="{{ url_for('immobilie_speichern', iid=immo.id) }}">
+    {{ immobilie_felder(immo) }}
+    <div class="knopfleiste">{{ speichern() }}</div>
+  </form>
+  <p class="leise">Dokumentenordner: <code>{{ immo.ordner }}</code></p>
+  {{ loeschen(url_for('immobilie_loeschen', iid=immo.id), 'Immobilie mit allen Kosten und Dokumenteinträgen löschen?', 'Immobilie löschen') }}
+</details>
+{% endif %}
+{% endblock %}
