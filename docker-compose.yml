@@ -7,7 +7,7 @@ services:
       - path: .env
         required: false
     ports:
-      - "8080:8080"
+      - "${NK_PORT:-8080}:8080"   # Port auf dem Server, einstellbar in .env
     volumes:
       - nk-daten:/data            # Datenbank, Profilfotos, Logo
       - nk-dokumente:/dokumente   # hochgeladene Belege: <Immobilie>/<Jahr>/Vermieter|Mieter/...
