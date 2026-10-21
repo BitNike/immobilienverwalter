@@ -173,6 +173,14 @@ def start():
     return render_template("start.html", immobilien=immobilien)
 
 
+@app.get("/archiv")
+def archiv():
+    immobilien = sichtbare_immobilien(archiv=True)
+    for i in immobilien:
+        i["wohnungen"] = wohnungen_der_immobilie(i["id"])
+    return render_template("start.html", immobilien=immobilien, archiv=True)
+
+
 # ---------- Immobilie ----------
 
 def immobilie_werte():
@@ -227,7 +235,12 @@ def immobilie(iid):
     mea = [r["wohnung"] for r in verteilung if r["wohnung"]["mea"]]
     mea_summe = {"anteil": sum(w["mea"] / w["mea_basis"] for w in mea if w["mea_basis"]),
                  "basen": {w["mea_basis"] for w in mea}} if mea else None
+    umfang = one("SELECT (SELECT COUNT(*) FROM wohnung WHERE immobilie_id = :i) AS wohnungen, "
+                 "(SELECT COUNT(*) FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id WHERE w.immobilie_id = :i) AS mieter, "
+                 "(SELECT COUNT(*) FROM kosten WHERE immobilie_id = :i) AS kosten, "
+                 "(SELECT COUNT(*) FROM dokument WHERE immobilie_id = :i) AS dokumente", {"i": iid})
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
+                           umfang=umfang,
                            pruefung=pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()),
                            std_schluessel=standard_schluessel(immo, len(erg["wohnungen"])),
                            vorhanden=vorhandene_kostenarten(iid, j),
@@ -248,9 +261,23 @@ def immobilie_speichern(iid):
 @app.post("/immobilien/<int:iid>/loeschen")
 @admin_noetig
 def immobilie_loeschen(iid):
-    exe("DELETE FROM immobilie WHERE id = ?", (iid,))
-    flash("Immobilie gelöscht. Die Mietobjekte bleiben unter Einstellungen erhalten, die Dateien im Dokumentenordner.")
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    con = db.get_db()
+    con.execute("DELETE FROM wohnung WHERE immobilie_id = ?", (iid,))  # mit Mietern, Zählern, Kosten (CASCADE)
+    con.execute("DELETE FROM immobilie WHERE id = ?", (iid,))
+    con.commit()
+    flash(f"Immobilie „{immo['name']}“ mit allen Mietobjekten gelöscht. Hochgeladene Dateien liegen weiterhin im "
+          f"Dokumentenordner „{immo['ordner']}“ und können dort von Hand entfernt werden.")
     return redirect(url_for("start"))
+
+
+@app.post("/immobilien/<int:iid>/archiv")
+@admin_noetig
+def immobilie_archivieren(iid):
+    archiviert = 1 if request.form.get("archiviert") == "1" else 0
+    exe("UPDATE immobilie SET archiviert = ? WHERE id = ?", (archiviert, iid))
+    flash("Immobilie archiviert. Du findest sie links unter „Archiv“." if archiviert else "Immobilie wiederhergestellt.")
+    return redirect(url_for("immobilie", iid=iid))
 
 
 # ---------- Kosten ----------

@@ -281,4 +281,23 @@
   </details>
   {% endif %}
 </section>
+
+{% if ist_admin %}
+<section class="block verwalten">
+  <h2>Mietobjekt lösen oder löschen</h2>
+  <p class="leise"><strong>Aus der Immobilie lösen</strong> nimmt das Mietobjekt hier heraus; es bleibt mit allen Daten unter
+    Einstellungen → Mietobjekte erhalten und kann einer anderen Immobilie zugeordnet werden. <strong>Löschen</strong> entfernt es
+    endgültig mit {{ mvs|length }} Mietverhältnis{{ 'sen' if mvs|length != 1 }}, Zählern, Kosten und Vorauszahlungen.</p>
+  <div class="knopfleiste">
+    <form method="post" action="{{ url_for('wohnung_entfernen', wid=w.id) }}" class="inline">
+      <button class="btn hell">{{ icon('home') }}<span>Aus der Immobilie lösen</span></button>
+    </form>
+    <form method="post" action="{{ url_for('wohnung_stamm_loeschen', wid=w.id) }}" class="inline"
+          onsubmit="return confirm({{ ('Mietobjekt „%s“ mit %d Mietverhältnissen, Zählern und Kosten endgültig löschen? Das lässt sich nicht rückgängig machen.' % (w.bezeichnung, mvs|length))|tojson|forceescape }})">
+      <input type="hidden" name="next" value="{{ url_for('immobilie', iid=immo.id) }}">
+      <button class="btn-icon gefahr">{{ icon('trash', 16) }}<span>Mietobjekt löschen</span></button>
+    </form>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

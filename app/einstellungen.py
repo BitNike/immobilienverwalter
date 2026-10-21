@@ -208,9 +208,11 @@ def wohnung_stamm(wid=None):
 @app.post("/einstellungen/admin/wohnungen/<int:wid>/loeschen")
 @admin_noetig
 def wohnung_stamm_loeschen(wid):
+    w = row("SELECT * FROM wohnung WHERE id = ?", (wid,))
     exe("DELETE FROM wohnung WHERE id = ?", (wid,))
-    flash("Mietobjekt gelöscht.")
-    return redirect(url_for("wohnungen_liste"))
+    flash(f"Mietobjekt „{w['bezeichnung']}“ gelöscht.")
+    ziel = request.form.get("next", "")
+    return redirect(ziel if ziel.startswith("/") and not ziel.startswith("//") else url_for("wohnungen_liste"))
 
 
 # ---------- Administration: Kostenarten ----------

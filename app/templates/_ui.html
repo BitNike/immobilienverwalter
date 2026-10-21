@@ -7,7 +7,7 @@
 {%- endmacro %}
 
 {% macro loeschen(action, frage, label="") -%}
-<form method="post" action="{{ action }}" class="inline" onsubmit="return confirm('{{ frage }}')">
+<form method="post" action="{{ action }}" class="inline" onsubmit="return confirm({{ frage|tojson|forceescape }})">
   <button class="btn-icon gefahr" title="Löschen">{{ icon('trash', 16) }}{% if label %}<span>{{ label }}</span>{% endif %}</button>
 </form>
 {%- endmacro %}

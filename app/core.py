@@ -119,11 +119,11 @@ def admin_noetig(f):
     return wrapper
 
 
-def sichtbare_immobilien():
+def sichtbare_immobilien(archiv=False):
     if ist_admin():
-        return rows("SELECT * FROM immobilie ORDER BY name")
+        return rows("SELECT * FROM immobilie WHERE archiviert = ? ORDER BY name", (int(archiv),))
     return rows("SELECT DISTINCT i.* FROM immobilie i JOIN wohnung w ON w.immobilie_id = i.id "
-                "WHERE w.eigentuemer_id = ? ORDER BY i.name", (g.user["id"],))
+                "WHERE w.eigentuemer_id = ? AND i.archiviert = ? ORDER BY i.name", (g.user["id"], int(archiv)))
 
 
 def immobilie_laden(iid):
@@ -233,7 +233,8 @@ def kontext():
         return {"user": None, "ist_admin": False, "logo": logo_info(), "version": VERSION}
     return {
         "user": g.user, "ist_admin": ist_admin(), "logo": logo_info(), "version": VERSION,
-        "sidebar_immobilien": sichtbare_immobilien(), "jahr": jahr(),
+        "sidebar_immobilien": sichtbare_immobilien(), "archiv_anzahl": len(sichtbare_immobilien(archiv=True)),
+        "jahr": jahr(),
     }
 
 

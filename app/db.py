@@ -139,6 +139,10 @@ MIGRATIONEN = [
     ALTER TABLE immobilie ADD COLUMN weg INTEGER NOT NULL DEFAULT 0;
     UPDATE immobilie SET weg = 1 WHERE (SELECT COUNT(*) FROM wohnung w WHERE w.immobilie_id = immobilie.id) > 1;
     """,
+    # 4: Immobilien archivieren (ausgeblendet, Daten bleiben erhalten)
+    """
+    ALTER TABLE immobilie ADD COLUMN archiviert INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

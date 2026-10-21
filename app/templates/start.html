@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% from "_ui.html" import icon %}
-{% block title %}Übersicht{% endblock %}
+{% block title %}{{ 'Archiv' if archiv else 'Übersicht' }}{% endblock %}
 {% block content %}
-<h1>Übersicht</h1>
+<h1>{{ 'Archiv' if archiv else 'Übersicht' }}</h1>
+{% if archiv %}<p class="leise">Archivierte Immobilien sind ausgeblendet, alle Daten und Belege bleiben erhalten. Wiederherstellen kannst du sie auf der Seite der Immobilie.</p>{% endif %}
 {% if immobilien %}
 <div class="karten">
   {% for i in immobilien %}

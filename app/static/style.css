@@ -195,3 +195,7 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 }
 
 [hidden] { display: none !important; }
+.archiv-link { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 6px 4px; font-size: 13px; color: var(--leise); }
+.archiv-link.aktiv, .archiv-link:hover { color: var(--primaer); text-decoration: none; }
+.verwalten { border-top: 1px solid var(--linie); padding-top: 18px; }
+.verwalten .knopfleiste form { display: inline-flex; }

@@ -141,7 +141,18 @@ def test_gesamter_ablauf():
     html = ok(c.get("/immobilien/2")).get_data(as_text=True)
     assert 'Umlageschlüssel<select name="schluessel" ><option value="mea" >' in html
     assert '<option value="einheiten" selected>' in html
+    # Archivieren blendet aus, Wiederherstellen holt zurück
+    post(c, "/immobilien/2/wohnungen/neu", data={"bezeichnung": "Versehen", "wohnflaeche": "40"})
+    post(c, "/immobilien/2/archiv", data={"archiviert": "1"})
+    assert "Haus Test" not in ok(c.get("/")).get_data(as_text=True)
+    assert "Haus Test" in ok(c.get("/archiv")).get_data(as_text=True)
+    post(c, "/immobilien/2/archiv", data={"archiviert": "0"})
+    assert "Archiv (" not in ok(c.get("/")).get_data(as_text=True)
+    # Löschen entfernt die Immobilie samt Mietobjekten
+    assert "Mietobjekt löschen" in ok(c.get("/wohnungen/3")).get_data(as_text=True)
     post(c, "/immobilien/2/loeschen")
+    ok(c.get("/immobilien/2"), 404)
+    ok(c.get("/einstellungen/admin/wohnungen/3"), 404)
 
     # Dokument in den Mieterordner
     post(c, "/immobilien/1/dokumente", data={"wohnung_id": "1", "dok_wohnung_id": "1", "dok_jahr": "2025",

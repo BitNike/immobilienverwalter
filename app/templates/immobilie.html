@@ -10,6 +10,12 @@
   </div>
   {{ jahr_umschalter(jahr) }}
 </div>
+{% if immo.archiviert %}
+<div class="meldung">Diese Immobilie ist archiviert und links ausgeblendet. Alle Daten bleiben erhalten.
+  {% if ist_admin %}<form method="post" action="{{ url_for('immobilie_archivieren', iid=immo.id) }}" class="inline">
+    <input type="hidden" name="archiviert" value="0"><button class="btn-icon">{{ icon('upload', 15) }}<span>Wiederherstellen</span></button></form>{% endif %}
+</div>
+{% endif %}
 {{ pruefliste(pruefung) }}
 
 <section class="block" id="kosten">
@@ -162,7 +168,22 @@
     <div class="knopfleiste">{{ speichern() }}</div>
   </form>
   <p class="leise">Dokumentenordner: <code>{{ immo.ordner }}</code></p>
-  {{ loeschen(url_for('immobilie_loeschen', iid=immo.id), 'Immobilie mit allen Kosten und Dokumenteinträgen löschen?', 'Immobilie löschen') }}
 </details>
+
+<section class="block verwalten">
+  <h2>Immobilie archivieren oder löschen</h2>
+  <p class="leise"><strong>Archivieren</strong> blendet die Immobilie aus (z. B. nach einem Verkauf); Abrechnungen und Belege bleiben
+    erhalten und lassen sich jederzeit wiederherstellen. <strong>Löschen</strong> entfernt die Immobilie endgültig mit
+    {{ umfang.wohnungen }} Mietobjekt{{ 'en' if umfang.wohnungen != 1 }}, {{ umfang.mieter }} Mietverhältnis{{ 'sen' if umfang.mieter != 1 }},
+    {{ umfang.kosten }} Kostenposition{{ 'en' if umfang.kosten != 1 }} und {{ umfang.dokumente }} Dokument{{ 'en' if umfang.dokumente != 1 }}
+    – gedacht z. B. für versehentlich angelegte Immobilien.</p>
+  <div class="knopfleiste">
+    <form method="post" action="{{ url_for('immobilie_archivieren', iid=immo.id) }}" class="inline">
+      <input type="hidden" name="archiviert" value="{{ 0 if immo.archiviert else 1 }}">
+      <button class="btn hell">{{ icon('folder') }}<span>{{ 'Wiederherstellen' if immo.archiviert else 'Archivieren' }}</span></button>
+    </form>
+    {{ loeschen(url_for('immobilie_loeschen', iid=immo.id), 'Immobilie „%s“ mit %d Mietobjekten, %d Kostenpositionen und %d Dokumenten endgültig löschen? Das lässt sich nicht rückgängig machen.' % (immo.name, umfang.wohnungen, umfang.kosten, umfang.dokumente), 'Immobilie löschen') }}
+  </div>
+</section>
 {% endif %}
 {% endblock %}
