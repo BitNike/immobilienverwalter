@@ -97,7 +97,9 @@ def test_gesamter_ablauf():
     # Kosten bearbeiten: erst nach Klick auf den Stift sind die Felder offen
     assert 'form="k1"' not in ok(c.get("/immobilien/1")).get_data(as_text=True)
     assert 'name="notiz" form="k1"' in ok(c.get("/immobilien/1?bearbeiten=1")).get_data(as_text=True)
-    assert 'name="mv_id" form="k3"' in ok(c.get("/wohnungen/1?bearbeiten=3")).get_data(as_text=True)
+    html = ok(c.get("/wohnungen/1?bearbeiten=3")).get_data(as_text=True)
+    assert 'name="mv_id" form="k3"' in html
+    assert "/immobilien/1?bearbeiten=1#kosten" in html  # Gebäudekosten: Stift führt zur Immobilie
     post(c, "/kosten/1", data={"kostenart_id": ka["Gebäudeversicherung"], "betrag": "1.000,00", "schluessel": "mea",
                                "notiz": "Police 2025\nZweite Zeile"})
     post(c, "/kosten/4", data={"kostenart_id": ka["Grundsteuer"], "betrag": "103,54", "mv_id": "", "notiz": "Bescheid"})

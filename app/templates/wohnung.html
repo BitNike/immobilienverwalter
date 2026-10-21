@@ -89,12 +89,14 @@
       <td>{{ po.kostenart }}{% if not po.umlagefaehig %} <small class="warnung">nicht umlagefähig</small>{% endif %}</td>
       <td>{% if dk %}{% if dk.mv_id %}direkt für Mieter{% for p in r.parteien if p.mv.id == dk.mv_id %} {{ mv_name(p.mv) }}{% endfor %}{% else %}Kosten der Wohnung, zeitanteilig{% endif %}
           {% if dk.notiz %}<br><small class="leise notiz">{{ dk.notiz }}</small>{% endif %}
-          {% else %}{{ po.basis }}{% endif %}</td>
+          {% else %}{{ po.basis }}<br><small class="leise">Gebäudekosten der Immobilie</small>{% endif %}</td>
       <td class="zahl">{{ po.gesamt|eur }}</td>
       <td class="zahl">{{ po.betrag|eur }}</td>
       <td class="aktionen">{% if dk and darf %}
         <a class="btn-icon" href="{{ url_for('wohnung', wid=w.id, bearbeiten=dk.id) }}#abrechnung" title="Bearbeiten">{{ icon('edit', 16) }}</a>
-        {{ loeschen(url_for('kosten_loeschen', kid=dk.id), 'Kostenposition löschen?') }}{% endif %}</td>
+        {{ loeschen(url_for('kosten_loeschen', kid=dk.id), 'Kostenposition löschen?') }}
+        {% elif not dk and ist_admin %}
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, bearbeiten=po.kosten_id) }}#kosten" title="Gebäudekosten – bei der Immobilie bearbeiten">{{ icon('edit', 16) }}</a>{% endif %}</td>
     </tr>
     {% endif %}
     {% else %}
