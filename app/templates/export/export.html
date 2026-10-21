@@ -12,7 +12,7 @@
 
 <div class="export">
   <div class="export-vorschau">
-    <iframe src="{{ url_for('export_brief', wid=wid, partei=d.partei) }}" title="Vorschau Deckblatt"></iframe>
+    <iframe name="vorschau" src="{{ url_for('export_brief', wid=wid, partei=d.partei) }}" title="Vorschau"></iframe>
   </div>
   <form class="export-auswahl" method="post" action="{{ url_for('export_pdf', wid=wid) }}">
     <input type="hidden" name="partei" value="{{ d.partei }}">
@@ -29,7 +29,8 @@
     {{ pruefliste(pruefung) }}
     {% set fehler = pruefung|selectattr('art', 'equalto', 'fehler')|list %}
     <div class="knopfleiste senkrecht">
-      <button class="btn hell" name="aktion" value="vorschau" formtarget="_blank">{{ icon('eye') }}<span>PDF-Vorschau</span></button>
+      <button class="btn hell" name="aktion" value="vorschau" formtarget="vorschau" title="Zeigt das fertige PDF mit Anlagen links im Vorschaufenster">{{ icon('eye') }}<span>PDF-Vorschau</span></button>
+      <a class="btn hell" href="{{ url_for('export_brief', wid=wid, partei=d.partei) }}" target="vorschau">{{ icon('file') }}<span>Zurück zur Briefansicht</span></a>
       <button class="btn" name="aktion" value="speichern"
         {% if fehler %}onclick="return confirm({{ ('Es sind noch %d Punkte offen, die die Abrechnung verfälschen können. Trotzdem speichern?' % fehler|length)|tojson|forceescape }})"{% endif %}>{{ icon('save') }}<span>PDF speichern</span></button>
     </div>
