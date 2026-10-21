@@ -8,7 +8,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import dateien
 import mail
 from auth import link_senden, passwort_pruefen
-from calc import SCHLUESSEL, de_num, parse_num
+from calc import SCHLUESSEL, parse_num
 from core import (ROLLEN, ZAEHLERARTEN, admin_noetig, app, einstellung, einstellung_setzen, exe, ist_admin, one,
                   row, rows, sichtbare_immobilien, wohnungen_der_immobilie, zurueck)
 from immobilien import wohnung_werte, zaehler_aus_formular
@@ -243,15 +243,15 @@ def logo_admin():
             raise ValueError("Bitte zuerst ein Logo hochladen.")
         einstellung_setzen("logo_typ", typ)
         einstellung_setzen("brief_fusszeile", "1" if f.get("brief_fusszeile") else "0")
-        hoch = parse_num(f.get("brief_anschrift_hoch"), 0.0)
+        hoch = round(parse_num(f.get("brief_anschrift_hoch"), 0.0))
         if not -10 <= hoch <= 30:
             raise ValueError("Die Anschrift lässt sich zwischen -10 und 30 mm verschieben.")
-        einstellung_setzen("brief_anschrift_hoch", de_num(hoch, 1))
+        einstellung_setzen("brief_anschrift_hoch", str(hoch))
         flash("Gespeichert.")
         return redirect(url_for("logo_admin"))
     return render_template("einstellungen/logo.html", bereich="admin_logo", logo_datei=einstellung("logo_datei"),
                            brief_fusszeile=einstellung("brief_fusszeile", "1") == "1",
-                           brief_anschrift_hoch=einstellung("brief_anschrift_hoch", "0"))
+                           brief_anschrift_hoch=round(parse_num(einstellung("brief_anschrift_hoch", "0"))))
 
 
 @app.get("/logo")

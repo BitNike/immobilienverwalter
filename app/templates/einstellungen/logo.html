@@ -22,7 +22,8 @@
   </div>
   <h2>Brief</h2>
   <div class="raster">
-    {{ feld('brief_anschrift_hoch', 'Anschrift nach oben verschieben (mm)', brief_anschrift_hoch, attrs='inputmode="decimal"',
+    {{ feld('brief_anschrift_hoch', 'Anschrift nach oben verschieben (mm)', brief_anschrift_hoch, typ='number', breit=True,
+            attrs='min="-10" max="30" step="1" style="max-width: 120px"',
             hinweis='0 = genau nach DIN 5008 (Fensterumschlag DIN lang, gefaltet an den Falzmarken). Liegt die Adresse in deinen Umschlägen zu tief, z. B. 10–15 eintragen; negative Werte schieben nach unten.') }}
   </div>
   <label class="haken"><input type="checkbox" name="brief_fusszeile" {{ 'checked' if brief_fusszeile }}>

@@ -86,7 +86,7 @@ def brief_daten(wid, partei):
             spalte_gesamt="Gesamtkosten im Jahr")
     d["summe_gesamt"] = rund(sum(x["gesamt"] for x in d["posten"]))
     wohnung = w["bezeichnung"] if len(erg["wohnungen"]) > 1 else ""
-    d["anschrift_hoch"] = parse_num(einstellung("brief_anschrift_hoch", "0"))
+    d["anschrift_hoch"] = round(parse_num(einstellung("brief_anschrift_hoch", "0")))
     d["fusszeile"] = (f"Erstellt mit {NAME}" + (f" · {URL}" if URL else "")
                       if einstellung("brief_fusszeile", "1") == "1" else "")
     d["verwendungszweck"] = sepa_text(", ".join(x for x in (f"Nebenkosten {j}", d["objekt"][0] if d["objekt"] else "",
