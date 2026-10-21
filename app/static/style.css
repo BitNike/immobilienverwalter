@@ -147,6 +147,7 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 .baum a.aktiv { background: var(--primaer); color: #fff; }
 .baum-knopf { width: 100%; background: none; border: none; cursor: pointer; margin-top: 12px; color: var(--leise); }
 .baum-gruppe { margin-top: 14px; padding-left: 10px; border-left: 1px solid var(--linie); }
+.baum-version { margin-top: 24px; padding: 0 10px; font-size: 12px; color: var(--leise); }
 .baum-untertitel { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--leise); margin: 0 0 4px; display: flex; align-items: center; gap: 6px; }
 .baum-gruppe.gesperrt > span { color: #b0b5bc; cursor: not-allowed; }
 .panel { flex: 1; min-width: 0; }

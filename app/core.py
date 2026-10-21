@@ -10,6 +10,8 @@ import db
 from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
+VERSION = "0.1.0"
+
 app = Flask(__name__)
 
 
@@ -209,9 +211,9 @@ app.jinja_env.globals.update(
 @app.context_processor
 def kontext():
     if not g.get("user"):
-        return {"user": None, "ist_admin": False, "logo": logo_info()}
+        return {"user": None, "ist_admin": False, "logo": logo_info(), "version": VERSION}
     return {
-        "user": g.user, "ist_admin": ist_admin(), "logo": logo_info(),
+        "user": g.user, "ist_admin": ist_admin(), "logo": logo_info(), "version": VERSION,
         "sidebar_immobilien": sichtbare_immobilien(), "jahr": jahr(),
     }
 
