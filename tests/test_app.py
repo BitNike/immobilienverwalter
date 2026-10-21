@@ -108,6 +108,11 @@ def test_gesamter_ablauf():
     html = ok(c.get("/wohnungen/1")).get_data(as_text=True)
     assert "Gerber" in html and "Noah Gerber, Mia Muster" in html
     assert "1.350,00" in html  # Soll-Vorauszahlung 9 × 150 als Platzhalter
+    # Prüfliste: Vorauszahlung nur vorgeschlagen; Gebäudekosten nicht vollständig verteilt (OG noch nicht zugeordnet)
+    assert "Bitte prüfen" in html and "noch nicht gespeichert" in html
+    immo_html = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert "keinem Mietobjekt zugeordnet" in immo_html and "Summe MEA" in immo_html
+    assert "Trotzdem speichern" in ok(c.get("/wohnungen/1/export?partei=1")).get_data(as_text=True)
 
     # Brief prüfen: Grundsteuer 75 %, Heizkosten 100 %
     brief = ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
@@ -116,6 +121,14 @@ def test_gesamter_ablauf():
     assert "Nachzahlung" in brief or "Gutschrift" in brief
 
     post(c, "/wohnungen/1/vorauszahlungen", data={"vz_1": "1.350", "vz_eigentuemer": "500"})
+    assert "noch nicht gespeichert" not in ok(c.get("/wohnungen/1")).get_data(as_text=True)
+
+    # Standard-Umlageschlüssel einer Immobilie wird beim Erfassen neuer Gebäudekosten vorausgewählt
+    post(c, "/immobilien/neu", data={"name": "Haus Test", "schluessel": "einheiten"})
+    html = ok(c.get("/immobilien/2")).get_data(as_text=True)
+    assert 'Umlageschlüssel<select name="schluessel" ><option value="mea" >' in html
+    assert '<option value="einheiten" selected>' in html
+    post(c, "/immobilien/2/loeschen")
 
     # Dokument in den Mieterordner
     post(c, "/immobilien/1/dokumente", data={"wohnung_id": "1", "dok_wohnung_id": "1", "dok_jahr": "2025",

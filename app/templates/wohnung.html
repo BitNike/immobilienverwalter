@@ -1,17 +1,18 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl, pruefliste, doppelt_rueckfrage %}
 {% block title %}{{ w.bezeichnung }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
 <div class="kopf">
   <div>
     <h1>{{ w.bezeichnung }}</h1>
-    <p class="leise">{{ immo.name }} · {{ w.wohnflaeche|num }} m² · {{ w.mea|num }}/{{ w.mea_basis|num(0) }} MEA
+    <p class="leise">{{ immo.name }} · {{ w.wohnflaeche|num }} m²{% if w.mea %} · {{ w.mea|num }}/{{ w.mea_basis|num(0) }} MEA ({{ (w.mea / w.mea_basis * 100)|num }} %){% endif %}
       · Eigentümer: {{ person_name(eigentuemer) if eigentuemer else '–' }}
       {% if ist_admin %} · <a href="{{ url_for('wohnung_stamm', wid=w.id) }}">{{ icon('edit', 14) }} Stammdaten</a>{% endif %}</p>
   </div>
   {{ jahr_umschalter(jahr) }}
 </div>
+{{ pruefliste(pruefung) }}
 
 {# ---------- Abrechnung ---------- #}
 <section class="block" id="abrechnung">
@@ -33,7 +34,9 @@
       <td class="zahl">{{ p.summe|eur }}</td>
       <td class="zahl">{% if darf %}<input class="betrag" form="vz" name="vz_{{ p.mv.id }}" inputmode="decimal"
           value="{{ vz_gespeichert[p.mv.id]|num if p.mv.id in vz_gespeichert else '' }}" placeholder="{{ p.vorauszahlung_soll|num }}"
-          title="Leer = Soll ({{ p.mv.vorauszahlung_monat|eur }} × Monate)">{% else %}{{ p.vorauszahlung|eur }}{% endif %}</td>
+          title="Leer = Soll ({{ p.mv.vorauszahlung_monat|eur }} × Monate)">
+          {% if p.mv.id not in vz_gespeichert %}<br><small class="warnung">nur Vorschlag, nicht gespeichert</small>{% endif %}
+          {% else %}{{ p.vorauszahlung|eur }}{% endif %}</td>
       <td class="zahl">{{ saldo(p.saldo) }}</td>
       <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei=p.mv.id) }}">{{ icon('download', 16) }}<span>Export</span></a></td>
     </tr>
@@ -110,9 +113,13 @@
   {% if darf %}
   <details>
     <summary>{{ icon('plus') }} Kosten nur für diese Wohnung erfassen</summary>
+    <p class="meldung">Hier nur Kosten erfassen, die <strong>allein diese Wohnung</strong> betreffen.
+      Rechnungen für das ganze Haus (z. B. Gebäudeversicherung, Schornsteinfeger, Müll, Allgemeinstrom) gehören zu den
+      {% if ist_admin %}<a href="{{ url_for('immobilie', iid=immo.id) }}#kosten">Gebäudekosten der Immobilie</a>{% else %}Gebäudekosten der Immobilie{% endif %}
+      und werden von dort automatisch verteilt.</p>
     <p class="leise">Zum Beispiel die Heizkostenabrechnung des Messdienstes oder die Grundsteuer der Wohnung.
       „Für Mieter …“ = der Betrag gilt bereits für dessen Zeitraum und wird zu 100 % umgelegt.</p>
-    <form method="post" action="{{ url_for('wohnung_kosten_neu', wid=w.id) }}" class="zeile">
+    <form method="post" action="{{ url_for('wohnung_kosten_neu', wid=w.id) }}" class="zeile" {{ doppelt_rueckfrage(vorhanden, jahr) }}>
       <label>Kostenart{{ kostenart_auswahl(kostenarten) }}</label>
       <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
       <label>Zuordnung

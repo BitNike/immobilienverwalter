@@ -6,12 +6,13 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 
 import dateien
 import db
-from calc import berechne, parse_date, parse_mea, parse_num
+from calc import berechne, de_num, parse_date, parse_mea, parse_num
 from core import (BEREICHE, ZAEHLERARTEN, admin_noetig, app, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
 
-IMMOBILIE_FELDER = ("name", "strasse", "hausnummer", "plz", "ort", "absender", "kontoinhaber", "iban", "bank", "notiz")
+IMMOBILIE_FELDER = ("name", "strasse", "hausnummer", "plz", "ort", "absender", "kontoinhaber", "iban", "bank", "notiz",
+                    "schluessel")
 WOHNUNG_FELDER = ("bezeichnung", "umlageschluessel", "iban", "notiz")
 
 
@@ -50,7 +51,75 @@ def berechnung(immo, j):
     vz = {(r["wohnung_id"], r["mv_id"]): r["betrag"] for r in rows(
         "SELECT v.* FROM vorauszahlung v JOIN wohnung w ON w.id = v.wohnung_id "
         "WHERE w.immobilie_id = ? AND v.jahr = ?", (iid, j))}
-    return berechne(date(j, 1, 1), date(j, 12, 31), immo, wohnungen, kosten, kostenarten, mvs, zaehler, vz)
+    erg = berechne(date(j, 1, 1), date(j, 12, 31), immo, wohnungen, kosten, kostenarten, mvs, zaehler, vz)
+    erg["vz_gespeichert"] = set(vz)
+    return erg
+
+
+def standard_schluessel(immo, anzahl_wohnungen):
+    """Vorauswahl für neue Gebäudekosten; None = Standard der Kostenart."""
+    return immo["schluessel"] or ("flaeche" if anzahl_wohnungen == 1 else None)
+
+
+def vorhandene_kostenarten(iid, j, wid=None):
+    """{kostenart_id: Ort} der Kosten eines Jahres – für die Rückfrage bei doppelter Erfassung."""
+    orte = {}
+    for k in rows("SELECT k.kostenart_id, k.wohnung_id, w.bezeichnung FROM kosten k "
+                  "LEFT JOIN wohnung w ON w.id = k.wohnung_id WHERE k.immobilie_id = ? AND k.jahr = ?", (iid, j)):
+        if wid is None or k["wohnung_id"] in (None, wid):
+            orte.setdefault(k["kostenart_id"], "als Gebäudekosten" if k["wohnung_id"] is None
+                            else f"bei {k['bezeichnung']}")
+    return orte
+
+
+def pruefungen(immo, erg, wids, ganze_immobilie=False):
+    """Offene Punkte vor dem Export: 'fehler' verfälschen die Abrechnung, 'hinweis' sollte man ansehen."""
+    punkte = []
+
+    def punkt(text, link, art="fehler"):
+        punkte.append({"text": text, "link": link, "art": art})
+
+    for gk in erg["gebaeude"]:
+        k = gk["kosten"]
+        name = f"{gk['kostenart']} ({de_num(k['betrag'])} €)"
+        link = url_for("immobilie", iid=immo["id"], bearbeiten=k["id"]) + "#kosten"
+        if gk["warnung"]:
+            punkt(f"{name}: {gk['warnung']} Der Betrag wird niemandem zugeordnet.", link)
+        elif ganze_immobilie and gk["rest"] < 0:
+            punkt(f"{name}: Es werden {de_num(-gk['rest'])} € mehr verteilt als vorhanden. "
+                  "Bitte MEA bzw. Wohnflächen der Mietobjekte prüfen.", link)
+        elif ganze_immobilie and gk["rest"] > 0:
+            punkt(f"{name}: {de_num(gk['rest'])} € sind keinem Mietobjekt zugeordnet. "
+                  "Fehlen Mietobjekte oder deren MEA bzw. Wohnfläche?", link, "hinweis")
+    schluessel = {gk["kosten"]["schluessel"] for gk in erg["gebaeude"] if not gk["warnung"]}
+    if not immo["iban"] and any(not erg["wohnungen"][i]["wohnung"]["iban"] for i in wids if i in erg["wohnungen"]):
+        punkt("Bei der Immobilie ist keine IBAN hinterlegt; im Brief fehlt dann die Bankverbindung.",
+              url_for("immobilie", iid=immo["id"], stammdaten=1) + "#stammdaten", "hinweis")
+
+    for wid, r in erg["wohnungen"].items():
+        if wid not in wids:
+            continue
+        w = r["wohnung"]
+        stamm = url_for("wohnung_stamm", wid=wid)
+        abrechnung = url_for("wohnung", wid=wid) + "#abrechnung"
+        if "mea" in schluessel and not w["mea"]:
+            punkt(f"{w['bezeichnung']}: Keine MEA hinterlegt. Kosten nach MEA entfallen auf dieses Mietobjekt mit 0 €.",
+                  stamm)
+        if "flaeche" in schluessel and not w["wohnflaeche"]:
+            punkt(f"{w['bezeichnung']}: Keine Wohnfläche hinterlegt. Kosten nach Wohnfläche entfallen auf dieses "
+                  "Mietobjekt mit 0 €.", stamm)
+        for p in r["parteien"]:
+            if (wid, p["mv"]["id"]) not in erg["vz_gespeichert"]:
+                punkt(f"{w['bezeichnung']}: Die Vorauszahlung von {mv_name(p['mv'])} ist nur vorgeschlagen "
+                      f"({de_num(p['vorauszahlung_soll'])} €) und noch nicht gespeichert.", abrechnung)
+        gezaehlt = {}
+        for po in r["posten"]:
+            gezaehlt[po["kostenart"]] = gezaehlt.get(po["kostenart"], 0) + 1
+        for name, n in gezaehlt.items():
+            if n > 1:
+                punkt(f"{w['bezeichnung']}: „{name}“ ist {n}-mal enthalten. Sind das wirklich verschiedene Rechnungen?",
+                      abrechnung, "hinweis")
+    return punkte
 
 
 def zaehler_mit_staenden(sql, args):
@@ -112,6 +181,8 @@ def immobilie_werte():
     if not vals["name"]:
         raise ValueError("Bitte einen Namen für die Immobilie angeben.")
     vals["iban"] = vals["iban"].upper()
+    if vals["schluessel"] not in ("", "mea", "flaeche", "einheiten"):
+        raise ValueError("Unbekannter Umlageschlüssel.")
     vals["gesamtflaeche"] = parse_num(f.get("gesamtflaeche"), None)
     einheiten = parse_num(f.get("einheiten_gesamt"), None)
     vals["einheiten_gesamt"] = int(einheiten) if einheiten else None
@@ -152,7 +223,13 @@ def immobilie(iid):
                "WHERE w.immobilie_id = ? ORDER BY m.nummer", (iid,))
     for mv in mvs:
         mv["personen"] = mv_personen(mv["id"])
-    return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung,
+    mea = [r["wohnung"] for r in verteilung if r["wohnung"]["mea"]]
+    mea_summe = {"anteil": sum(w["mea"] / w["mea_basis"] for w in mea if w["mea_basis"]),
+                 "basen": {w["mea_basis"] for w in mea}} if mea else None
+    return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
+                           pruefung=pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()),
+                           std_schluessel=standard_schluessel(immo, len(erg["wohnungen"])),
+                           vorhanden=vorhandene_kostenarten(iid, j),
                            vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
                            dokumente=dokumente_sichtbar(iid, j), hauptzaehler=hauptzaehler, mvs=mvs,
                            wohnungen=rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung", (iid,)))
@@ -326,6 +403,7 @@ def wohnung(wid):
     direkt = {k["id"]: k for k in rows("SELECT * FROM kosten WHERE wohnung_id = ? AND jahr = ?", (wid, j))}
     return render_template(
         "wohnung.html", **spalte(immo, wid), w=w, r=r, erg=erg, mvs=mvs, direkt=direkt,
+        pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
         darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
         zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? ORDER BY art, ausgebaut IS NULL, id",

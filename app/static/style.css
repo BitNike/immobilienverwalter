@@ -148,6 +148,11 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 .btn-icon.gefahr { color: var(--gefahr); }
 
 .meldung { border-left: 3px solid var(--primaer); background: var(--primaer-hell); padding: 9px 14px; margin-bottom: 14px; }
+.pruefliste { border-left: 3px solid var(--warnung); background: #fdf5e6; padding: 10px 14px; margin: 0 0 18px; }
+.pruefliste ul { margin: 6px 0 0; padding-left: 18px; }
+.pruefliste li { margin: 3px 0; }
+.pruefliste li a { color: var(--text); }
+.pruefliste li.fehler a { color: var(--gefahr); }
 .meldung.fehler { border-color: var(--gefahr); background: #fbeceb; }
 
 /* ---------- Einstellungen / Profil ---------- */

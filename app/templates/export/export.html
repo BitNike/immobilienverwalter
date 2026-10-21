@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, saldo %}
+{% from "_ui.html" import icon, saldo, pruefliste %}
 {% block title %}Export {{ d.partei_name }}{% endblock %}
 {% block content %}
 <p class="brotkrumen"><a href="{{ url_for('wohnung', wid=wid) }}#abrechnung">{{ icon('left', 15) }} {{ d.immo.name }} · {{ d.w.bezeichnung }}</a></p>
@@ -26,10 +26,12 @@
     {% else %}
     <p class="leise">Für {{ d.jahr }} sind keine Dokumente hochgeladen.</p>
     {% endfor %}
-    {% if not d.iban %}<p class="warnung">Hinweis: Bei der Immobilie ist keine IBAN hinterlegt.</p>{% endif %}
+    {{ pruefliste(pruefung) }}
+    {% set fehler = pruefung|selectattr('art', 'equalto', 'fehler')|list %}
     <div class="knopfleiste senkrecht">
       <button class="btn hell" name="aktion" value="vorschau" formtarget="_blank">{{ icon('eye') }}<span>PDF-Vorschau</span></button>
-      <button class="btn" name="aktion" value="speichern">{{ icon('save') }}<span>PDF speichern</span></button>
+      <button class="btn" name="aktion" value="speichern"
+        {% if fehler %}onclick="return confirm({{ ('Es sind noch %d Punkte offen, die die Abrechnung verfälschen können. Trotzdem speichern?' % fehler|length)|tojson|forceescape }})"{% endif %}>{{ icon('save') }}<span>PDF speichern</span></button>
     </div>
   </form>
 </div>

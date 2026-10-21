@@ -130,6 +130,10 @@ MIGRATIONEN = [
         hochgeladen_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 2: Standard-Umlageschlüssel je Immobilie ('' = automatisch)
+    """
+    ALTER TABLE immobilie ADD COLUMN schluessel TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

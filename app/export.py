@@ -8,7 +8,7 @@ from flask import abort, g, render_template, request, send_file
 import dateien
 from calc import de_num, rund
 from core import app, ist_admin, jahr, one, person_name, row, wohnung_laden
-from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name
+from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen
 
 HINWEIS_NACHZAHLUNG = ("Bitte leisten Sie die Nachzahlung innerhalb von 30 Tagen nach Erhalt der Abrechnung "
                        "auf folgendes Konto:")
@@ -34,7 +34,8 @@ def brief_daten(wid, partei):
         "abrechnung_von": date(j, 1, 1), "abrechnung_bis": date(j, 12, 31),
         "iban": w["iban"] or immo["iban"], "kontoinhaber": immo["kontoinhaber"], "bank": immo["bank"],
         "umlageschluessel": ", ".join(x for x in (
-            f"Wohnfläche {de_num(w['wohnflaeche'])} m² ({de_num(w['mea'])}/{de_num(w['mea_basis'], 0)} MEA)",
+            f"Wohnfläche {de_num(w['wohnflaeche'])} m²"
+            + (f" ({de_num(w['mea'])}/{de_num(w['mea_basis'], 0)} MEA)" if w["mea"] else ""),
             w["umlageschluessel"]) if x),
         "hinweis_nachzahlung": HINWEIS_NACHZAHLUNG,
     }
@@ -84,7 +85,8 @@ def export_dokumente(d):
 def export(wid):
     partei = request.args.get("partei", "eigentuemer")
     d = brief_daten(wid, partei)
-    return render_template("export/export.html", d=d, dokumente=export_dokumente(d), wid=wid)
+    pruefung = pruefungen(d["immo"], berechnung(d["immo"], d["jahr"]), {wid})
+    return render_template("export/export.html", d=d, dokumente=export_dokumente(d), wid=wid, pruefung=pruefung)
 
 
 @app.get("/wohnungen/<int:wid>/export/brief")

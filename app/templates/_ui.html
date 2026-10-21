@@ -21,6 +21,25 @@
 </select>
 {%- endmacro %}
 
+{% macro pruefliste(punkte) -%}
+{% if punkte %}
+<div class="pruefliste">
+  <strong>Bitte prüfen</strong>
+  <ul>
+    {% for p in punkte %}<li class="{{ p.art }}"><a href="{{ p.link }}">{{ p.text }}</a></li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro schluessel_auswahl(gewaehlt, form=None) -%}
+<select name="schluessel" {% if form %}form="{{ form }}"{% endif %}>{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}" {{ 'selected' if gewaehlt == s }}>{{ t }}</option>{% endfor %}</select>
+{%- endmacro %}
+
+{% macro doppelt_rueckfrage(vorhanden, jahr) -%}
+onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; return !o || confirm('Diese Kostenart ist für {{ jahr }} schon erfasst (' + o + '). Trotzdem hinzufügen?')"
+{%- endmacro %}
+
 {% macro jahr_umschalter(j) -%}
 <div class="jahr" aria-label="Abrechnungsjahr">
   <a href="?jahr={{ j - 1 }}" title="Vorjahr">{{ icon('left') }}</a>
@@ -50,6 +69,13 @@
 </fieldset>
 <fieldset><legend>Abrechnung</legend>
 <div class="raster">
+  <label>Standard-Umlageschlüssel
+    <select name="schluessel">
+      <option value="">Automatisch</option>
+      {% for s, t in SCHLUESSEL.items() if s != 'wasser' %}<option value="{{ s }}" {{ 'selected' if i.schluessel == s }}>{{ t }}</option>{% endfor %}
+    </select>
+    <small>Vorauswahl für neue Gebäudekosten. Automatisch: bei nur einem Mietobjekt Wohnfläche, sonst der Standard der Kostenart. Eigenes Haus ohne WEG: Wohnfläche.</small>
+  </label>
   {{ feld('absender', 'Absender', i.absender, breit=True, hinweis='z. B. „Hausverwaltung, Straße, PLZ Ort“ – leer = Eigentümer') }}
   {{ feld('kontoinhaber', 'Kontoinhaber', i.kontoinhaber) }}
   {{ feld('iban', 'IBAN', i.iban, attrs='autocomplete="off"') }}
@@ -77,7 +103,7 @@
     </select>
   </label>
   {{ feld('wohnflaeche', 'Wohnfläche (m²)', w.wohnflaeche|num if w.wohnflaeche else '', pflicht=True, attrs='inputmode="decimal"') }}
-  {{ feld('mea', 'MEA', w.mea|num if w.mea else '', attrs='inputmode="decimal" placeholder="86,13"', hinweis='Miteigentumsanteil, z. B. 86,13') }}
+  {{ feld('mea', 'MEA', w.mea|num if w.mea else '', attrs='inputmode="decimal" placeholder="86,13"', hinweis='Miteigentumsanteil laut Teilungserklärung, z. B. 86,13. Nur bei WEG, sonst leer lassen.' ~ (' Aktuell ' ~ (w.mea / w.mea_basis * 100)|num ~ ' %.' if w.mea and w.mea_basis else '')) }}
   {{ feld('mea_basis', 'MEA-Basis', w.mea_basis|num(0) if w.mea_basis else '1.000', attrs='inputmode="decimal"', hinweis='z. B. 1.000 (für 86,13/1.000)') }}
   {{ feld('umlageschluessel', 'Umlageschlüssel (Text für die Abrechnung)', w.umlageschluessel, breit=True, attrs='placeholder="z. B. Heizung nach Verbrauch und Fläche laut Abrechnung der Eigentümergemeinschaft"') }}
   {{ feld('iban', 'Abweichende IBAN', w.iban, hinweis='nur falls anders als bei der Immobilie') }}
