@@ -22,7 +22,7 @@
   .vorschau .seitenzahl .nr { margin-left: auto; }
   /* Seite 1 nach DIN 5008 Form B (Fensterumschlag DIN lang / C5/6). Bezug: Blattkante; Inhalt beginnt 25 mm links. */
   .seite.erste, .vorschau .seite.erste { padding-top: 97mm; }
-  .anschrift { position: absolute; top: 45mm; left: -5mm; width: 85mm; height: 45mm; padding-left: 5mm; }
+  .anschrift { position: absolute; top: {{ 45 - d.anschrift_hoch }}mm; left: -5mm; width: 85mm; height: 45mm; padding-left: 5mm; }
   .ruecksende { position: absolute; top: 12.7mm; left: 5mm; right: 0; height: 5mm; font-size: 7pt; line-height: 5mm;
                 white-space: nowrap; overflow: hidden; text-decoration: underline; color: #333; }
   .empfaenger { position: absolute; top: 17.7mm; left: 5mm; right: 0; line-height: 1.25; }

@@ -6,7 +6,7 @@ from datetime import date
 from flask import abort, g, render_template, request, send_file
 
 import dateien
-from calc import de_num, rund
+from calc import de_num, parse_num, rund
 from core import NAME, URL, app, einstellung, ist_admin, jahr, one, person_name, row, wohnung_laden
 from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen
 
@@ -86,6 +86,7 @@ def brief_daten(wid, partei):
             spalte_gesamt="Gesamtkosten im Jahr")
     d["summe_gesamt"] = rund(sum(x["gesamt"] for x in d["posten"]))
     wohnung = w["bezeichnung"] if len(erg["wohnungen"]) > 1 else ""
+    d["anschrift_hoch"] = parse_num(einstellung("brief_anschrift_hoch", "0"))
     d["fusszeile"] = (f"Erstellt mit {NAME}" + (f" · {URL}" if URL else "")
                       if einstellung("brief_fusszeile", "1") == "1" else "")
     d["verwendungszweck"] = sepa_text(", ".join(x for x in (f"Nebenkosten {j}", d["objekt"][0] if d["objekt"] else "",

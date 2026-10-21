@@ -185,6 +185,8 @@ def test_gesamter_ablauf():
     ok(c.get("/logo"))
     # Fußzeile im Brief ist abschaltbar (Haken fehlte beim Speichern)
     assert "Erstellt mit" not in ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
+    post(c, "/einstellungen/admin/logo", data={"logo_typ": "text", "logo_text": "Vermietung", "brief_anschrift_hoch": "15"})
+    assert ".anschrift { position: absolute; top: 30.0mm;" in ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
     post(c, "/einstellungen/admin/kostenarten", data={"name": "Dachrinnenreinigung", "betrkv_nr": "17",
                                                         "schluessel": "mea", "umlagefaehig": "on"})
 

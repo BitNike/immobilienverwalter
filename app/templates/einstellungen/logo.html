@@ -21,6 +21,10 @@
     <label class="breit">Neues Bild (PNG oder JPG, max. 2 MB)<input type="file" name="logo" accept=".png,.jpg,.jpeg"><small>Wird auf 160 Pixel Höhe begrenzt.</small></label>
   </div>
   <h2>Brief</h2>
+  <div class="raster">
+    {{ feld('brief_anschrift_hoch', 'Anschrift nach oben verschieben (mm)', brief_anschrift_hoch, attrs='inputmode="decimal"',
+            hinweis='0 = genau nach DIN 5008 (Fensterumschlag DIN lang, gefaltet an den Falzmarken). Liegt die Adresse in deinen Umschlägen zu tief, z. B. 10–15 eintragen; negative Werte schieben nach unten.') }}
+  </div>
   <label class="haken"><input type="checkbox" name="brief_fusszeile" {{ 'checked' if brief_fusszeile }}>
     <span>Fußzeile „Erstellt mit Immobilienverwalter“ im Brief anzeigen<br><small class="leise">Klein und hellgrau unten links auf jeder Seite des Briefs. Hilft, das kostenlose Projekt bekannt zu machen.</small></span></label>
   <div class="knopfleiste">{{ speichern() }}</div>
