@@ -227,8 +227,14 @@ def kosten_speichern(kid):
     schl = f.get("schluessel", k["schluessel"])
     if schl not in ("mea", "flaeche", "einheiten", "wasser"):
         raise ValueError("Unbekannter Umlageschlüssel.")
-    exe("UPDATE kosten SET betrag = ?, schluessel = ?, notiz = ? WHERE id = ?",
-        (parse_num(f.get("betrag")), schl, f.get("notiz", k["notiz"]).strip(), kid))
+    kostenart_id = _kostenart_id(f) if f.get("kostenart_id") else k["kostenart_id"]
+    mv_id = k["mv_id"]
+    if k["wohnung_id"] and "mv_id" in f:
+        mv_id = int(f["mv_id"]) if f["mv_id"] else None
+        if mv_id:
+            row("SELECT id FROM mietverhaeltnis WHERE id = ? AND wohnung_id = ?", (mv_id, k["wohnung_id"]))
+    exe("UPDATE kosten SET kostenart_id = ?, betrag = ?, schluessel = ?, mv_id = ?, notiz = ? WHERE id = ?",
+        (kostenart_id, parse_num(f.get("betrag")), schl, mv_id, f.get("notiz", k["notiz"] or "").strip(), kid))
     return zurueck()
 
 

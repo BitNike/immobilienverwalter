@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl %}
 {% block title %}{{ w.bezeichnung }}{% endblock %}
 {% block content %}
+{% set bearbeiten = request.args.get('bearbeiten')|int %}
 <div class="kopf">
   <div>
     <h1>{{ w.bezeichnung }}</h1>
@@ -66,22 +67,36 @@
     <thead><tr><th>Kostenart</th><th>Verteilung</th><th class="zahl">Gesamt</th><th class="zahl">Anteil Wohnung</th><th></th></tr></thead>
     <tbody>
     {% for po in r.posten %}{% set dk = direkt.get(po.kosten_id) %}
+    {% if dk and darf and bearbeiten == dk.id %}
+    <tr class="in-bearbeitung">
+      <td>{{ kostenart_auswahl(kostenarten, dk.kostenart_id, po.kostenart, form="k%d" % dk.id) }}
+        <textarea name="notiz" form="k{{ dk.id }}" rows="3" placeholder="Notiz (optional)">{{ dk.notiz }}</textarea></td>
+      <td><select name="mv_id" form="k{{ dk.id }}">
+          <option value="">Wohnung – zeitanteilig auf die Mieter</option>
+          {% for p in r.parteien %}<option value="{{ p.mv.id }}" {{ 'selected' if p.mv.id == dk.mv_id }}>Für Mieter {{ mv_name(p.mv) }} (100 %)</option>{% endfor %}
+        </select></td>
+      <td class="zahl">{{ po.gesamt|eur }}</td>
+      <td class="zahl"><input class="betrag" name="betrag" form="k{{ dk.id }}" inputmode="decimal" value="{{ dk.betrag|num }}" required></td>
+      <td class="aktionen">
+        <form id="k{{ dk.id }}" method="post" action="{{ url_for('kosten_speichern', kid=dk.id) }}" class="inline">
+          <input type="hidden" name="next" value="{{ url_for('wohnung', wid=w.id) }}#abrechnung">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        <a class="btn-icon" href="{{ url_for('wohnung', wid=w.id) }}#abrechnung" title="Abbrechen">{{ icon('x', 16) }}</a>
+      </td>
+    </tr>
+    {% else %}
     <tr>
       <td>{{ po.kostenart }}{% if not po.umlagefaehig %} <small class="warnung">nicht umlagefähig</small>{% endif %}</td>
       <td>{% if dk %}{% if dk.mv_id %}direkt für Mieter{% for p in r.parteien if p.mv.id == dk.mv_id %} {{ mv_name(p.mv) }}{% endfor %}{% else %}Kosten der Wohnung, zeitanteilig{% endif %}
-          {% if dk.notiz %}<br><small class="leise">{{ dk.notiz }}</small>{% endif %}
+          {% if dk.notiz %}<br><small class="leise notiz">{{ dk.notiz }}</small>{% endif %}
           {% else %}{{ po.basis }}{% endif %}</td>
       <td class="zahl">{{ po.gesamt|eur }}</td>
-      <td class="zahl">
-        {% if dk and darf %}
-        <form method="post" action="{{ url_for('kosten_speichern', kid=dk.id) }}" class="inline">
-          <input class="betrag" name="betrag" inputmode="decimal" value="{{ dk.betrag|num }}">
-          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button>
-        </form>
-        {% else %}{{ po.betrag|eur }}{% endif %}
-      </td>
-      <td class="aktionen">{% if dk and darf %}{{ loeschen(url_for('kosten_loeschen', kid=dk.id), 'Kostenposition löschen?') }}{% endif %}</td>
+      <td class="zahl">{{ po.betrag|eur }}</td>
+      <td class="aktionen">{% if dk and darf %}
+        <a class="btn-icon" href="{{ url_for('wohnung', wid=w.id, bearbeiten=dk.id) }}#abrechnung" title="Bearbeiten">{{ icon('edit', 16) }}</a>
+        {{ loeschen(url_for('kosten_loeschen', kid=dk.id), 'Kostenposition löschen?') }}{% endif %}</td>
     </tr>
+    {% endif %}
     {% else %}
     <tr><td colspan="5" class="leise">Noch keine Kosten für {{ jahr }}.</td></tr>
     {% endfor %}
@@ -96,12 +111,7 @@
     <p class="leise">Zum Beispiel die Heizkostenabrechnung des Messdienstes oder die Grundsteuer der Wohnung.
       „Für Mieter …“ = der Betrag gilt bereits für dessen Zeitraum und wird zu 100 % umgelegt.</p>
     <form method="post" action="{{ url_for('wohnung_kosten_neu', wid=w.id) }}" class="zeile">
-      <label>Kostenart
-        <select name="kostenart_id" required>
-          <option value="">– wählen –</option>
-          {% for k in kostenarten %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}
-        </select>
-      </label>
+      <label>Kostenart{{ kostenart_auswahl(kostenarten) }}</label>
       <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
       <label>Zuordnung
         <select name="mv_id">
@@ -109,7 +119,7 @@
           {% for p in r.parteien %}<option value="{{ p.mv.id }}">Für Mieter {{ mv_name(p.mv) }} (100 %)</option>{% endfor %}
         </select>
       </label>
-      <label>Notiz<input name="notiz" placeholder="optional"></label>
+      <label class="notizfeld">Notiz<textarea name="notiz" rows="2" placeholder="optional"></textarea></label>
       <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
     </form>
   </details>

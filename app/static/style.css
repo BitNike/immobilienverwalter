@@ -119,6 +119,11 @@ textarea { resize: vertical; }
 input.betrag { width: 120px; text-align: right; }
 .zeile { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin: 12px 0; }
 form.inline { display: inline; }
+.notizfeld { flex: 1 1 340px; }
+.notizfeld textarea { width: 100%; }
+.in-bearbeitung td { vertical-align: top; background: var(--flaeche); }
+.in-bearbeitung textarea { display: block; width: 100%; min-width: 260px; margin-top: 6px; }
+.notiz { white-space: pre-line; }
 form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
 .knopfleiste { display: flex; gap: 10px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
 .knopfleiste.senkrecht { flex-direction: column; align-items: stretch; }

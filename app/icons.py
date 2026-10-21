@@ -18,6 +18,7 @@ ICONS = {
     "right": '<path d="M9 18l6-6-6-6"/>',
     "file": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
     "edit": '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+    "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     "building": '<path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>'
                 '<path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/>',
     "home": '<path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/>',

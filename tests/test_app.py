@@ -94,6 +94,15 @@ def test_gesamter_ablauf():
     post(c, "/wohnungen/1/kosten", data={"kostenart_id": ka["Heizkosten"], "betrag": "712,37", "mv_id": "1"})
     post(c, "/wohnungen/1/kosten", data={"kostenart_id": ka["Grundsteuer"], "betrag": "103,54"})
 
+    # Kosten bearbeiten: erst nach Klick auf den Stift sind die Felder offen
+    assert 'form="k1"' not in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert 'name="notiz" form="k1"' in ok(c.get("/immobilien/1?bearbeiten=1")).get_data(as_text=True)
+    assert 'name="mv_id" form="k3"' in ok(c.get("/wohnungen/1?bearbeiten=3")).get_data(as_text=True)
+    post(c, "/kosten/1", data={"kostenart_id": ka["Gebäudeversicherung"], "betrag": "1.000,00", "schluessel": "mea",
+                               "notiz": "Police 2025\nZweite Zeile"})
+    post(c, "/kosten/4", data={"kostenart_id": ka["Grundsteuer"], "betrag": "103,54", "mv_id": "", "notiz": "Bescheid"})
+    assert "Police 2025" in ok(c.get("/immobilien/1")).get_data(as_text=True)
+
     html = ok(c.get("/wohnungen/1")).get_data(as_text=True)
     assert "Gerber" in html and "Noah Gerber, Mia Muster" in html
     assert "1.350,00" in html  # Soll-Vorauszahlung 9 × 150 als Platzhalter

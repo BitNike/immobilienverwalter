@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl %}
 {% block title %}{{ immo.name }}{% endblock %}
 {% block content %}
+{% set bearbeiten = request.args.get('bearbeiten')|int %}
 <div class="kopf">
   <div>
     <h1>{{ immo.name }}</h1>
@@ -20,25 +21,35 @@
     <thead><tr><th>Kostenart</th><th>Umlageschlüssel</th><th class="zahl">Betrag</th><th class="zahl">Verteilt</th><th></th></tr></thead>
     <tbody>
     {% for gk in erg.gebaeude %}{% set k = gk.kosten %}
-    <tr>
-      <td>{{ gk.kostenart }}{% if k.notiz %}<br><small class="leise">{{ k.notiz }}</small>{% endif %}
-        {% if gk.warnung %}<br><small class="warnung">{{ gk.warnung }}</small>{% endif %}</td>
-      {% if ist_admin %}
+    {% if ist_admin and bearbeiten == k.id %}
+    <tr class="in-bearbeitung">
+      <td>{{ kostenart_auswahl(kostenarten, k.kostenart_id, gk.kostenart, form="k%d" % k.id) }}
+        <textarea name="notiz" form="k{{ k.id }}" rows="3" placeholder="Notiz (optional)">{{ k.notiz }}</textarea></td>
       <td><select name="schluessel" form="k{{ k.id }}">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}" {{ 'selected' if k.schluessel == s }}>{{ t }}</option>{% endfor %}</select></td>
-      <td class="zahl"><input class="betrag" name="betrag" form="k{{ k.id }}" inputmode="decimal" value="{{ k.betrag|num }}"></td>
-      {% else %}
+      <td class="zahl"><input class="betrag" name="betrag" form="k{{ k.id }}" inputmode="decimal" value="{{ k.betrag|num }}" required></td>
+      <td class="zahl">{{ gk.verteilt|eur }}</td>
+      <td class="aktionen">
+        <form id="k{{ k.id }}" method="post" action="{{ url_for('kosten_speichern', kid=k.id) }}" class="inline">
+          <input type="hidden" name="next" value="{{ url_for('immobilie', iid=immo.id) }}#kosten">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id) }}#kosten" title="Abbrechen">{{ icon('x', 16) }}</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td>{{ gk.kostenart }}{% if k.notiz %}<br><small class="leise notiz">{{ k.notiz }}</small>{% endif %}
+        {% if gk.warnung %}<br><small class="warnung">{{ gk.warnung }}</small>{% endif %}</td>
       <td>{{ SCHLUESSEL[k.schluessel] }}</td>
       <td class="zahl">{{ k.betrag|eur }}</td>
-      {% endif %}
       <td class="zahl">{{ gk.verteilt|eur }}{% if gk.rest %}<br><small class="leise">nicht im System: {{ gk.rest|eur }}</small>{% endif %}</td>
       <td class="aktionen">
         {% if ist_admin %}
-        <form id="k{{ k.id }}" method="post" action="{{ url_for('kosten_speichern', kid=k.id) }}" class="inline">
-          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, bearbeiten=k.id) }}#kosten" title="Bearbeiten">{{ icon('edit', 16) }}</a>
         {{ loeschen(url_for('kosten_loeschen', kid=k.id), 'Kostenposition löschen?') }}
         {% endif %}
       </td>
     </tr>
+    {% endif %}
     {% endfor %}
     </tbody>
     <tfoot><tr><th colspan="2">Summe</th><th class="zahl">{{ erg.summe_gebaeude|eur }}</th><th colspan="2"></th></tr></tfoot>
@@ -55,17 +66,12 @@
   </form>
   {% endif %}
   <form method="post" action="{{ url_for('kosten_neu', iid=immo.id) }}" class="zeile">
-    <label>Kostenart
-      <select name="kostenart_id" required onchange="this.form.schluessel.value = this.selectedOptions[0].dataset.s">
-        <option value="">– wählen –</option>
-        {% for k in kostenarten %}<option value="{{ k.id }}" data-s="{{ k.schluessel }}">{{ k.name }}{% if not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
-      </select>
-    </label>
+    <label>Kostenart{{ kostenart_auswahl(kostenarten, mit_schluessel=True) }}</label>
     <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
     <label>Umlageschlüssel
       <select name="schluessel">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}">{{ t }}</option>{% endfor %}</select>
     </label>
-    <label>Notiz<input name="notiz" placeholder="optional"></label>
+    <label class="notizfeld">Notiz<textarea name="notiz" rows="2" placeholder="optional"></textarea></label>
     <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
   </form>
   {% endif %}

@@ -12,6 +12,15 @@
 </form>
 {%- endmacro %}
 
+{% macro kostenart_auswahl(kostenarten, gewaehlt=None, alt_name="", form=None, mit_schluessel=False) -%}
+<select name="kostenart_id" required {% if form %}form="{{ form }}"{% endif %}
+  {% if mit_schluessel %}onchange="this.form.schluessel.value = this.selectedOptions[0].dataset.s"{% endif %}>
+  {% if not gewaehlt %}<option value="">– wählen –</option>{% endif %}
+  {% if gewaehlt and gewaehlt not in kostenarten|map(attribute='id')|list %}<option value="{{ gewaehlt }}" selected>{{ alt_name }}</option>{% endif %}
+  {% for k in kostenarten %}<option value="{{ k.id }}" data-s="{{ k.schluessel }}" {{ 'selected' if k.id == gewaehlt }}>{{ k.name }}{% if not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
+</select>
+{%- endmacro %}
+
 {% macro jahr_umschalter(j) -%}
 <div class="jahr" aria-label="Abrechnungsjahr">
   <a href="?jahr={{ j - 1 }}" title="Vorjahr">{{ icon('left') }}</a>
