@@ -22,7 +22,7 @@
 
   <form method="post" action="{{ url_for('vorauszahlungen_speichern', wid=w.id) }}" id="vz"></form>
   <div class="tabelle">
-  <table>
+  <table class="abrechnung">
     <thead><tr><th>Partei</th><th>Nutzungszeitraum</th><th class="zahl">Monate</th><th class="zahl">Kosten</th>
       <th class="zahl">Vorauszahlungen</th><th class="zahl">Ergebnis</th><th></th></tr></thead>
     <tbody>
@@ -55,7 +55,7 @@
       <th>Summe Wohnung</th><td>{{ erg.monate|monate }} Monate</td><td></td>
       <th class="zahl">{{ r.summe|eur }}</th>
       <th class="zahl">{{ r.parteien|sum(attribute='vorauszahlung')|eur }}</th>
-      <td class="zahl">{% if r.parteien %}<small class="leise">Mieter gesamt</small><br>{{ saldo(r.parteien|sum(attribute='saldo')) }}{% endif %}</td>
+      <td class="zahl" title="Ergebnis aller Mieter zusammen">{% if r.parteien %}{{ saldo(r.parteien|sum(attribute='saldo')) }}{% endif %}</td>
       <td></td>
     </tr>
     {% if immo.weg %}
