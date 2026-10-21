@@ -163,7 +163,7 @@ def test_gesamter_ablauf():
     # PDF mit beiden Anlagen
     r = post(c, "/wohnungen/1/export/pdf", 200, data={"partei": "1", "dokumente": ["1", "2"], "aktion": "speichern"})
     assert r.mimetype == "application/pdf" and "attachment" in r.headers["Content-Disposition"]
-    assert len(PdfReader(io.BytesIO(r.data)).pages) == 3  # Deckblatt + PDF-Beleg + JPG-Beleg
+    assert len(PdfReader(io.BytesIO(r.data)).pages) == 4  # Brief (2 Seiten) + PDF-Beleg + JPG-Beleg
     r = post(c, "/wohnungen/1/export/pdf", 200, data={"partei": "eigentuemer", "aktion": "vorschau"})
     assert "inline" in r.headers.get("Content-Disposition", "inline")
 
