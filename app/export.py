@@ -10,7 +10,7 @@ from calc import de_num, rund
 from core import app, ist_admin, jahr, one, person_name, row, wohnung_laden
 from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen
 
-HINWEIS_NACHZAHLUNG = ("Bitte leisten Sie die Nachzahlung innerhalb von 30 Tagen nach Erhalt der Abrechnung "
+HINWEIS_NACHZAHLUNG = ("Bitte überweisen Sie die Nachzahlung innerhalb von 30 Tagen nach Erhalt dieser Abrechnung "
                        "auf folgendes Konto:")
 
 
