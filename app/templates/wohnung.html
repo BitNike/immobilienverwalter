@@ -119,7 +119,7 @@
           {% for p in r.parteien %}<option value="{{ p.mv.id }}">Für Mieter {{ mv_name(p.mv) }} (100 %)</option>{% endfor %}
         </select>
       </label>
-      <label class="notizfeld">Notiz<textarea name="notiz" rows="2" placeholder="optional"></textarea></label>
+      <label class="notizfeld">Notiz<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
       <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
     </form>
   </details>

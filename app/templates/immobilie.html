@@ -71,7 +71,7 @@
     <label>Umlageschlüssel
       <select name="schluessel">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}">{{ t }}</option>{% endfor %}</select>
     </label>
-    <label class="notizfeld">Notiz<textarea name="notiz" rows="2" placeholder="optional"></textarea></label>
+    <label class="notizfeld">Notiz<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
     <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
   </form>
   {% endif %}
