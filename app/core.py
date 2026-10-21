@@ -11,6 +11,8 @@ from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
 VERSION = "0.2.0"
+NAME = "Immobilienverwalter"
+URL = ""  # öffentliche Projektseite, sobald es eine gibt (erscheint in der Fußzeile des Briefs)
 
 app = Flask(__name__)
 

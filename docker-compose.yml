@@ -12,6 +12,9 @@ services:
       - nk-daten:/data            # Datenbank, Profilfotos, Logo
       - nk-dokumente:/dokumente   # hochgeladene Belege: <Immobilie>/<Jahr>/Vermieter|Mieter/...
 
+# Feste Volume-Namen: Daten bleiben erhalten, auch wenn Ordner oder Projekt umbenannt werden.
 volumes:
   nk-daten:
+    name: nebenkostenabrechnung_nk-daten
   nk-dokumente:
+    name: nebenkostenabrechnung_nk-dokumente

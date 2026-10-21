@@ -7,7 +7,7 @@ from flask import abort, g, render_template, request, send_file
 
 import dateien
 from calc import de_num, rund
-from core import app, ist_admin, jahr, one, person_name, row, wohnung_laden
+from core import NAME, URL, app, einstellung, ist_admin, jahr, one, person_name, row, wohnung_laden
 from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen
 
 HINWEIS_NACHZAHLUNG = ("Bitte überweisen Sie die Nachzahlung innerhalb von 30 Tagen nach Erhalt dieser Abrechnung "
@@ -75,6 +75,8 @@ def brief_daten(wid, partei):
             spalte_gesamt="Gesamtkosten im Jahr")
     d["summe_gesamt"] = rund(sum(x["gesamt"] for x in d["posten"]))
     wohnung = w["bezeichnung"] if len(erg["wohnungen"]) > 1 else ""
+    d["fusszeile"] = (f"Erstellt mit {NAME}" + (f" · {URL}" if URL else "")
+                      if einstellung("brief_fusszeile", "1") == "1" else "")
     d["verwendungszweck"] = ", ".join(x for x in (f"Nebenkosten {j}", d["objekt"][0] if d["objekt"] else "", wohnung,
                                                   d["partei_name"]) if x)
     d["girocode"] = girocode(d["kontoinhaber"] or (person_name(eig) if eig else ""), d["iban"] or "", d["saldo"],

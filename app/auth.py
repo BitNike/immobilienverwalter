@@ -35,7 +35,7 @@ def link_basis():
 def link_senden(benutzer, einladung=False):
     link = link_basis() + url_for("passwort_setzen", token=token_erstellen(benutzer))
     if einladung:
-        betreff = "Einladung zur Nebenkostenabrechnung"
+        betreff = "Einladung zum Immobilienverwalter"
         text = (f"Hallo {benutzer['vorname'] or benutzer['benutzername']},\n\n"
                 f"für dich wurde ein Zugang angelegt. Benutzername: {benutzer['benutzername']}\n"
                 f"Bitte lege über diesen Link dein Passwort fest (7 Tage gültig):\n{link}\n")

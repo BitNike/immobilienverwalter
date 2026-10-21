@@ -242,9 +242,11 @@ def logo_admin():
         if typ == "bild" and not einstellung("logo_datei"):
             raise ValueError("Bitte zuerst ein Logo hochladen.")
         einstellung_setzen("logo_typ", typ)
-        flash("Logo gespeichert.")
+        einstellung_setzen("brief_fusszeile", "1" if f.get("brief_fusszeile") else "0")
+        flash("Gespeichert.")
         return redirect(url_for("logo_admin"))
-    return render_template("einstellungen/logo.html", bereich="admin_logo", logo_datei=einstellung("logo_datei"))
+    return render_template("einstellungen/logo.html", bereich="admin_logo", logo_datei=einstellung("logo_datei"),
+                           brief_fusszeile=einstellung("brief_fusszeile", "1") == "1")
 
 
 @app.get("/logo")
@@ -262,7 +264,7 @@ def smtp_admin():
     if request.method == "POST":
         an = request.form.get("an", "").strip() or g.user["email"]
         try:
-            mail.senden(an, "Testnachricht Nebenkostenabrechnung", "Der E-Mail-Versand funktioniert.")
+            mail.senden(an, "Testnachricht Immobilienverwalter", "Der E-Mail-Versand funktioniert.")
             flash(f"Testmail an {an} gesendet.")
         except Exception as e:  # noqa: BLE001
             flash(f"Versand fehlgeschlagen: {e}", "fehler")

@@ -1,8 +1,8 @@
 {% extends "einstellungen/_layout.html" %}
 {% from "_ui.html" import icon, speichern, feld %}
-{% block title %}Logo{% endblock %}
+{% block title %}Logo & Brief{% endblock %}
 {% block panel %}
-<h1>Logo</h1>
+<h1>Logo & Brief</h1>
 <p class="leise">Das Logo erscheint oben links. Ideal ist ein Querformat (z. B. 600 × 120 Pixel), PNG mit transparentem Hintergrund oder JPG.</p>
 <div class="logo-vorschau">
   {% if logo.typ == 'standard' %}<img src="{{ url_for('static', filename='logo.png') }}" alt="">
@@ -20,6 +20,9 @@
     {{ feld('logo_text', 'Text (auch Alternativtext)', logo.text) }}
     <label class="breit">Neues Bild (PNG oder JPG, max. 2 MB)<input type="file" name="logo" accept=".png,.jpg,.jpeg"><small>Wird auf 160 Pixel Höhe begrenzt.</small></label>
   </div>
+  <h2>Brief</h2>
+  <label class="haken"><input type="checkbox" name="brief_fusszeile" {{ 'checked' if brief_fusszeile }}>
+    <span>Fußzeile „Erstellt mit Immobilienverwalter“ im Brief anzeigen<br><small class="leise">Klein und hellgrau unten links auf jeder Seite des Briefs. Hilft, das kostenlose Projekt bekannt zu machen.</small></span></label>
   <div class="knopfleiste">{{ speichern() }}</div>
 </form>
 {% endblock %}

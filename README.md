@@ -1,8 +1,8 @@
 <p align="center"><img src="design/logo-readme.png" alt="Immobilienverwalter" width="480"></p>
 
-# Nebenkostenabrechnung
+# Immobilienverwalter
 
-Web-App im Docker-Container für die jährliche Betriebskostenabrechnung (§ 556 BGB, § 2 BetrKV).
+Web-App im Docker-Container für Vermieter: Immobilien, Mietobjekte, Mieter, Zähler, Belege und die jährliche Betriebskostenabrechnung (§ 556 BGB, § 2 BetrKV).
 
 ## Starten
 

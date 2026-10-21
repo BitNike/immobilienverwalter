@@ -7,6 +7,7 @@
   @page {
     size: A4; margin: 20mm 20mm 20mm 22mm;
     @bottom-right { content: "Seite " counter(page) " von " counter(pages); font-family: "Liberation Sans", Arial, sans-serif; font-size: 8pt; color: #666; }
+    {% if d.fusszeile %}@bottom-left { content: {{ d.fusszeile|tojson }}; font-family: "Liberation Sans", Arial, sans-serif; font-size: 7pt; color: #999; }{% endif %}
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; }
@@ -15,7 +16,9 @@
   .seitenzahl { display: none; }
   .vorschau { background: #e9ebee; padding: 24px; }
   .vorschau .seite { width: 210mm; min-height: 297mm; margin: 0 auto 24px; padding: 20mm 20mm 20mm 22mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
-  .vorschau .seitenzahl { display: block; position: absolute; right: 20mm; bottom: 10mm; font-size: 8pt; color: #666; }
+  .vorschau .seitenzahl { display: flex; align-items: baseline; position: absolute; left: 22mm; right: 20mm; bottom: 10mm; font-size: 8pt; color: #666; }
+  .vorschau .seitenzahl .fuss { font-size: 7pt; color: #999; }
+  .vorschau .seitenzahl .nr { margin-left: auto; }
   .absender { margin: 0 0 7mm; }
   table.kopf td { vertical-align: top; padding: 0; }
   .empfaenger { height: 32mm; }
@@ -99,7 +102,7 @@
     <tr><td>geleistete Vorauszahlungen:</td><td class="zahl">{{ d.vorauszahlung|eur }}</td></tr>
     <tr class="saldo"><th>{{ 'Nachzahlung' if d.saldo > 0 else 'Gutschrift' }}</th><th class="zahl">{{ d.saldo|abs|eur }}</th></tr>
   </table>
-  <div class="seitenzahl">Seite 1 von 2</div>
+  <div class="seitenzahl"><span class="fuss">{{ d.fusszeile }}</span><span class="nr">Seite 1 von 2</span></div>
 </div>
 
 <div class="seite">
@@ -137,7 +140,7 @@
     <ul>{% for a in anlagen %}<li>{{ a.titel }}</li>{% endfor %}</ul>
     {% endif %}
   </div>
-  <div class="seitenzahl">Seite 2 von 2</div>
+  <div class="seitenzahl"><span class="fuss">{{ d.fusszeile }}</span><span class="nr">Seite 2 von 2</span></div>
 </div>
 </body>
 </html>

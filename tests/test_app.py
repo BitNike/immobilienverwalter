@@ -117,6 +117,7 @@ def test_gesamter_ablauf():
     # Brief prüfen: Grundsteuer 75 %, Heizkosten 100 %
     brief = ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
     assert "77,66 €" in brief and "712,37 €" in brief and "75 %" in brief
+    assert "Erstellt mit Immobilienverwalter" in brief  # Fußzeile standardmäßig an
     from export import girocode
     assert girocode("Max", "DE89 3704 0044 0532 0130 00", 162.43, "Nebenkosten").startswith("<svg")
     assert girocode("Max", "", 162.43, "x") is None and girocode("Max", "DE89", 0, "x") is None
@@ -181,6 +182,8 @@ def test_gesamter_ablauf():
                                                  "logo": bild_datei("logo.png", "PNG", "RGBA", (900, 300))},
               content_type="multipart/form-data")
     ok(c.get("/logo"))
+    # Fußzeile im Brief ist abschaltbar (Haken fehlte beim Speichern)
+    assert "Erstellt mit" not in ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
     post(c, "/einstellungen/admin/kostenarten", data={"name": "Dachrinnenreinigung", "betrkv_nr": "17",
                                                         "schluessel": "mea", "umlagefaehig": "on"})
 
