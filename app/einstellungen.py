@@ -27,7 +27,7 @@ def profil_werte(mit_notizen=False):
 
 def zugeordnete_wohnungen(uid):
     return rows("SELECT w.*, i.name AS immobilie FROM wohnung w LEFT JOIN immobilie i ON i.id = w.immobilie_id "
-                "WHERE w.eigentuemer_id = ? ORDER BY i.name, w.bezeichnung", (uid,))
+                "WHERE w.eigentuemer_id = ? ORDER BY i.name COLLATE NATUERLICH, w.bezeichnung COLLATE NATUERLICH", (uid,))
 
 
 # ---------- Einstellungen: Vermieter (für alle sichtbar) ----------
@@ -136,7 +136,7 @@ def vermieter_bearbeiten(uid):
         flash("Gespeichert.")
         return redirect(url_for("vermieter_bearbeiten", uid=uid))
     andere = rows("SELECT w.*, i.name AS immobilie FROM wohnung w LEFT JOIN immobilie i ON i.id = w.immobilie_id "
-                  "WHERE w.eigentuemer_id IS NOT ? ORDER BY i.name IS NULL, i.name, w.bezeichnung", (uid,))
+                  "WHERE w.eigentuemer_id IS NOT ? ORDER BY i.name IS NULL, i.name COLLATE NATUERLICH, w.bezeichnung COLLATE NATUERLICH", (uid,))
     return render_template("einstellungen/vermieter_form.html", bereich="admin_vermieter", b=b, neu=False,
                            smtp=mail.konfiguriert(), wohnungen=zugeordnete_wohnungen(uid), andere=andere)
 
@@ -180,7 +180,7 @@ def vermieter_loeschen(uid):
 def wohnungen_liste():
     ws = rows("""SELECT w.*, i.name AS immobilie, b.vorname, b.name AS eig_name, b.benutzername
                  FROM wohnung w LEFT JOIN immobilie i ON i.id = w.immobilie_id
-                 LEFT JOIN benutzer b ON b.id = w.eigentuemer_id ORDER BY i.name IS NULL, i.name, w.bezeichnung""")
+                 LEFT JOIN benutzer b ON b.id = w.eigentuemer_id ORDER BY i.name IS NULL, i.name COLLATE NATUERLICH, w.bezeichnung COLLATE NATUERLICH""")
     return render_template("einstellungen/wohnungen_liste.html", bereich="admin_wohnungen", wohnungen=ws)
 
 
@@ -201,7 +201,7 @@ def wohnung_stamm(wid=None):
         return redirect(url_for("wohnung_stamm", wid=wid))
     zaehler = rows("SELECT * FROM zaehler WHERE wohnung_id = ? ORDER BY art, ausgebaut IS NULL, id", (wid,)) if wid else []
     return render_template("einstellungen/wohnung_form.html", bereich="admin_wohnungen", w=w, zaehler=zaehler,
-                           immobilien=rows("SELECT * FROM immobilie ORDER BY name"),
+                           immobilien=rows("SELECT * FROM immobilie ORDER BY name COLLATE NATUERLICH"),
                            benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname"))
 
 

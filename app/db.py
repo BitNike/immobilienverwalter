@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 
 from flask import g
@@ -173,8 +174,19 @@ STANDARD_KOSTENARTEN = [
 ]
 
 
+def _natuerlich_schluessel(s):
+    """„Wohnung 10“ nach „Wohnung 9“: Ziffernfolgen als Zahlen vergleichen, sonst ohne Groß/klein."""
+    return [(0, int(t), "") if t.isdigit() else (1, 0, t.casefold()) for t in re.split(r"(\d+)", s or "") if t]
+
+
+def _natuerlich(a, b):
+    x, y = _natuerlich_schluessel(a), _natuerlich_schluessel(b)
+    return (x > y) - (x < y)
+
+
 def verbinden(pfad=None):
     con = sqlite3.connect(pfad or DB_PATH)
+    con.create_collation("NATUERLICH", _natuerlich)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
     return con

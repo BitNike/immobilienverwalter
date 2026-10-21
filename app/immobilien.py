@@ -36,7 +36,7 @@ def kostenarten_aktiv():
 def berechnung(immo, j):
     """Lädt alle Daten einer Immobilie für ein Jahr und berechnet die Verteilung."""
     iid = immo["id"]
-    wohnungen = rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung", (iid,))
+    wohnungen = rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung COLLATE NATUERLICH", (iid,))
     kosten = rows("SELECT k.* FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id "
                   "WHERE k.immobilie_id = ? AND k.jahr = ? ORDER BY ka.sortierung, ka.name, k.id", (iid, j))
     kostenarten = {k["id"]: k for k in rows("SELECT * FROM kostenart")}
@@ -248,7 +248,7 @@ def immobilie(iid):
                            vorhanden=vorhandene_kostenarten(iid, j),
                            vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
                            dokumente=dokumente_sichtbar(iid, j), hauptzaehler=hauptzaehler, mvs=mvs,
-                           wohnungen=rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung", (iid,)))
+                           wohnungen=rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung COLLATE NATUERLICH", (iid,)))
 
 
 @app.post("/immobilien/<int:iid>/stammdaten")
@@ -414,7 +414,7 @@ def wohnung_hinzufuegen(iid):
                       list(vals.values()))
             zaehler_aus_formular(wid)
         return redirect(url_for("wohnung", wid=wid))
-    frei = rows("SELECT * FROM wohnung WHERE immobilie_id IS NULL ORDER BY bezeichnung")
+    frei = rows("SELECT * FROM wohnung WHERE immobilie_id IS NULL ORDER BY bezeichnung COLLATE NATUERLICH")
     return render_template("wohnung_neu.html", **spalte(immo), frei=frei,
                            benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname"))
 

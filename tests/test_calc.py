@@ -84,3 +84,15 @@ def test_wasser_fehlende_ablesung():
 def test_eigentuemer_vorauszahlung():
     erg = berechne(VON, BIS, {}, [wohnung(1)], [kosten(1, 1, 200.0, wohnung_id=1)], KA, [], [], {(1, None): 250.0})
     assert erg["wohnungen"][1]["saldo"] == -50.0
+
+
+def test_natuerliche_sortierung():
+    import sqlite3
+
+    import db
+    con = sqlite3.connect(":memory:")
+    con.create_collation("NATUERLICH", db._natuerlich)
+    con.execute("CREATE TABLE t (n TEXT)")
+    con.executemany("INSERT INTO t VALUES (?)", [(x,) for x in ["Wohnung 10", "Wohnung 2", "wohnung 1", "Garage", "Wohnung 12a"]])
+    assert [r[0] for r in con.execute("SELECT n FROM t ORDER BY n COLLATE NATUERLICH")] == \
+        ["Garage", "wohnung 1", "Wohnung 2", "Wohnung 10", "Wohnung 12a"]

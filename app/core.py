@@ -121,9 +121,9 @@ def admin_noetig(f):
 
 def sichtbare_immobilien(archiv=False):
     if ist_admin():
-        return rows("SELECT * FROM immobilie WHERE archiviert = ? ORDER BY name", (int(archiv),))
+        return rows("SELECT * FROM immobilie WHERE archiviert = ? ORDER BY name COLLATE NATUERLICH", (int(archiv),))
     return rows("SELECT DISTINCT i.* FROM immobilie i JOIN wohnung w ON w.immobilie_id = i.id "
-                "WHERE w.eigentuemer_id = ? AND i.archiviert = ? ORDER BY i.name", (g.user["id"], int(archiv)))
+                "WHERE w.eigentuemer_id = ? AND i.archiviert = ? ORDER BY i.name COLLATE NATUERLICH", (g.user["id"], int(archiv)))
 
 
 def immobilie_laden(iid):
@@ -140,7 +140,7 @@ def wohnungen_der_immobilie(iid):
     if not ist_admin():
         sql += " AND eigentuemer_id = ?"
         args.append(g.user["id"])
-    return rows(sql + " ORDER BY bezeichnung", args)
+    return rows(sql + " ORDER BY bezeichnung COLLATE NATUERLICH", args)
 
 
 def wohnung_sichtbar(w):
