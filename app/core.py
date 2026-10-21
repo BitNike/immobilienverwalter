@@ -217,5 +217,5 @@ def kontext():
 
 
 def logo_info():
-    return {"typ": einstellung("logo_typ", "text"), "text": einstellung("logo_text", "Nebenkosten"),
+    return {"typ": einstellung("logo_typ", "standard"), "text": einstellung("logo_text", "Immobilienverwalter"),
             "version": einstellung("logo_version", "0")}

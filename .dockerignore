@@ -5,3 +5,4 @@ tests/
 **/__pycache__
 .git
 *.md
+design/

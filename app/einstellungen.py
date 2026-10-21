@@ -231,8 +231,10 @@ def kostenart_loeschen(kid):
 def logo_admin():
     if request.method == "POST":
         f = request.form
-        einstellung_setzen("logo_text", f.get("logo_text", "").strip() or "Nebenkosten")
-        typ = f.get("logo_typ", "text")
+        einstellung_setzen("logo_text", f.get("logo_text", "").strip() or "Immobilienverwalter")
+        typ = f.get("logo_typ", "standard")
+        if typ not in ("standard", "bild", "text"):
+            typ = "standard"
         if request.files.get("logo") and request.files["logo"].filename:
             einstellung_setzen("logo_datei", dateien.logo_speichern(request.files["logo"]))
             einstellung_setzen("logo_version", str(int(einstellung("logo_version", "0")) + 1))
