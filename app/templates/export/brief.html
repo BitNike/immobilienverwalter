@@ -4,23 +4,23 @@
 <meta charset="utf-8">
 <title>Betriebskostenabrechnung {{ d.jahr }}</title>
 <style>
-  @page { size: A4; margin: 18mm 20mm 18mm 22mm; }
+  @page { size: A4; margin: 15mm 20mm 14mm 22mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.4; color: #111; }
+  body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.35; color: #111; }
   .seite { background: #fff; }
   .vorschau { background: #e9ebee; padding: 24px; }
-  .vorschau .seite { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 20mm 18mm 22mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
-  .absender { margin: 0 0 6mm; }
+  .vorschau .seite { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 15mm 20mm 14mm 22mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .absender { margin: 0 0 5mm; }
   table.kopf td { vertical-align: top; padding: 0; }
-  .empfaenger { height: 30mm; }
+  .empfaenger { height: 27mm; }
   .empfaenger div, .infos div { white-space: nowrap; }
   .infos { width: 62mm; }
   .infos table td { padding: 0 0 0.6mm; }
   .infos table td:first-child { width: 22mm; color: #444; }
   .infos .abstand td { padding-bottom: 4mm; }
-  h1 { font-size: 11pt; margin: 6mm 0 0; }
+  h1 { font-size: 11pt; margin: 2mm 0 0; }
   h1 span { margin-left: 18mm; }
-  .unter { margin: 0 0 5mm; }
+  .unter { margin: 0 0 4mm; }
   table { border-collapse: collapse; width: 100%; }
   td, th { padding: 0.6mm 0; text-align: left; vertical-align: top; font-weight: normal; }
   .zeitraum { width: 125mm; margin-bottom: 2mm; }
@@ -28,20 +28,26 @@
   .zeitraum td.w { width: 28mm; text-align: center; }
   .zeitraum tr.linie td.w { border-bottom: 1px solid #111; }
   .zahl { text-align: right; white-space: nowrap; }
-  .kosten { margin-top: 6mm; }
+  .kosten { margin-top: 5mm; }
   .kosten thead th { font-weight: bold; vertical-align: bottom; }
-  .kosten .basis { display: block; font-size: 8pt; color: #555; }
+  .kosten td { padding: 0.5mm 0; vertical-align: baseline; }
+  .kosten th.basis { font-weight: normal; }
+  .kosten .basis { font-size: 8pt; color: #555; padding-left: 4mm; white-space: nowrap; }
   .kosten tfoot th { font-weight: bold; padding-top: 4mm; }
-  .ergebnis { width: 100mm; margin: 6mm 0 0 auto; }
+  .ergebnis { width: 100mm; margin: 4mm 0 0 auto; }
   .ergebnis tr.saldo th { border-top: 1px solid #111; font-weight: bold; }
-  .zahlung { margin-top: 9mm; }
+  .zahlung { margin-top: 6mm; break-inside: avoid; }
+  .zahlung > table { width: 100%; }
+  .zahlung > table > tbody > tr > td { vertical-align: top; padding: 0; }
+  .girocode { width: 32mm; text-align: center; font-size: 7.5pt; color: #444; padding-left: 6mm !important; }
+  .girocode svg { display: block; width: 26mm; height: 26mm; margin: 0 auto 1mm; }
   .zahlung p { margin: 0 0 2mm; }
   .konto { width: auto; margin: 0 0 2.5mm; }
   .konto td { padding: 0.3mm 6mm 0.3mm 0; }
   .konto td:first-child { color: #444; }
-  .hinweis { margin-top: 7mm; padding-top: 2.5mm; border-top: 1px solid #bbb; font-size: 8.5pt; color: #444; }
+  .hinweis { break-inside: avoid; margin-top: 5mm; padding-top: 2.5mm; border-top: 1px solid #bbb; font-size: 8.5pt; color: #444; }
   .hinweis p { margin: 0 0 1mm; }
-  .anlagen { margin-top: 5mm; font-size: 9pt; }
+
 </style>
 </head>
 <body class="{{ 'vorschau' if vorschau }}">
@@ -64,23 +70,23 @@
   <table class="zeitraum">
     <tr><td>Abrechnungszeitraum</td><td class="w">{{ d.abrechnung_von|datum(True) }}</td><td class="w">bis</td><td class="w">{{ d.abrechnung_bis|datum(True) }}</td></tr>
     <tr class="linie"><td>Nutzungszeitraum</td><td class="w">{{ d.nutzung_von|datum(True) }}</td><td class="w">bis</td><td class="w">{{ d.nutzung_bis|datum(True) }}</td></tr>
-    <tr><td>Abrechnungsmonate</td><td class="w">{{ d.monate|monate }}</td><td></td><td></td></tr>
-    <tr><td>Abrechnungsmonate %</td><td class="w">{{ d.prozent|num(0) }}%</td><td></td><td></td></tr>
+    <tr><td>Abrechnungsmonate</td><td class="w">{{ d.monate|monate }}</td><td class="w">{{ d.prozent|num(0) }} %</td><td></td></tr>
   </table>
   <p>Umlageschlüssel: {{ d.umlageschluessel }}</p>
 
   <table class="kosten">
-    <thead><tr><th>Kostenart</th><th class="zahl">{{ d.spalte_gesamt }}</th><th class="zahl">Ihr Anteil</th></tr></thead>
+    <thead><tr><th>Kostenart</th><th class="basis">Verteilung</th><th class="zahl">{{ d.spalte_gesamt }}</th><th class="zahl">Ihr Anteil</th></tr></thead>
     <tbody>
     {% for p in d.posten %}
     <tr>
-      <td>{{ p.kostenart }}<span class="basis">{{ p.basis }}</span></td>
+      <td>{{ p.kostenart }}</td>
+      <td class="basis">{{ p.basis }}</td>
       <td class="zahl">{{ p.gesamt|eur }}</td>
       <td class="zahl">{{ p.betrag|eur }}</td>
     </tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><th>Nebenkosten</th><th class="zahl">{{ d.summe_gesamt|eur }}</th><th class="zahl">{{ d.summe|eur }}</th></tr></tfoot>
+    <tfoot><tr><th colspan="2">Nebenkosten</th><th class="zahl">{{ d.summe_gesamt|eur }}</th><th class="zahl">{{ d.summe|eur }}</th></tr></tfoot>
   </table>
 
   <table class="ergebnis">
@@ -90,14 +96,18 @@
 
   <div class="zahlung">
     {% if d.saldo > 0 %}
+    <table><tr><td>
     <p>{{ d.hinweis_nachzahlung }}</p>
     <table class="konto">
       {% if d.kontoinhaber %}<tr><td>Kontoinhaber</td><td>{{ d.kontoinhaber }}</td></tr>{% endif %}
       <tr><td>IBAN</td><td>{{ d.iban or '________________' }}</td></tr>
       {% if d.bank %}<tr><td>Bank</td><td>{{ d.bank }}</td></tr>{% endif %}
-      <tr><td>Verwendungszweck</td><td>Nebenkosten {{ d.jahr }}, {{ d.objekt|first }}</td></tr>
+      <tr><td>Verwendungszweck</td><td>{{ d.verwendungszweck }}</td></tr>
     </table>
     <p>Bei nicht fristgerechter Zahlung geraten Sie automatisch in Verzug.</p>
+    </td>
+    {% if d.girocode %}<td class="girocode">{{ d.girocode|safe }}GiroCode – mit der Banking-App scannen</td>{% endif %}
+    </tr></table>
     {% else %}
     <p>Die Gutschrift in Höhe von {{ d.saldo|abs|eur }} wird Ihnen erstattet.</p>
     {% endif %}
@@ -106,11 +116,8 @@
   <div class="hinweis">
     <p><strong>Belegeinsicht:</strong> Sie können die Originalbelege zu dieser Abrechnung einsehen.
       Bitte vereinbaren Sie dazu vorher einen Termin.</p>
+    {% if anlagen %}<p><strong>Anlagen:</strong> {{ anlagen|map(attribute='titel')|join(', ') }}</p>{% endif %}
   </div>
-
-  {% if anlagen %}
-  <p class="anlagen">Im Folgenden finden Sie die Anlagen: {{ anlagen|map(attribute='titel')|join(', ') }}</p>
-  {% endif %}
 </div>
 </body>
 </html>

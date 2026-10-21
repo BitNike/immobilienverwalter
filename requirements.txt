@@ -3,4 +3,5 @@ gunicorn==23.0.0
 weasyprint==62.3
 pydyf==0.10.0
 pypdf==4.3.1
+segno==1.6.1
 pillow==10.4.0
