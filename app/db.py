@@ -134,6 +134,11 @@ MIGRATIONEN = [
     """
     ALTER TABLE immobilie ADD COLUMN schluessel TEXT NOT NULL DEFAULT '';
     """,
+    # 3: Eigentümer-Abrechnung nur bei WEG; Bestand: WEG, wenn mehr als ein Mietobjekt
+    """
+    ALTER TABLE immobilie ADD COLUMN weg INTEGER NOT NULL DEFAULT 0;
+    UPDATE immobilie SET weg = 1 WHERE (SELECT COUNT(*) FROM wohnung w WHERE w.immobilie_id = immobilie.id) > 1;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

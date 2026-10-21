@@ -58,7 +58,7 @@ def test_gesamter_ablauf():
 
     # Immobilie mit Dokument anlegen
     r = c.post("/immobilien/neu", data={"name": "Lindenhof 7", "strasse": "Lindenhof", "hausnummer": "7",
-                                        "plz": "12345", "ort": "Musterstadt", "iban": "de00 1234",
+                                        "plz": "12345", "ort": "Musterstadt", "iban": "de00 1234", "weg": "on",
                                         "dateien": pdf_datei("Grundsteuerbescheid.pdf"), "dok_jahr": "2025",
                                         "bereich": "mieter"}, content_type="multipart/form-data")
     ok(r, 302)
@@ -121,7 +121,15 @@ def test_gesamter_ablauf():
     assert "Nachzahlung" in brief or "Gutschrift" in brief
 
     post(c, "/wohnungen/1/vorauszahlungen", data={"vz_1": "1.350", "vz_eigentuemer": "500"})
-    assert "noch nicht gespeichert" not in ok(c.get("/wohnungen/1")).get_data(as_text=True)
+    html = ok(c.get("/wohnungen/1")).get_data(as_text=True)
+    assert "noch nicht gespeichert" not in html and "Eigentümer-Abrechnung (WEG)" in html
+    # ohne WEG keine Eigentümer-Abrechnung, nur die Übersicht
+    post(c, "/immobilien/1/stammdaten", data={"name": "Lindenhof 7", "strasse": "Lindenhof", "hausnummer": "7",
+                                              "plz": "12345", "ort": "Musterstadt", "iban": "DE00 1234"})
+    html = ok(c.get("/wohnungen/1")).get_data(as_text=True)
+    assert "Eigentümer-Abrechnung (WEG)" not in html and "Der Eigentümer trägt selbst" in html
+    post(c, "/immobilien/1/stammdaten", data={"name": "Lindenhof 7", "strasse": "Lindenhof", "hausnummer": "7",
+                                              "plz": "12345", "ort": "Musterstadt", "iban": "DE00 1234", "weg": "on"})
 
     # Standard-Umlageschlüssel einer Immobilie wird beim Erfassen neuer Gebäudekosten vorausgewählt
     post(c, "/immobilien/neu", data={"name": "Haus Test", "schluessel": "einheiten"})

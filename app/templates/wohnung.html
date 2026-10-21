@@ -52,16 +52,29 @@
     </tbody>
     <tfoot>
     <tr>
-      <th>Eigentümer (gesamte Wohnung)</th><td>{{ erg.monate|monate }} Monate</td><td></td>
+      <th>Summe Wohnung</th><td>{{ erg.monate|monate }} Monate</td><td></td>
+      <th class="zahl">{{ r.summe|eur }}</th>
+      <th class="zahl">{{ r.parteien|sum(attribute='vorauszahlung')|eur }}</th>
+      <td class="zahl">{% if r.parteien %}<small class="leise">Mieter gesamt</small><br>{{ saldo(r.parteien|sum(attribute='saldo')) }}{% endif %}</td>
+      <td></td>
+    </tr>
+    {% if immo.weg %}
+    <tr class="weg">
+      <th>Eigentümer-Abrechnung (WEG)<br><small class="leise">gesamte Wohnung gegenüber der WEG</small></th>
+      <td>{{ erg.monate|monate }} Monate</td><td></td>
       <th class="zahl">{{ r.summe|eur }}</th>
       <td class="zahl">{% if darf %}<input class="betrag" form="vz" name="vz_eigentuemer" inputmode="decimal"
-          value="{{ vz_gespeichert[None]|num if None in vz_gespeichert else '' }}" placeholder="0,00">{% else %}{{ r.vorauszahlung|eur }}{% endif %}</td>
+          value="{{ vz_gespeichert[None]|num if None in vz_gespeichert else '' }}" placeholder="Hausgeld" title="An die WEG gezahltes Hausgeld">{% else %}{{ r.vorauszahlung|eur }}{% endif %}</td>
       <td class="zahl">{{ saldo(r.saldo) }}</td>
       <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}">{{ icon('download', 16) }}<span>Export</span></a></td>
     </tr>
+    {% endif %}
     </tfoot>
   </table>
   </div>
+  <p class="leise">{% if immo.weg %}Die Eigentümer-Abrechnung vergleicht die Kosten der gesamten Wohnung mit dem an die WEG gezahlten
+    Hausgeld. Die Vorauszahlungen der Mieter sind darin nicht enthalten, sie stehen dem Eigentümer zu.{% endif %}
+    Der Eigentümer trägt selbst: {{ r.leerstand.summe|eur }} (Leerstand und nicht umlagefähige Kosten).</p>
   {% if darf %}<div class="knopfleiste">{{ speichern("Vorauszahlungen speichern", form="vz") }}</div>{% endif %}
 
   <h3>Kostenaufstellung</h3>

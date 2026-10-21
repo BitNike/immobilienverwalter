@@ -76,6 +76,8 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
     </select>
     <small>Vorauswahl für neue Gebäudekosten. Automatisch: bei nur einem Mietobjekt Wohnfläche, sonst der Standard der Kostenart. Eigenes Haus ohne WEG: Wohnfläche.</small>
   </label>
+  <label class="haken breit"><input type="checkbox" name="weg" {{ 'checked' if i.weg }}>
+    <span>Eigentümergemeinschaft (WEG): zusätzlich eine Eigentümer-Abrechnung je Wohnung erstellen (Kosten gegen Hausgeld)</span></label>
   {{ feld('absender', 'Absender', i.absender, breit=True, hinweis='z. B. „Hausverwaltung, Straße, PLZ Ort“ – leer = Eigentümer') }}
   {{ feld('kontoinhaber', 'Kontoinhaber', i.kontoinhaber) }}
   {{ feld('iban', 'IBAN', i.iban, attrs='autocomplete="off"') }}

@@ -183,6 +183,7 @@ def immobilie_werte():
     vals["iban"] = vals["iban"].upper()
     if vals["schluessel"] not in ("", "mea", "flaeche", "einheiten"):
         raise ValueError("Unbekannter Umlageschlüssel.")
+    vals["weg"] = 1 if f.get("weg") else 0
     vals["gesamtflaeche"] = parse_num(f.get("gesamtflaeche"), None)
     einheiten = parse_num(f.get("einheiten_gesamt"), None)
     vals["einheiten_gesamt"] = int(einheiten) if einheiten else None
