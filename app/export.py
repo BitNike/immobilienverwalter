@@ -19,13 +19,24 @@ def _zeile(person, o):
     return ", ".join(x for x in (person, a1, a2) if x)
 
 
+SEPA_ZEICHEN = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-?:().,'+ ")
+UMLAUTE = {"ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss"}
+
+
+def sepa_text(s):
+    """Auf den SEPA-Grundzeichensatz bringen (Umlaute ausschreiben), den alle Banken sicher verarbeiten."""
+    s = "".join(UMLAUTE.get(z, z) for z in s or "")
+    return " ".join("".join(z if z in SEPA_ZEICHEN else " " for z in s).split())
+
+
 def girocode(name, iban, betrag, zweck):
     """EPC-QR-Code („GiroCode“) als SVG: Banking-Apps übernehmen daraus Empfänger, IBAN, Betrag und Zweck."""
     import segno
     iban = "".join(iban.split()).upper()
     if not (name and iban and betrag > 0):
         return None
-    daten = "\n".join(["BCD", "002", "1", "SCT", "", name[:70], iban, f"EUR{betrag:.2f}", "", "", zweck[:140]])
+    daten = "\n".join(["BCD", "002", "1", "SCT", "", sepa_text(name)[:70], iban, f"EUR{betrag:.2f}", "", "",
+                       sepa_text(zweck)[:140]])
     return segno.make(daten, error="m", micro=False).svg_inline(scale=1, border=0, omitsize=True)
 
 
@@ -77,8 +88,8 @@ def brief_daten(wid, partei):
     wohnung = w["bezeichnung"] if len(erg["wohnungen"]) > 1 else ""
     d["fusszeile"] = (f"Erstellt mit {NAME}" + (f" · {URL}" if URL else "")
                       if einstellung("brief_fusszeile", "1") == "1" else "")
-    d["verwendungszweck"] = ", ".join(x for x in (f"Nebenkosten {j}", d["objekt"][0] if d["objekt"] else "", wohnung,
-                                                  d["partei_name"]) if x)
+    d["verwendungszweck"] = sepa_text(", ".join(x for x in (f"Nebenkosten {j}", d["objekt"][0] if d["objekt"] else "",
+                                                            wohnung, d["partei_name"]) if x))
     d["girocode"] = girocode(d["kontoinhaber"] or (person_name(eig) if eig else ""), d["iban"] or "", d["saldo"],
                              d["verwendungszweck"]) if d["saldo"] > 0 else None
     return d

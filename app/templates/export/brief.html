@@ -5,29 +5,39 @@
 <title>Betriebskostenabrechnung {{ d.jahr }}</title>
 <style>
   @page {
-    size: A4; margin: 20mm 20mm 20mm 22mm;
+    size: A4; margin: 20mm 20mm 20mm 25mm;
     @bottom-right { content: "Seite " counter(page) " von " counter(pages); font-family: "Liberation Sans", Arial, sans-serif; font-size: 8pt; color: #666; }
     {% if d.fusszeile %}@bottom-left { content: {{ d.fusszeile|tojson }}; font-family: "Liberation Sans", Arial, sans-serif; font-size: 7pt; color: #999; }{% endif %}
   }
+  @page :first { margin-top: 0; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; }
   .seite { background: #fff; position: relative; }
   .seite + .seite { break-before: page; }
   .seitenzahl { display: none; }
   .vorschau { background: #e9ebee; padding: 24px; }
-  .vorschau .seite { width: 210mm; min-height: 297mm; margin: 0 auto 24px; padding: 20mm 20mm 20mm 22mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
-  .vorschau .seitenzahl { display: flex; align-items: baseline; position: absolute; left: 22mm; right: 20mm; bottom: 10mm; font-size: 8pt; color: #666; }
+  .vorschau .seite { width: 210mm; min-height: 297mm; margin: 0 auto 24px; padding: 20mm 20mm 20mm 25mm; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .vorschau .seitenzahl { display: flex; align-items: baseline; position: absolute; left: 25mm; right: 20mm; bottom: 10mm; font-size: 8pt; color: #666; }
   .vorschau .seitenzahl .fuss { font-size: 7pt; color: #999; }
   .vorschau .seitenzahl .nr { margin-left: auto; }
-  .absender { margin: 0 0 7mm; }
-  table.kopf td { vertical-align: top; padding: 0; }
-  .empfaenger { height: 32mm; }
-  .empfaenger div, .infos div { white-space: nowrap; }
-  .infos { width: 62mm; }
+  /* Seite 1 nach DIN 5008 Form B (Fensterumschlag DIN lang / C5/6). Bezug: Blattkante; Inhalt beginnt 25 mm links. */
+  .seite.erste, .vorschau .seite.erste { padding-top: 97mm; }
+  .anschrift { position: absolute; top: 45mm; left: -5mm; width: 85mm; height: 45mm; padding-left: 5mm; }
+  .ruecksende { position: absolute; top: 12.7mm; left: 5mm; right: 0; height: 5mm; font-size: 7pt; line-height: 5mm;
+                white-space: nowrap; overflow: hidden; text-decoration: underline; color: #333; }
+  .empfaenger { position: absolute; top: 17.7mm; left: 5mm; right: 0; line-height: 1.25; }
+  .empfaenger div { white-space: nowrap; overflow: hidden; }
+  .infos { position: absolute; top: 50mm; left: 100mm; width: 65mm; }
   .infos table td { padding: 0 0 0.8mm; }
   .infos table td:first-child { width: 22mm; color: #444; }
   .infos .abstand td { padding-bottom: 4mm; }
-  h1 { font-size: 11pt; margin: 8mm 0 0; }
+  .falz { position: absolute; left: -20mm; width: 5mm; border-top: 0.5pt solid #999; }
+  .falz.loch { width: 3mm; }
+  /* In der Vorschau zählt die Position ab Blattkante (Ränder sind dort Innenabstand statt Seitenrand). */
+  .vorschau .anschrift { left: 20mm; }
+  .vorschau .infos { left: 125mm; }
+  .vorschau .falz { left: 5mm; }
+  h1 { font-size: 11pt; margin: 0; }
   h1 span { margin-left: 18mm; }
   h2 { font-size: 10.5pt; margin: 0 0 3mm; }
   .unter { margin: 0 0 6mm; }
@@ -60,18 +70,18 @@
 </style>
 </head>
 <body class="{{ 'vorschau' if vorschau }}">
-<div class="seite">
-  <p class="absender">{{ d.absender }}</p>
-
-  <table class="kopf"><tr>
-    <td class="empfaenger">{% for z in d.empfaenger if z %}<div>{{ z }}</div>{% endfor %}</td>
-    <td class="infos">
-      <table>
-        <tr class="abstand"><td>Erstellt am</td><td>{{ d.erstellt|datum }}</td></tr>
-        {% for z in d.objekt %}<tr><td>{{ 'Objekt' if loop.first }}</td><td>{{ z }}</td></tr>{% endfor %}
-      </table>
-    </td>
-  </tr></table>
+<div class="seite erste">
+  <div class="falz" style="top: 105mm"></div><div class="falz loch" style="top: 148.5mm"></div><div class="falz" style="top: 210mm"></div>
+  <div class="anschrift">
+    <div class="ruecksende">{{ d.absender }}</div>
+    <div class="empfaenger">{% for z in d.empfaenger if z %}<div>{{ z }}</div>{% endfor %}</div>
+  </div>
+  <div class="infos">
+    <table>
+      <tr class="abstand"><td>Erstellt am</td><td>{{ d.erstellt|datum }}</td></tr>
+      {% for z in d.objekt %}<tr><td>{{ 'Objekt' if loop.first }}</td><td>{{ z }}</td></tr>{% endfor %}
+    </table>
+  </div>
 
   <h1>Betriebskostenabrechnung <span>{{ d.jahr }}</span></h1>
   <p class="unter">Zusammensetzung der Betriebskosten</p>

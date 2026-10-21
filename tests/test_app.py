@@ -118,7 +118,8 @@ def test_gesamter_ablauf():
     brief = ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
     assert "77,66 €" in brief and "712,37 €" in brief and "75 %" in brief
     assert "Erstellt mit Immobilienverwalter" in brief  # Fußzeile standardmäßig an
-    from export import girocode
+    from export import girocode, sepa_text
+    assert sepa_text("Gartenstraße 5, Klara Krämer & Söhne") == "Gartenstrasse 5, Klara Kraemer Soehne"
     assert girocode("Max", "DE89 3704 0044 0532 0130 00", 162.43, "Nebenkosten").startswith("<svg")
     assert girocode("Max", "", 162.43, "x") is None and girocode("Max", "DE89", 0, "x") is None
     assert "Max Vermieter, Musterweg 1, 12345 Musterstadt" in brief
