@@ -96,3 +96,13 @@ def test_natuerliche_sortierung():
     con.executemany("INSERT INTO t VALUES (?)", [(x,) for x in ["Wohnung 10", "Wohnung 2", "wohnung 1", "Garage", "Wohnung 12a"]])
     assert [r[0] for r in con.execute("SELECT n FROM t ORDER BY n COLLATE NATUERLICH")] == \
         ["Garage", "wohnung 1", "Wohnung 2", "Wohnung 10", "Wohnung 12a"]
+
+
+def test_wasser_erste_ablesung_im_jahr():
+    from calc import messbeginn
+    # Uhr ohne Stand zum 01.01., erste Ablesung beim Einzug am 17.03.
+    uhr = [wasseruhr(1, [("2025-03-17", 1335.0), ("2025-12-31", 1356.0)], eingebaut="2025-01-01")]
+    assert verbrauch_zeitraum(uhr, VON, BIS) == 21.0
+    assert messbeginn(uhr, VON, BIS) == date(2025, 3, 17)
+    # mit Stand zum Jahresanfang: kein Hinweis
+    assert messbeginn([wasseruhr(1, [("2024-12-31", 1300.0), ("2025-12-31", 1356.0)])], VON, BIS) is None

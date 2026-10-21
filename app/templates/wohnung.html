@@ -230,7 +230,8 @@
 <section class="block" id="zaehler">
   <h2>Zähler &amp; Ablesungen</h2>
   <p class="leise">Für die Wasserverteilung den Stand am 31.12. sowie am Ein- und Auszugstag eintragen.
-    Wasserverbrauch {{ jahr }}: <strong>{{ (r.wasser|num(1) ~ ' m³') if r.wasser is not none else 'nicht ermittelbar' }}</strong></p>
+    Wasserverbrauch {{ jahr }}: <strong>{{ (r.wasser|num(1) ~ ' m³') if r.wasser is not none else 'nicht ermittelbar' }}</strong>
+    {% if r.wasser is not none and r.wasser_ab %}<span class="warnung">(gemessen erst ab {{ r.wasser_ab|datum }}; der Stand zum 01.01.{{ jahr }} fehlt)</span>{% endif %}</p>
   <div class="zaehler-raster">
   {% for z in zaehler %}
   <div class="karte-flach {{ 'gedimmt' if z.ausgebaut }}">

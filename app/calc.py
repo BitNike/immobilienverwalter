@@ -85,8 +85,9 @@ def monate(von, bis):
 def verbrauch_zeitraum(zaehler, von, bis):
     """
     Verbrauch aller übergebenen Zähler (z. B. alte + neue Wasseruhr) im Zeitraum.
-    Anfang = letzte Ablesung am/vor `von` (oder Einbaustand), Ende = letzte Ablesung am/vor `bis`
-    (bzw. Ausbaustand). None, wenn Ablesungen fehlen.
+    Anfang = letzte Ablesung am/vor `von`; fehlt sie (Einbau oder erste Ablesung erst im Zeitraum),
+    zählt der Verbrauch ab der ersten Ablesung im Zeitraum (siehe `messbeginn`).
+    Ende = letzte Ablesung am/vor `bis` (bzw. Ausbaustand). None, wenn das Ende fehlt.
     """
     summe, gezaehlt = 0.0, False
     for z in zaehler:
@@ -97,8 +98,8 @@ def verbrauch_zeitraum(zaehler, von, bis):
         vorher = [s for s in st if s[0] <= von]
         if vorher:
             start = vorher[-1]
-        elif ein and ein > von and st and st[0][0] <= bis:
-            start = st[0]  # Zähler wurde im Zeitraum eingebaut
+        elif st and st[0][0] <= bis:
+            start = st[0]
         else:
             return None
         bis_eff = min(bis, aus) if aus else bis
@@ -108,6 +109,19 @@ def verbrauch_zeitraum(zaehler, von, bis):
         summe += ende[-1][1] - start[1]
         gezaehlt = True
     return summe if gezaehlt else None
+
+
+def messbeginn(zaehler, von, bis):
+    """Datum der ersten Ablesung, wenn für den Zeitraum kein Stand am/vor `von` vorliegt und der Zähler
+    nicht erst im Zeitraum eingebaut wurde – der Verbrauch davor ist dann unbekannt. Sonst None."""
+    for z in zaehler:
+        ein, aus = parse_date(z.get("eingebaut")), parse_date(z.get("ausgebaut"))
+        if (aus and aus < von) or (ein and ein > von):
+            continue
+        st = sorted(parse_date(d) for d, _ in z["staende"])
+        if st and st[0] > von and st[0] <= bis:
+            return st[0]
+    return None
 
 
 # ---------- Berechnung ----------
@@ -135,7 +149,8 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
     for w in wohnungen:
         wz = wasserzaehler[w["id"]]
         erg[w["id"]] = {"wohnung": w, "posten": [], "summe": 0.0,
-                        "wasser": verbrauch_zeitraum(wz, von, bis) if wz else None}
+                        "wasser": verbrauch_zeitraum(wz, von, bis) if wz else None,
+                        "wasser_ab": messbeginn(wz, von, bis) if wz else None}
 
     def verteile(k):
         b, s = k["betrag"], k["schluessel"]

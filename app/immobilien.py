@@ -105,6 +105,10 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         if "mea" in schluessel and not w["mea"]:
             punkt(f"{w['bezeichnung']}: Keine MEA hinterlegt. Kosten nach MEA entfallen auf dieses Mietobjekt mit 0 €.",
                   stamm)
+        if "wasser" in schluessel and r["wasser"] is not None and r["wasser_ab"]:
+            punkt(f"{w['bezeichnung']}: Wasserverbrauch erst ab {r['wasser_ab']:%d.%m.%Y} gemessen, der Zählerstand "
+                  "zum Jahresanfang fehlt (z. B. aus der Ablesung zum 31.12. des Vorjahres nachtragen).",
+                  url_for("wohnung", wid=wid) + "#zaehler", "hinweis")
         if "flaeche" in schluessel and not w["wohnflaeche"]:
             punkt(f"{w['bezeichnung']}: Keine Wohnfläche hinterlegt. Kosten nach Wohnfläche entfallen auf dieses "
                   "Mietobjekt mit 0 €.", stamm)
