@@ -98,8 +98,12 @@
       <td class="zahl">{% if w.mea %}{{ w.mea|num }}/{{ w.mea_basis|num(0) }}<br><small class="leise">{{ (w.mea / w.mea_basis * 100)|num }} %</small>{% else %}<span class="leise">–</span>{% endif %}</td>
       <td class="zahl">{{ (r.wasser|num(1) ~ ' m³') if r.wasser is not none else '–' }}</td>
       <td class="zahl">{{ r.summe|eur }}</td>
+      {% if w.mieter_extern %}
+      <td class="zahl leise" colspan="2" title="Mieter rechnet der Eigentümer selbst ab">rechnet Eigentümer ab</td>
+      {% else %}
       <td class="zahl">{{ (r.summe - r.leerstand.summe)|eur }}</td>
       <td class="zahl leise">{{ r.leerstand.summe|eur }}</td>
+      {% endif %}
     </tr>
     {% endfor %}
     </tbody>

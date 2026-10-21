@@ -127,6 +127,8 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   {{ feld('gas_nummer', 'Gaszähler (Nummer)', '') }}
   {% endif %}
 </div>
+<label class="haken"><input type="checkbox" name="mieter_extern" {{ 'checked' if w.mieter_extern }}>
+  <span>Mieter rechnet der Eigentümer selbst ab<br><small class="leise">Bei WEG-Wohnungen anderer Eigentümer: Hier erscheint dann nur die Eigentümer-Abrechnung (Kosten gegen Hausgeld), keine Mieter und kein „Leerstand“.</small></span></label>
 <label class="breit">Notiz<textarea name="notiz" rows="2">{{ w.notiz }}</textarea></label>
 {%- endmacro %}
 

@@ -143,6 +143,10 @@ MIGRATIONEN = [
     """
     ALTER TABLE immobilie ADD COLUMN archiviert INTEGER NOT NULL DEFAULT 0;
     """,
+    # 5: Mieter rechnet der Eigentümer selbst ab (WEG: hier nur Eigentümer-Abrechnung)
+    """
+    ALTER TABLE wohnung ADD COLUMN mieter_extern INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

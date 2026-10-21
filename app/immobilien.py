@@ -108,7 +108,9 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         if "flaeche" in schluessel and not w["wohnflaeche"]:
             punkt(f"{w['bezeichnung']}: Keine Wohnfläche hinterlegt. Kosten nach Wohnfläche entfallen auf dieses "
                   "Mietobjekt mit 0 €.", stamm)
-        for p in r["parteien"]:
+        if (immo["weg"] or w["mieter_extern"]) and (wid, None) not in erg["vz_gespeichert"]:
+            punkt(f"{w['bezeichnung']}: Das Hausgeld des Eigentümers ist noch nicht eingetragen.", abrechnung, "hinweis")
+        for p in ([] if w["mieter_extern"] else r["parteien"]):
             if (wid, p["mv"]["id"]) not in erg["vz_gespeichert"]:
                 punkt(f"{w['bezeichnung']}: Die Vorauszahlung von {mv_name(p['mv'])} ist nur vorgeschlagen "
                       f"({de_num(p['vorauszahlung_soll'])} €) und noch nicht gespeichert.", abrechnung)
@@ -374,6 +376,7 @@ def wohnung_werte():
         raise ValueError("Bitte eine Bezeichnung angeben, z. B. „1. OG links“.")
     vals["iban"] = vals["iban"].upper()
     vals["wohnflaeche"] = parse_num(f.get("wohnflaeche"))
+    vals["mieter_extern"] = 1 if f.get("mieter_extern") else 0
     mea, basis = parse_mea(f.get("mea"))
     vals["mea"] = mea
     vals["mea_basis"] = basis or parse_num(f.get("mea_basis"), 1000.0) or 1000.0

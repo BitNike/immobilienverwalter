@@ -208,6 +208,14 @@ def test_gesamter_ablauf():
     post(c, "/einstellungen/admin/wohnungen/2", data={"bezeichnung": "OG", "wohnflaeche": "50", "mea": "60",
                                                         "mea_basis": "1000", "immobilie_id": "1",
                                                         "eigentuemer_id": "2"})
+    # Mieter rechnet der Eigentümer selbst ab: nur Eigentümer-Abrechnung, kein „Leerstand“
+    post(c, "/einstellungen/admin/wohnungen/2", data={"bezeichnung": "OG", "wohnflaeche": "50", "mea": "60",
+                                                        "mea_basis": "1000", "immobilie_id": "1",
+                                                        "eigentuemer_id": "2", "mieter_extern": "on"})
+    html = ok(c.get("/wohnungen/2")).get_data(as_text=True)
+    assert "rechnet der Eigentümer" in html and "Leerstand" not in html and "Eigentümer-Abrechnung (WEG)" in html
+    html = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert "rechnet Eigentümer ab" in html and "OG: Das Hausgeld des Eigentümers" in html
 
     # Eigentümer ohne Zugang direkt beim Mietobjekt anlegen (nur der Name ist Pflicht)
     post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Garage", "wohnflaeche": "15", "immobilie_id": "",

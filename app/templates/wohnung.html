@@ -17,14 +17,21 @@
 {# ---------- Abrechnung ---------- #}
 <section class="block" id="abrechnung">
   <h2>Abrechnung {{ jahr }}</h2>
+  {% set extern = w.mieter_extern %}
+  {% if extern %}
+  <p class="leise">Abrechnungszeitraum 01.01.{{ jahr }} – 31.12.{{ jahr }}. Die Mieter dieser Wohnung rechnet der Eigentümer
+    selbst ab; hier steht nur die Eigentümer-Abrechnung (Kosten der Wohnung gegen das gezahlte Hausgeld).</p>
+  {% else %}
   <p class="leise">Abrechnungszeitraum 01.01.{{ jahr }} – 31.12.{{ jahr }}. Kosten werden nach Monaten verteilt;
     auf Leerstand entfallende Kosten trägt der Eigentümer.</p>
+  {% endif %}
 
   <form method="post" action="{{ url_for('vorauszahlungen_speichern', wid=w.id) }}" id="vz"></form>
   <div class="tabelle">
   <table class="abrechnung">
     <thead><tr><th>Partei</th><th>Nutzungszeitraum</th><th class="zahl">Monate</th><th class="zahl">Kosten</th>
       <th class="zahl">Vorauszahlungen</th><th class="zahl">Ergebnis</th><th></th></tr></thead>
+    {% if not extern %}
     <tbody>
     {% for p in r.parteien %}
     <tr>
@@ -50,7 +57,9 @@
     </tr>
     {% endif %}
     </tbody>
+    {% endif %}
     <tfoot>
+    {% if not extern %}
     <tr>
       <th>Summe Wohnung</th><td>{{ erg.monate|monate }} Monate</td><td></td>
       <th class="zahl">{{ r.summe|eur }}</th>
@@ -58,7 +67,8 @@
       <td class="zahl" title="Ergebnis aller Mieter zusammen">{% if r.parteien %}{{ saldo(r.parteien|sum(attribute='saldo')) }}{% endif %}</td>
       <td></td>
     </tr>
-    {% if immo.weg %}
+    {% endif %}
+    {% if immo.weg or extern %}
     <tr class="weg">
       <th>Eigentümer-Abrechnung (WEG)<br><small class="leise">gesamte Wohnung gegenüber der WEG</small></th>
       <td>{{ erg.monate|monate }} Monate</td><td></td>
@@ -72,10 +82,12 @@
     </tfoot>
   </table>
   </div>
+  {% if not extern %}
   <p class="leise">{% if immo.weg %}Die Eigentümer-Abrechnung vergleicht die Kosten der gesamten Wohnung mit dem an die WEG gezahlten
     Hausgeld. Die Vorauszahlungen der Mieter sind darin nicht enthalten, sie stehen dem Eigentümer zu.{% endif %}
     Der Eigentümer trägt selbst: {{ r.leerstand.summe|eur }} (Leerstand und nicht umlagefähige Kosten).</p>
-  {% if darf %}<div class="knopfleiste">{{ speichern("Vorauszahlungen speichern", form="vz") }}</div>{% endif %}
+  {% endif %}
+  {% if darf %}<div class="knopfleiste">{{ speichern("Hausgeld speichern" if extern else "Vorauszahlungen speichern", form="vz") }}</div>{% endif %}
 
   <h3>Kostenaufstellung</h3>
   <div class="tabelle">
@@ -151,6 +163,10 @@
 {# ---------- Mieter ---------- #}
 <section class="block" id="mieter">
   <h2>Mieter</h2>
+  {% if w.mieter_extern %}
+  <p class="leise">Die Mieter dieser Wohnung rechnet der Eigentümer selbst ab.
+    {% if ist_admin %}Ändern kannst du das in den <a href="{{ url_for('wohnung_stamm', wid=w.id) }}">Stammdaten</a>.{% endif %}</p>
+  {% else %}
   {% for mv in mvs %}
   <div class="karte-flach {{ 'gedimmt' if not mv.im_jahr }}">
     <div class="karte-kopf">
@@ -207,6 +223,7 @@
     </form>
   </details>
   {% endif %}
+{% endif %}
 </section>
 
 {# ---------- Zähler ---------- #}
