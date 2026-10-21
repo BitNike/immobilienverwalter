@@ -197,6 +197,29 @@ def test_gesamter_ablauf():
     post(c, "/einstellungen/admin/wohnungen/2", data={"bezeichnung": "OG", "wohnflaeche": "50", "mea": "60",
                                                         "mea_basis": "1000", "immobilie_id": "1",
                                                         "eigentuemer_id": "2"})
+
+    # Eigentümer ohne Zugang direkt beim Mietobjekt anlegen (nur der Name ist Pflicht)
+    post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Garage", "wohnflaeche": "15", "immobilie_id": "",
+                                                          "eigentuemer_id": "neu", "neu_name": "Ohnezugang"})
+    liste = ok(c.get("/einstellungen/vermieter")).get_data(as_text=True)
+    assert "Ohnezugang" in liste and "ohne Zugang" in liste
+    # weiteres Mietobjekt beim Eigentümer zuordnen
+    post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Keller", "wohnflaeche": "5", "immobilie_id": ""})
+    post(c, "/einstellungen/admin/vermieter/3/mietobjekte", data={"wid": "4"})
+    seite = ok(c.get("/einstellungen/admin/vermieter/3")).get_data(as_text=True)
+    assert "Garage" in seite and "Keller" in seite.split("Weiteres Mietobjekt")[0]
+    # Anmeldung ist für Eigentümer ohne Zugang unmöglich (Platzhalter-Benutzername, leeres Passwort)
+    import db as datenbank
+    platzhalter = datenbank.verbinden().execute("SELECT benutzername FROM benutzer WHERE id = 3").fetchone()[0]
+    assert platzhalter.startswith("~")
+    x = app.test_client()
+    ok(x.post("/login", data={"benutzername": platzhalter, "passwort": ""}))
+    assert x.get("/").status_code == 302
+    # Zugang nachträglich einrichten
+    post(c, "/einstellungen/admin/vermieter/3", data={"rolle": "vermieter", "benutzername": "otto", "name": "Ohnezugang",
+                                                      "passwort": "passwort9", "passwort2": "passwort9"})
+    post(x, "/login", data={"benutzername": "otto", "passwort": "passwort9"})
+    ok(x.get("/"))
     post(c, "/logout")
 
     a = app.test_client()

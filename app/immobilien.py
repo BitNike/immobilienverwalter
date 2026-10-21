@@ -7,7 +7,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 import dateien
 import db
 from calc import berechne, de_num, parse_date, parse_mea, parse_num
-from core import (BEREICHE, ZAEHLERARTEN, admin_noetig, app, exe, immobilie_laden, ist_admin, jahr, one,
+from core import (BEREICHE, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
 
@@ -351,6 +351,9 @@ def wohnung_werte():
     vals["mea"] = mea
     vals["mea_basis"] = basis or parse_num(f.get("mea_basis"), 1000.0) or 1000.0
     eig = f.get("eigentuemer_id")
+    if eig == "neu":
+        eig = eigentuemer_anlegen({k: f.get("neu_" + k, "").strip()
+                                   for k in ("vorname", "name", "strasse", "hausnummer", "plz", "ort", "email")})
     vals["eigentuemer_id"] = int(eig) if eig else None
     if "immobilie_id" in f:
         vals["immobilie_id"] = int(f["immobilie_id"]) if f["immobilie_id"] else None

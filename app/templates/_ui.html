@@ -99,11 +99,23 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   </label>
   {% endif %}
   <label>Eigentümer (Vermieter)
-    <select name="eigentuemer_id">
+    <select name="eigentuemer_id" onchange="this.form.querySelector('.neuer-eigentuemer').hidden = this.value !== 'neu'">
       <option value="">– keiner –</option>
-      {% for b in benutzer %}<option value="{{ b.id }}" {{ 'selected' if w.eigentuemer_id == b.id }}>{{ person_name(b) }}</option>{% endfor %}
+      {% for b in benutzer %}<option value="{{ b.id }}" {{ 'selected' if w.eigentuemer_id == b.id }}>{{ person_name(b) }}{% if b.rolle == 'ohne_zugang' %} (ohne Zugang){% endif %}</option>{% endfor %}
+      <option value="neu">+ Neuer Eigentümer …</option>
     </select>
   </label>
+  <fieldset class="breit neuer-eigentuemer" hidden>
+    <legend>Neuer Eigentümer (ohne Zugang)</legend>
+    <p class="leise">Nur der Name ist Pflicht. Adresse und E-Mail kannst du später unter Einstellungen → Vermieter ergänzen.
+      Den Eigentümer kannst du danach bei weiteren Mietobjekten auswählen, auch in anderen Immobilien.</p>
+    <div class="raster">
+      {{ feld('neu_vorname', 'Vorname') }}{{ feld('neu_name', 'Name') }}
+      {{ feld('neu_strasse', 'Straße') }}{{ feld('neu_hausnummer', 'Hausnummer') }}
+      {{ feld('neu_plz', 'Postleitzahl') }}{{ feld('neu_ort', 'Ort') }}
+      {{ feld('neu_email', 'E-Mail', typ='email') }}
+    </div>
+  </fieldset>
   {{ feld('wohnflaeche', 'Wohnfläche (m²)', w.wohnflaeche|num if w.wohnflaeche else '', pflicht=True, attrs='inputmode="decimal"') }}
   {{ feld('mea', 'MEA', w.mea|num if w.mea else '', attrs='inputmode="decimal" placeholder="86,13"', hinweis='Miteigentumsanteil laut Teilungserklärung, z. B. 86,13. Nur bei WEG, sonst leer lassen.' ~ (' Aktuell ' ~ (w.mea / w.mea_basis * 100)|num ~ ' %.' if w.mea and w.mea_basis else '')) }}
   {{ feld('mea_basis', 'MEA-Basis', w.mea_basis|num(0) if w.mea_basis else '1.000', attrs='inputmode="decimal"', hinweis='z. B. 1.000 (für 86,13/1.000)') }}

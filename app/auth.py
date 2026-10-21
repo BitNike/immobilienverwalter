@@ -6,7 +6,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import mail
-from core import app, exe, one
+from core import OHNE_ZUGANG, app, exe, one
 
 MIN_PASSWORT = 8
 
@@ -73,7 +73,8 @@ def einrichtung():
 def login():
     if request.method == "POST":
         b = one("SELECT * FROM benutzer WHERE benutzername = ?", (request.form.get("benutzername", "").strip(),))
-        if b and check_password_hash(b["passwort_hash"], request.form.get("passwort", "")):
+        if b and b["rolle"] != OHNE_ZUGANG and b["passwort_hash"] and \
+                check_password_hash(b["passwort_hash"], request.form.get("passwort", "")):
             session.clear()
             session["uid"] = b["id"]
             session.permanent = True
@@ -93,7 +94,8 @@ def logout():
 def passwort_vergessen():
     if request.method == "POST":
         email = request.form.get("email", "").strip()
-        b = one("SELECT * FROM benutzer WHERE email = ? COLLATE NOCASE", (email,)) if email else None
+        b = one("SELECT * FROM benutzer WHERE email = ? COLLATE NOCASE AND rolle <> ?", (email, OHNE_ZUGANG)) \
+            if email else None
         if b and mail.konfiguriert():
             try:
                 link_senden(b)
@@ -115,7 +117,7 @@ def passwort_setzen(token):
         flash("Der Link ist ungültig.", "fehler")
         return redirect(url_for("login"))
     b = one("SELECT * FROM benutzer WHERE id = ?", (daten["uid"],))
-    if not b or b["passwort_hash"][-16:] != daten["h"]:
+    if not b or b["rolle"] == OHNE_ZUGANG or b["passwort_hash"][-16:] != daten["h"]:
         flash("Der Link wurde bereits verwendet.", "fehler")
         return redirect(url_for("login"))
     if request.method == "POST":

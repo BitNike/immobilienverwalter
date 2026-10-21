@@ -6,17 +6,24 @@
 <div class="kopf">
   <h1>{{ 'Vermieter anlegen' if neu else person_name(b) }} {% if b.rolle == 'admin' %}<span class="marke admin">Admin</span>{% endif %}</h1>
 </div>
+{% set rolle = b.rolle or 'ohne_zugang' %}
+{% set neuer_zugang = neu or not b.passwort_hash %}
 <form method="post" enctype="multipart/form-data">
   <fieldset><legend>Zugang</legend>
     <div class="raster">
-      {{ feld('benutzername', 'Benutzername', b.benutzername, pflicht=True, attrs='autocomplete="off"') }}
       <label>Gruppe
-        <select name="rolle">{% for r, t in ROLLEN.items() %}<option value="{{ r }}" {{ 'selected' if (b.rolle or 'vermieter') == r }}>{{ t }}</option>{% endfor %}</select>
+        <select name="rolle" onchange="this.form.querySelector('.zugangsdaten').hidden = this.value === 'ohne_zugang'">{% for r, t in ROLLEN.items() %}<option value="{{ r }}" {{ 'selected' if rolle == r }}>{{ t }}</option>{% endfor %}</select>
+        <small>„Ohne Zugang“: nur Name und Anschrift für die Abrechnung, keine Anmeldung möglich.</small>
       </label>
-      {{ feld('passwort', 'Startpasswort' if neu else 'Neues Passwort', '', typ='password', attrs='autocomplete="new-password" minlength="8"', hinweis='' if neu else 'leer lassen = unverändert') }}
-      {{ feld('passwort2', 'Passwort wiederholen', '', typ='password', attrs='autocomplete="new-password"') }}
     </div>
-    {% if neu and smtp %}<label class="haken"><input type="checkbox" name="einladen"> Einladung per E-Mail senden (Vermieter legt sein Passwort selbst fest)</label>{% endif %}
+    <div class="zugangsdaten" {{ 'hidden' if rolle == 'ohne_zugang' }}>
+      <div class="raster">
+        {{ feld('benutzername', 'Benutzername', '' if (b.benutzername or '').startswith('~') else b.benutzername, attrs='autocomplete="off"') }}
+        {{ feld('passwort', 'Startpasswort' if neuer_zugang else 'Neues Passwort', '', typ='password', attrs='autocomplete="new-password" minlength="8"', hinweis='' if neuer_zugang else 'leer lassen = unverändert') }}
+        {{ feld('passwort2', 'Passwort wiederholen', '', typ='password', attrs='autocomplete="new-password"') }}
+      </div>
+      {% if neuer_zugang and smtp %}<label class="haken"><input type="checkbox" name="einladen"> Einladung per E-Mail senden (Vermieter legt sein Passwort selbst fest)</label>{% endif %}
+    </div>
   </fieldset>
   <fieldset><legend>Benutzerinformation</legend>
     {{ profilfelder(b) }}
@@ -25,14 +32,33 @@
 </form>
 
 {% if not neu %}
-<section class="block">
-  <h2>Zugeordnete Mietobjekte</h2>
+<section class="block" id="mietobjekte">
+  <h2>Mietobjekte dieses Eigentümers</h2>
   {% if wohnungen %}
-  <ul class="liste">{% for w in wohnungen %}<li><a href="{{ url_for('wohnung_stamm', wid=w.id) }}">{{ w.immobilie or 'ohne Immobilie' }} – {{ w.bezeichnung }}</a></li>{% endfor %}</ul>
-  {% else %}<p class="leise">Keine. Die Zuordnung erfolgt beim Mietobjekt (Feld „Eigentümer“).</p>{% endif %}
+  <table>
+    <tbody>
+    {% for w in wohnungen %}
+    <tr><td><a href="{{ url_for('wohnung_stamm', wid=w.id) }}">{{ w.immobilie or 'ohne Immobilie' }} – {{ w.bezeichnung }}</a></td>
+      <td class="aktionen"><form method="post" action="{{ url_for('vermieter_mietobjekt', uid=b.id) }}" class="inline">
+        <button class="btn-icon gefahr" name="loesen" value="{{ w.id }}" title="Zuordnung lösen">{{ icon('x', 16) }}</button></form></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="leise">Noch keine.</p>{% endif %}
+  {% if andere %}
+  <form method="post" action="{{ url_for('vermieter_mietobjekt', uid=b.id) }}" class="zeile">
+    <label>Weiteres Mietobjekt zuordnen
+      <select name="wid" required>
+        <option value="">– wählen –</option>
+        {% for w in andere %}<option value="{{ w.id }}">{{ w.immobilie or 'ohne Immobilie' }} – {{ w.bezeichnung }}{% if w.eigentuemer_id %} (hat schon einen Eigentümer){% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="btn">{{ icon('plus') }}<span>Zuordnen</span></button>
+  </form>
+  {% endif %}
 </section>
 <div class="knopfleiste">
-  {% if smtp and b.email %}
+  {% if smtp and b.email and b.rolle != 'ohne_zugang' %}
   <form method="post" action="{{ url_for('vermieter_einladen', uid=b.id) }}" class="inline"><button class="btn hell">{{ icon('mail') }}<span>Einladung / Passwort-Link senden</span></button></form>
   {% endif %}
   {% if b.id != user.id %}{{ loeschen(url_for('vermieter_loeschen', uid=b.id), 'Vermieter löschen?', 'Vermieter löschen') }}{% endif %}

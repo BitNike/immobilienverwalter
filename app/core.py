@@ -38,7 +38,9 @@ app.config.update(
 app.teardown_appcontext(db.close_db)
 db.init_db()
 
+OHNE_ZUGANG = "ohne_zugang"
 ROLLEN = {
+    OHNE_ZUGANG: "Ohne Zugang",
     "admin": "Administrator",
     "vermieter_plus": "Vermieter + (darf Zahlen eintragen)",
     "vermieter": "Vermieter (nur lesen)",
@@ -96,6 +98,9 @@ def anmeldung_pruefen():
         return None if request.endpoint in ("einrichtung", "logo_datei") else redirect(url_for("einrichtung"))
     if session.get("uid"):
         g.user = one("SELECT * FROM benutzer WHERE id = ?", (session["uid"],))
+        if g.user and g.user["rolle"] == OHNE_ZUGANG:  # Zugang wurde entzogen
+            g.user = None
+            session.clear()
     if g.user is None and request.endpoint not in OFFEN:
         return redirect(url_for("login", next=request.full_path if request.method == "GET" else None))
     return None
@@ -201,7 +206,19 @@ def f_datum(v, kurz=False):
 
 
 def person_name(b):
-    return " ".join(x for x in (b.get("vorname"), b.get("name")) if x) or b.get("benutzername", "")
+    benutzername = b.get("benutzername", "")
+    return " ".join(x for x in (b.get("vorname"), b.get("name")) if x) or \
+        ("" if benutzername.startswith("~") else benutzername)
+
+
+def eigentuemer_anlegen(vals):
+    """Eigentümer ohne Zugang: nur Kontaktdaten. Platzhalter-Benutzername (~…) und leeres Passwort,
+    Anmeldung und „Passwort vergessen“ sind für diese Gruppe gesperrt."""
+    if not (vals.get("vorname") or vals.get("name")):
+        raise ValueError("Bitte mindestens den Namen des Eigentümers angeben.")
+    return exe(f"INSERT INTO benutzer (benutzername, passwort_hash, rolle, {', '.join(vals)}) "
+               f"VALUES (?, '', ?, {', '.join('?' * len(vals))})",
+               ["~" + secrets.token_hex(8), OHNE_ZUGANG, *vals.values()])
 
 
 app.jinja_env.globals.update(

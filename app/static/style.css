@@ -193,3 +193,5 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
   .inhalt { padding: 18px 16px 40px; }
   .zaehler-raster { grid-template-columns: 1fr; }
 }
+
+[hidden] { display: none !important; }

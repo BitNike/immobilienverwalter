@@ -9,7 +9,8 @@ import dateien
 import mail
 from auth import link_senden, passwort_pruefen
 from calc import SCHLUESSEL, parse_num
-from core import (ROLLEN, ZAEHLERARTEN, admin_noetig, app, einstellung, einstellung_setzen, exe, ist_admin, one,
+from core import (OHNE_ZUGANG, ROLLEN, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, einstellung,
+                  einstellung_setzen, exe, ist_admin, one,
                   row, rows, sichtbare_immobilien, wohnungen_der_immobilie, zurueck)
 from immobilien import wohnung_werte, zaehler_aus_formular
 
@@ -44,33 +45,41 @@ def vermieter_liste():
 
 # ---------- Administration: Vermieter ----------
 
+def _zugangsdaten(f, uid=None):
+    """Benutzername und Passwort-Hash für einen Zugang prüfen; None als Hash = Passwort unverändert lassen."""
+    name = f.get("benutzername", "").strip()
+    if not name or name.startswith("~"):
+        raise ValueError("Bitte einen Benutzernamen angeben (darf nicht mit ~ beginnen).")
+    if one("SELECT 1 FROM benutzer WHERE benutzername = ? AND id IS NOT ?", (name, uid)):
+        raise ValueError("Dieser Benutzername ist bereits vergeben.")
+    if f.get("passwort"):
+        return name, passwort_pruefen(f["passwort"], f.get("passwort2", ""))
+    if f.get("einladen"):
+        return name, generate_password_hash(secrets.token_urlsafe(24))
+    return name, None
+
+
 @app.route("/einstellungen/admin/vermieter/neu", methods=["GET", "POST"])
 @admin_noetig
 def vermieter_neu():
     if request.method == "POST":
         f = request.form
-        name = f.get("benutzername", "").strip()
-        if not name:
-            raise ValueError("Bitte einen Benutzernamen angeben.")
-        if one("SELECT 1 FROM benutzer WHERE benutzername = ?", (name,)):
-            raise ValueError("Dieser Benutzername ist bereits vergeben.")
-        rolle = f.get("rolle", "vermieter")
+        rolle = f.get("rolle", OHNE_ZUGANG)
         if rolle not in ROLLEN:
             abort(400)
-        einladen = bool(f.get("einladen"))
-        if f.get("passwort"):
-            pw_hash = passwort_pruefen(f["passwort"], f.get("passwort2", ""))
-        elif einladen:
-            pw_hash = generate_password_hash(secrets.token_urlsafe(24))
-        else:
-            raise ValueError("Bitte ein Startpasswort vergeben oder eine Einladung per E-Mail senden.")
         vals = profil_werte()
-        uid = exe(f"INSERT INTO benutzer (benutzername, passwort_hash, rolle, {', '.join(vals)}) "
-                  f"VALUES (?, ?, ?, {', '.join('?' * len(vals))})", [name, pw_hash, rolle, *vals.values()])
+        if rolle == OHNE_ZUGANG:
+            uid = eigentuemer_anlegen(vals)
+        else:
+            name, pw_hash = _zugangsdaten(f)
+            if not pw_hash:
+                raise ValueError("Bitte ein Startpasswort vergeben oder eine Einladung per E-Mail senden.")
+            uid = exe(f"INSERT INTO benutzer (benutzername, passwort_hash, rolle, {', '.join(vals)}) "
+                      f"VALUES (?, ?, ?, {', '.join('?' * len(vals))})", [name, pw_hash, rolle, *vals.values()])
         if request.files.get("foto") and request.files["foto"].filename:
             dateien.foto_speichern(request.files["foto"], uid)
             exe("UPDATE benutzer SET foto = foto + 1 WHERE id = ?", (uid,))
-        if einladen:
+        if rolle != OHNE_ZUGANG and f.get("einladen"):
             _einladung(uid)
         flash("Vermieter angelegt.")
         return redirect(url_for("vermieter_bearbeiten", uid=uid))
@@ -102,27 +111,54 @@ def vermieter_bearbeiten(uid):
         if b["rolle"] == "admin" and rolle != "admin" and \
                 one("SELECT COUNT(*) AS n FROM benutzer WHERE rolle = 'admin'")["n"] <= 1:
             raise ValueError("Es muss mindestens ein Administrator bleiben.")
-        name = f.get("benutzername", b["benutzername"]).strip()
-        if one("SELECT 1 FROM benutzer WHERE benutzername = ? AND id <> ?", (name, uid)):
-            raise ValueError("Dieser Benutzername ist bereits vergeben.")
+        if uid == g.user["id"] and rolle == OHNE_ZUGANG:
+            raise ValueError("Du kannst dir nicht selbst den Zugang entziehen.")
         vals = profil_werte()
+        neuer_zugang = not b["passwort_hash"]
+        if rolle == OHNE_ZUGANG:
+            if not (vals["vorname"] or vals["name"]):
+                raise ValueError("Bitte mindestens den Namen angeben.")
+            name = b["benutzername"] if b["benutzername"].startswith("~") else "~" + secrets.token_hex(8)
+            exe("UPDATE benutzer SET passwort_hash = '' WHERE id = ?", (uid,))
+        else:
+            name, pw_hash = _zugangsdaten(f, uid)
+            if pw_hash and (f.get("passwort") or neuer_zugang):  # Einladung überschreibt kein bestehendes Passwort
+                exe("UPDATE benutzer SET passwort_hash = ? WHERE id = ?", (pw_hash, uid))
+            elif neuer_zugang:
+                raise ValueError("Für den neuen Zugang bitte ein Passwort vergeben oder eine Einladung senden.")
         exe(f"UPDATE benutzer SET benutzername = ?, rolle = ?, {', '.join(k + ' = ?' for k in vals)} WHERE id = ?",
             [name, rolle, *vals.values(), uid])
-        if f.get("passwort"):
-            exe("UPDATE benutzer SET passwort_hash = ? WHERE id = ?",
-                (passwort_pruefen(f["passwort"], f.get("passwort2", "")), uid))
+        if rolle != OHNE_ZUGANG and f.get("einladen") and neuer_zugang:
+            _einladung(uid)
         if request.files.get("foto") and request.files["foto"].filename:
             dateien.foto_speichern(request.files["foto"], uid)
             exe("UPDATE benutzer SET foto = foto + 1 WHERE id = ?", (uid,))
         flash("Gespeichert.")
         return redirect(url_for("vermieter_bearbeiten", uid=uid))
+    andere = rows("SELECT w.*, i.name AS immobilie FROM wohnung w LEFT JOIN immobilie i ON i.id = w.immobilie_id "
+                  "WHERE w.eigentuemer_id IS NOT ? ORDER BY i.name IS NULL, i.name, w.bezeichnung", (uid,))
     return render_template("einstellungen/vermieter_form.html", bereich="admin_vermieter", b=b, neu=False,
-                           smtp=mail.konfiguriert(), wohnungen=zugeordnete_wohnungen(uid))
+                           smtp=mail.konfiguriert(), wohnungen=zugeordnete_wohnungen(uid), andere=andere)
+
+
+@app.post("/einstellungen/admin/vermieter/<int:uid>/mietobjekte")
+@admin_noetig
+def vermieter_mietobjekt(uid):
+    """Mietobjekt diesem Eigentümer zuordnen (wid) oder die Zuordnung lösen (loesen)."""
+    row("SELECT id FROM benutzer WHERE id = ?", (uid,))
+    f = request.form
+    if f.get("loesen"):
+        exe("UPDATE wohnung SET eigentuemer_id = NULL WHERE id = ? AND eigentuemer_id = ?", (int(f["loesen"]), uid))
+    elif f.get("wid"):
+        exe("UPDATE wohnung SET eigentuemer_id = ? WHERE id = ?", (uid, int(f["wid"])))
+    return redirect(url_for("vermieter_bearbeiten", uid=uid) + "#mietobjekte")
 
 
 @app.post("/einstellungen/admin/vermieter/<int:uid>/einladung")
 @admin_noetig
 def vermieter_einladen(uid):
+    if row("SELECT rolle FROM benutzer WHERE id = ?", (uid,))["rolle"] == OHNE_ZUGANG:
+        raise ValueError("Dieser Eigentümer hat keinen Zugang. Bitte zuerst eine Gruppe mit Zugang wählen.")
     _einladung(uid)
     return redirect(url_for("vermieter_bearbeiten", uid=uid))
 
