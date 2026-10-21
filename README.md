@@ -1,4 +1,4 @@
-<p align="center"><img src="design/logo-readme.jpg" alt="Immobilienverwalter" width="480"></p>
+<p align="center"><img src="design/logo-readme.png" alt="Immobilienverwalter" width="480"></p>
 
 # Nebenkostenabrechnung
 
