@@ -10,7 +10,31 @@
 
 Web-App im Docker-Container für Vermieter: Immobilien, Mietobjekte, Mieter, Zähler, Belege und die jährliche Betriebskostenabrechnung (§ 556 BGB, § 2 BetrKV).
 
-## Starten
+## Installation
+
+### Mit dem fertigen Image (empfohlen)
+
+Kein Git und kein Bauen nötig – läuft auf PC/Server (amd64) sowie Raspberry Pi und Synology (arm64).
+Die Datei [`docker-compose.image.yml`](docker-compose.image.yml) herunterladen, z. B. als `docker-compose.yml`
+in einen eigenen Ordner, dann:
+
+```bash
+docker compose up -d
+```
+
+Oder in **Portainer, Dockge, Unraid oder dem Synology Container Manager** einen neuen Stack anlegen und den Inhalt
+der Datei einfügen.
+
+Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
+
+**Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.9.0` eintragen.
+
+E-Mail-Versand (Passwort vergessen, Einladungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
+neben die Compose-Datei legen und ausfüllen.
+
+### Aus dem Quellcode
+
 
 ```bash
 git clone https://github.com/BitNike/immobilienverwalter.git

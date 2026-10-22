@@ -6,3 +6,4 @@ tests/
 .git
 *.md
 design/
+.github/

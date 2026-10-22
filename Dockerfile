@@ -1,5 +1,7 @@
 FROM python:3.12-slim
 
+LABEL org.opencontainers.image.source="https://github.com/BitNike/immobilienverwalter"
+
 # Systembibliotheken für WeasyPrint (PDF) und klassische Schriften für die Abrechnung
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-liberation fonts-dejavu-core \
