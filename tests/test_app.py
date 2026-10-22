@@ -168,7 +168,7 @@ def test_gesamter_ablauf():
                 "/wohnungen/1/export/brief?partei=eigentuemer", "/einstellungen/vermieter",
                 "/einstellungen/admin/vermieter/neu", "/einstellungen/admin/vermieter/1",
                 "/einstellungen/admin/wohnungen", "/einstellungen/admin/wohnungen/1", "/einstellungen/admin/wohnungen/neu",
-                "/einstellungen/admin/kostenarten", "/einstellungen/admin/ablage", "/einstellungen/admin/logo", "/einstellungen/admin/smtp",
+                "/einstellungen/admin/kostenarten", "/einstellungen/admin/ablage", "/einstellungen/info", "/einstellungen/admin/logo", "/einstellungen/admin/smtp",
                 "/profil", "/profil/immobilien", "/profil/passwort", "/immobilien/neu", "/benutzer/1/foto",
                 "/dokumente/1", "/dokumente/2"]:
         ok(c.get(url))

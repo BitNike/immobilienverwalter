@@ -1,0 +1,45 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon %}
+{% block title %}Über{% endblock %}
+{% block panel %}
+<div class="ueber-kopf">
+  <img src="{{ url_for('static', filename='icon.png') }}" alt="" width="96" height="96">
+  <div>
+    <h1>{{ name }}</h1>
+    <p class="leise">Version {{ version }} · Nebenkosten, Zähler und Unterlagen für Vermieter und Eigentümergemeinschaften</p>
+  </div>
+</div>
+
+<table class="schmal ueber">
+  <tr><th>Entwickler</th><td>{{ entwickler }}</td></tr>
+  <tr><th>Lizenz</th><td>
+    <a class="lizenz-badge" href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener" title="GNU Affero General Public License v3.0">
+      <span>Lizenz</span><span>{{ lizenz }}</span></a>
+    <p class="leise">Freie Software: Du darfst sie kostenlos nutzen, verändern und weitergeben. Wer eine veränderte Fassung
+      anderen anbietet – auch übers Internet –, muss deren Quellcode ebenfalls unter dieser Lizenz offenlegen.
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">Lizenztext (englisch)</a> ·
+      <a href="https://www.gnu.org/licenses/agpl-3.0.de.html" target="_blank" rel="noopener">deutsche Übersetzung</a></p>
+  </td></tr>
+  {% if projekt_url %}
+  <tr><th>Projektseite</th><td><a href="{{ projekt_url }}" target="_blank" rel="noopener">{{ icon('link', 15) }} {{ projekt_url }}</a>
+    <p class="leise">Quellcode, Neuigkeiten und Fehlermeldungen.</p></td></tr>
+  {% endif %}
+</table>
+
+{% if spenden_url %}
+<section class="block spenden">
+  <h2>Unterstützen</h2>
+  <p class="leise">{{ name }} ist kostenlos. Wenn dir das Projekt Arbeit abnimmt, freue ich mich über eine kleine Spende.</p>
+  <a class="btn" href="{{ spenden_url }}" target="_blank" rel="noopener">{{ icon('heart') }}<span>Spenden über PayPal</span></a>
+</section>
+{% endif %}
+
+<section class="block">
+  <h2>Haftungsausschluss</h2>
+  <p class="leise"><strong>Keine Rechtsberatung, keine Gewähr.</strong> Diese Software ist ein Hilfsmittel zur Erstellung von
+    Betriebskostenabrechnungen. Sie ersetzt keine Rechts- oder Steuerberatung. Für die Richtigkeit, Vollständigkeit und
+    rechtliche Wirksamkeit der erstellten Abrechnungen (insbesondere nach § 556 BGB und der Betriebskostenverordnung) ist
+    allein der Nutzer verantwortlich. Bitte prüfe jede Abrechnung vor dem Versand. Die Nutzung erfolgt auf eigenes Risiko;
+    eine Haftung des Autors ist ausgeschlossen, soweit gesetzlich zulässig.</p>
+</section>
+{% endblock %}

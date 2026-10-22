@@ -67,3 +67,15 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt pytest
 ```
 
 > Arbeitshilfe, keine Rechtsberatung.
+
+## Lizenz
+
+Freie Software unter der [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0): kostenlos nutzen, verändern und
+weitergeben. Wer eine veränderte Fassung anderen anbietet – auch übers Internet –, muss deren Quellcode ebenfalls unter
+dieser Lizenz offenlegen.
+
+**Keine Rechtsberatung, keine Gewähr.** Die Software ist ein Hilfsmittel zur Erstellung von Betriebskostenabrechnungen und
+ersetzt keine Rechts- oder Steuerberatung. Für Richtigkeit und rechtliche Wirksamkeit der Abrechnungen ist allein der Nutzer
+verantwortlich; bitte jede Abrechnung vor dem Versand prüfen. Haftung ausgeschlossen, soweit gesetzlich zulässig.
+
+Entwickler: Sascha Benecke · [Unterstützen per PayPal](https://www.paypal.com/paypalme/saschabenecke)

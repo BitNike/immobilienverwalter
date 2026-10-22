@@ -12,7 +12,10 @@ from icons import ICONS
 
 VERSION = "0.6.0"
 NAME = "Immobilienverwalter"
-URL = ""  # öffentliche Projektseite, sobald es eine gibt (erscheint in der Fußzeile des Briefs)
+URL = ""  # öffentliche Projektseite, sobald es eine gibt (Fußzeile des Briefs, Seite „Über“)
+ENTWICKLER = "Sascha Benecke"
+LIZENZ = "AGPL-3.0"
+SPENDEN_URL = "https://www.paypal.com/paypalme/saschabenecke"
 
 app = Flask(__name__)
 

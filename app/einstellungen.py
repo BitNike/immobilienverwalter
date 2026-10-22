@@ -44,6 +44,13 @@ def vermieter_liste():
                            benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname, benutzername"))
 
 
+@app.get("/einstellungen/info")
+def info():
+    from core import ENTWICKLER, LIZENZ, NAME, SPENDEN_URL, URL
+    return render_template("einstellungen/info.html", bereich="info", name=NAME, entwickler=ENTWICKLER,
+                           lizenz=LIZENZ, projekt_url=URL, spenden_url=SPENDEN_URL)
+
+
 # ---------- Administration: Vermieter ----------
 
 def _zugangsdaten(f, uid=None):

@@ -29,7 +29,8 @@
         {% endif %}
       </div>
     {% endif %}
-    <div class="baum-version">Version {{ version }}</div>
+    {{ eintrag('info', 'Über', 'info', bereich == 'info') }}
+    <a class="baum-version" href="{{ url_for('info') }}">Version {{ version }}</a>
   </nav>
   <div class="panel">{% block panel %}{% endblock %}</div>
 </div>
