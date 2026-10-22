@@ -50,6 +50,7 @@ def post(c, url, code=302, **kw):
 def test_gesamter_ablauf():
     c = app.test_client()
     assert c.get("/").headers["Location"].endswith("/einrichtung")
+    assert ok(c.get("/health")).get_json()["status"] == "ok"  # Healthcheck ohne Anmeldung, auch vor der Einrichtung
     post(c, "/einrichtung", data={"benutzername": "admin", "vorname": "Max", "name": "Vermieter",
                                     "passwort": "geheim123", "passwort2": "geheim123"})
     post(c, "/profil", data={"vorname": "Max", "name": "Vermieter", "strasse": "Musterweg", "hausnummer": "1",

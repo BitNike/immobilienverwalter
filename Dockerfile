@@ -22,4 +22,7 @@ USER nk
 
 VOLUME ["/data", "/dokumente"]
 EXPOSE 8080
+# Gesundheitscheck: Docker (und Dockge, Portainer …) zeigen „healthy“, solange App und Datenbank antworten
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=4).status == 200 else 1)"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "120", "main:app"]

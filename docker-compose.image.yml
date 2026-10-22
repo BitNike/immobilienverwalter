@@ -2,7 +2,7 @@
 #   docker compose -f docker-compose.image.yml up -d
 # Update:
 #   docker compose -f docker-compose.image.yml pull && docker compose -f docker-compose.image.yml up -d
-# Statt „latest“ kann eine feste Version stehen, z. B. ghcr.io/bitnike/immobilienverwalter:0.9.0
+# Statt „latest“ kann eine feste Version stehen, z. B. ghcr.io/bitnike/immobilienverwalter:0.9.1
 services:
   immobilienverwalter:
     image: ghcr.io/bitnike/immobilienverwalter:latest

@@ -19,12 +19,16 @@ jobs:
           docker run --rm -u 0 -v "$PWD:/t" -w /t immobilienverwalter
           sh -c "pip install -q pytest && python -m pytest -q tests -p no:cacheprovider"
 
-      - name: App startet mit leerer Datenbank
+      - name: App startet mit leerer Datenbank und meldet sich gesund
         run: |
           docker run -d --name app -p 8080:8080 immobilienverwalter
-          for i in $(seq 1 30); do
-            if curl -fsS -o /dev/null http://localhost:8080/einrichtung; then echo "Ersteinrichtung erreichbar"; exit 0; fi
-            sleep 1
+          for i in $(seq 1 60); do
+            status=$(docker inspect app --format '{{.State.Health.Status}}')
+            if [ "$status" = "healthy" ] && curl -fsS -o /dev/null http://localhost:8080/einrichtung; then
+              echo "Gesundheitscheck: $status, Ersteinrichtung erreichbar"; exit 0
+            fi
+            sleep 2
           done
+          docker inspect app --format '{{json .State.Health}}'
           docker logs app
           exit 1
