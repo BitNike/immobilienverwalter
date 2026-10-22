@@ -46,6 +46,7 @@ ROLLEN = {
     "vermieter": "Vermieter (nur lesen)",
 }
 ZAEHLERARTEN = {"wasser": "Wasser", "strom": "Strom", "gas": "Gas", "waerme": "Wärme"}
+EINHEITEN = {"wasser": "m³", "strom": "kWh", "gas": "m³", "waerme": "kWh"}
 BEREICHE = {"mieter": "Mieter (Nebenkosten)", "vermieter": "Vermieter (z. B. Steuer)", "mieterordner": "Mieterordner"}
 
 
@@ -222,7 +223,7 @@ def eigentuemer_anlegen(vals):
 
 
 app.jinja_env.globals.update(
-    ICONS=ICONS, ROLLEN=ROLLEN, SCHLUESSEL=SCHLUESSEL, ZAEHLERARTEN=ZAEHLERARTEN, BEREICHE=BEREICHE,
+    ICONS=ICONS, ROLLEN=ROLLEN, SCHLUESSEL=SCHLUESSEL, ZAEHLERARTEN=ZAEHLERARTEN, EINHEITEN=EINHEITEN, BEREICHE=BEREICHE,
     person_name=person_name,
 )
 

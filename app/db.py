@@ -148,6 +148,10 @@ MIGRATIONEN = [
     """
     ALTER TABLE wohnung ADD COLUMN mieter_extern INTEGER NOT NULL DEFAULT 0;
     """,
+    # 6: Bezeichnung bzw. Standort eines Zählers (z. B. „Flurstrom Haus 1“)
+    """
+    ALTER TABLE zaehler ADD COLUMN bezeichnung TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

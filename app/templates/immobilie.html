@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte %}
 {% block title %}{{ immo.name }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
@@ -137,26 +137,43 @@
 {% if ist_admin or hauptzaehler %}
 <section class="block" id="hauptzaehler">
   <h2>Hauptzähler</h2>
+  <p class="leise">Zähler für das ganze Haus, z. B. Wasser-Hauptuhren oder Flurstrom. Mehrere Zähler derselben Art werden
+    zusammengezählt. Für den Jahresverbrauch den Stand am 31.12. eintragen.</p>
+  {% if hauptverbrauch %}
+  <table class="schmal verbrauch">
+    <thead><tr><th>Verbrauch {{ jahr }}</th><th class="zahl">Summe</th><th></th></tr></thead>
+    <tbody>
+    {% for v in hauptverbrauch %}
+    <tr>
+      <td>{{ ZAEHLERARTEN[v.art] }} <span class="leise">({{ v.anzahl }} Zähler)</span></td>
+      <td class="zahl"><strong>{{ (v.verbrauch|num(1) ~ ' ' ~ EINHEITEN[v.art]) if v.verbrauch is not none else 'nicht ermittelbar' }}</strong></td>
+      <td class="leise">
+        {% if v.verbrauch is none %}Ablesungen zum Jahresende fehlen{% elif v.ab %}<span class="warnung">gemessen erst ab {{ v.ab|datum }}</span>{% endif %}
+        {% if v.art == 'wasser' and v.verbrauch is not none and wohnungen_wasser is not none %}
+          Wohnungsuhren zusammen {{ wohnungen_wasser|num(1) }} m³, Differenz {{ (v.verbrauch - wohnungen_wasser)|num(1) }} m³
+          {% if v.verbrauch %}({{ ((v.verbrauch - wohnungen_wasser) / v.verbrauch * 100)|num(1) }} %){% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <div class="zaehler-raster">
   {% for z in hauptzaehler %}
-  <div class="zaehler">
-    <strong>{{ ZAEHLERARTEN[z.art] }}</strong> Nr. {{ z.nummer or '–' }}
-    {% if z.staende %}<span class="leise"> · letzter Stand {{ z.staende[0].stand|num(2) }} am {{ z.staende[0].datum|datum }}</span>{% endif %}
-    {% if ist_admin %}
-    <form method="post" action="{{ url_for('zaehlerstand_neu', zid=z.id) }}" class="zeile">
-      <label>Datum<input type="date" name="datum" required></label>
-      <label>Stand<input class="betrag" name="stand" inputmode="decimal" required></label>
-      <button class="btn hell">{{ icon('plus') }}<span>Ablesung</span></button>
-    </form>
-    {% endif %}
-  </div>
+  {{ zaehler_karte(z, ist_admin, jahr) }}
   {% else %}<p class="leise">Kein Hauptzähler erfasst.</p>{% endfor %}
+  </div>
   {% if ist_admin %}
   <details>
     <summary>{{ icon('plus') }} Hauptzähler hinzufügen</summary>
     <form method="post" action="{{ url_for('zaehler_neu') }}" class="zeile">
       <input type="hidden" name="immobilie_id" value="{{ immo.id }}">
       <label>Art<select name="art">{% for a, t in ZAEHLERARTEN.items() %}<option value="{{ a }}">{{ t }}</option>{% endfor %}</select></label>
+      <label>Bezeichnung / Standort<input name="bezeichnung" placeholder="z. B. Flurstrom Haus 1"></label>
       <label>Nummer<input name="nummer"></label>
+      <label>Eingebaut am<input type="date" name="eingebaut"></label>
+      <label>Anfangsstand<input class="betrag" name="stand" inputmode="decimal"></label>
       <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
     </form>
   </details>

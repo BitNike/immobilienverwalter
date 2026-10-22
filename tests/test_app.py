@@ -189,6 +189,19 @@ def test_gesamter_ablauf():
     post(c, "/zaehler/2/tausch", data={"datum": "2026-06-30", "endstand": "30", "nummer": "W-2b",
                                          "anfangsstand": "0"})
 
+    # Hauptzähler: zwei Flurstromzähler werden addiert, Wasser-Hauptuhr mit Wohnungsuhren verglichen
+    for nr, (start, ende) in enumerate([(1000, 1400), (500, 650)], start=1):
+        post(c, "/zaehler", data={"immobilie_id": "1", "art": "strom", "bezeichnung": f"Flurstrom Haus {nr}",
+                                  "eingebaut": "2024-12-31", "stand": str(start)})
+    post(c, "/zaehler", data={"immobilie_id": "1", "art": "wasser", "eingebaut": "2024-12-31", "stand": "1000"})
+    for zid, stand in ((4, "1400"), (5, "650"), (6, "1060")):
+        post(c, f"/zaehler/{zid}/staende", data={"datum": "2025-12-31", "stand": stand, "notiz": "Jahresablesung"})
+    post(c, "/zaehler/6/bearbeiten", data={"bezeichnung": "Hauptwasser Keller", "nummer": "HW-1"})
+    html = ok(c.get("/immobilien/1?jahr=2025")).get_data(as_text=True)
+    assert "Flurstrom Haus 2" in html and "Hauptwasser Keller" in html and "Jahresablesung" in html
+    assert "550,0 kWh" in html                                    # 400 + 150
+    assert "Wohnungsuhren zusammen 50,0 m³, Differenz 10,0 m³" in html  # 60 Haupt − (30 EG + 20 OG)
+
     # Logo, Kostenart
     post(c, "/einstellungen/admin/logo", data={"logo_typ": "text", "logo_text": "Vermietung",
                                                  "logo": bild_datei("logo.png", "PNG", "RGBA", (900, 300))},

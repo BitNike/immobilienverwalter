@@ -40,6 +40,47 @@
 onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; return !o || confirm('Diese Kostenart ist für {{ jahr }} schon erfasst (' + o + '). Trotzdem hinzufügen?')"
 {%- endmacro %}
 
+{% macro zaehler_karte(z, darf, jahr) -%}
+<div class="karte-flach {{ 'gedimmt' if z.ausgebaut }}">
+  <div class="karte-kopf">
+    {{ icon('gauge') }} <strong>{{ ZAEHLERARTEN[z.art] }}</strong>{% if z.bezeichnung %} <strong>· {{ z.bezeichnung }}</strong>{% endif %} Nr. {{ z.nummer or '–' }}
+    {% if z.ausgebaut %}<span class="marke">ausgebaut {{ z.ausgebaut|datum }}</span>{% elif z.eingebaut %}<span class="leise">seit {{ z.eingebaut|datum }}</span>{% endif %}
+  </div>
+  <table class="kompakt">
+    {% for s in z.staende[:8] %}
+    <tr><td>{{ s.datum|datum }}</td><td class="zahl">{{ s.stand|num(2) }} {{ EINHEITEN[z.art] }}</td><td class="leise">{{ s.notiz }}</td>
+      <td class="aktionen">{% if darf %}{{ loeschen(url_for('zaehlerstand_loeschen', sid=s.id), 'Ablesung löschen?') }}{% endif %}</td></tr>
+    {% else %}<tr><td class="leise">Noch keine Ablesung.</td></tr>{% endfor %}
+    {% if z.staende|length > 8 %}<tr><td colspan="4" class="leise">… und {{ z.staende|length - 8 }} ältere Ablesungen</td></tr>{% endif %}
+  </table>
+  {% if darf and not z.ausgebaut %}
+  <form method="post" action="{{ url_for('zaehlerstand_neu', zid=z.id) }}" class="zeile">
+    <label>Datum<input type="date" name="datum" value="{{ jahr }}-12-31" required></label>
+    <label>Stand<input class="betrag" name="stand" inputmode="decimal" required></label>
+    <label>Notiz<input name="notiz" placeholder="z. B. Auszug"></label>
+    <button class="btn hell">{{ icon('plus') }}<span>Ablesung</span></button>
+  </form>
+  <details>
+    <summary>Zähler bearbeiten oder tauschen</summary>
+    <form method="post" action="{{ url_for('zaehler_bearbeiten', zid=z.id) }}" class="zeile">
+      <label>Bezeichnung / Standort<input name="bezeichnung" value="{{ z.bezeichnung }}" placeholder="z. B. Flurstrom Haus 1"></label>
+      <label>Nummer<input name="nummer" value="{{ z.nummer }}"></label>
+      <button class="btn hell">{{ icon('save') }}<span>Speichern</span></button>
+    </form>
+    <p class="leise">Zählertausch: Der alte Zähler bleibt mit seinen Ständen erhalten, der neue beginnt mit dem Anfangsstand.</p>
+    <form method="post" action="{{ url_for('zaehler_tausch', zid=z.id) }}" class="zeile">
+      <label>Datum<input type="date" name="datum" required></label>
+      <label>Endstand alt<input class="betrag" name="endstand" inputmode="decimal" required></label>
+      <label>Neue Nummer<input name="nummer"></label>
+      <label>Anfangsstand neu<input class="betrag" name="anfangsstand" inputmode="decimal" value="0"></label>
+      <button class="btn">{{ icon('save') }}<span>Tauschen</span></button>
+    </form>
+    {{ loeschen(url_for('zaehler_loeschen', zid=z.id), 'Zähler mit allen Ablesungen löschen?', 'Zähler löschen') }}
+  </details>
+  {% endif %}
+</div>
+{%- endmacro %}
+
 {% macro jahr_umschalter(j) -%}
 <div class="jahr" aria-label="Abrechnungsjahr">
   <a href="?jahr={{ j - 1 }}" title="Vorjahr">{{ icon('left') }}</a>

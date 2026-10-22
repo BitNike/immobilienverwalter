@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl, pruefliste, doppelt_rueckfrage %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte %}
 {% block title %}{{ w.bezeichnung }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
@@ -234,36 +234,7 @@
     {% if r.wasser is not none and r.wasser_ab %}<span class="warnung">(gemessen erst ab {{ r.wasser_ab|datum }}; der Stand zum 01.01.{{ jahr }} fehlt)</span>{% endif %}</p>
   <div class="zaehler-raster">
   {% for z in zaehler %}
-  <div class="karte-flach {{ 'gedimmt' if z.ausgebaut }}">
-    <div class="karte-kopf">
-      {{ icon('gauge') }} <strong>{{ ZAEHLERARTEN[z.art] }}</strong> Nr. {{ z.nummer or '–' }}
-      {% if z.ausgebaut %}<span class="marke">ausgebaut {{ z.ausgebaut|datum }}</span>{% elif z.eingebaut %}<span class="leise">seit {{ z.eingebaut|datum }}</span>{% endif %}
-    </div>
-    <table class="kompakt">
-      {% for s in z.staende[:8] %}
-      <tr><td>{{ s.datum|datum }}</td><td class="zahl">{{ s.stand|num(2) }}</td><td class="leise">{{ s.notiz }}</td>
-        <td class="aktionen">{% if darf %}{{ loeschen(url_for('zaehlerstand_loeschen', sid=s.id), 'Ablesung löschen?') }}{% endif %}</td></tr>
-      {% else %}<tr><td class="leise">Noch keine Ablesung.</td></tr>{% endfor %}
-    </table>
-    {% if darf and not z.ausgebaut %}
-    <form method="post" action="{{ url_for('zaehlerstand_neu', zid=z.id) }}" class="zeile">
-      <label>Datum<input type="date" name="datum" value="{{ jahr }}-12-31" required></label>
-      <label>Stand<input class="betrag" name="stand" inputmode="decimal" required></label>
-      <label>Notiz<input name="notiz" placeholder="z. B. Auszug"></label>
-      <button class="btn hell">{{ icon('plus') }}<span>Ablesung</span></button>
-    </form>
-    <details>
-      <summary>Zähler tauschen</summary>
-      <form method="post" action="{{ url_for('zaehler_tausch', zid=z.id) }}" class="zeile">
-        <label>Datum<input type="date" name="datum" required></label>
-        <label>Endstand alt<input class="betrag" name="endstand" inputmode="decimal" required></label>
-        <label>Neue Nummer<input name="nummer"></label>
-        <label>Anfangsstand neu<input class="betrag" name="anfangsstand" inputmode="decimal" value="0"></label>
-        <button class="btn">{{ icon('save') }}<span>Tauschen</span></button>
-      </form>
-    </details>
-    {% endif %}
-  </div>
+  {{ zaehler_karte(z, darf, jahr) }}
   {% else %}
   <p class="leise">Keine Zähler erfasst.</p>
   {% endfor %}
@@ -275,6 +246,7 @@
       <input type="hidden" name="wohnung_id" value="{{ w.id }}">
       <label>Art<select name="art">{% for a, t in ZAEHLERARTEN.items() %}<option value="{{ a }}">{{ t }}</option>{% endfor %}</select></label>
       <label>Nummer<input name="nummer"></label>
+      <label>Bezeichnung / Standort<input name="bezeichnung" placeholder="z. B. Bad, Küche"></label>
       <label>Eingebaut am<input type="date" name="eingebaut"></label>
       <label>Anfangsstand<input class="betrag" name="stand" inputmode="decimal"></label>
       <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>

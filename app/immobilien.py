@@ -6,7 +6,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 
 import dateien
 import db
-from calc import berechne, de_num, parse_date, parse_mea, parse_num
+from calc import berechne, de_num, messbeginn, parse_date, parse_mea, parse_num, verbrauch_zeitraum
 from core import (BEREICHE, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
@@ -233,7 +233,18 @@ def immobilie(iid):
         r["eigentuemer"] = one("SELECT * FROM benutzer WHERE id = ?", (r["wohnung"]["eigentuemer_id"],))
     vorjahr_vorhanden = not erg["gebaeude"] and one(
         "SELECT 1 FROM kosten WHERE immobilie_id = ? AND jahr = ?", (iid, j - 1))
-    hauptzaehler = zaehler_mit_staenden("SELECT * FROM zaehler WHERE immobilie_id = ? ORDER BY art, id", (iid,))
+    hauptzaehler = zaehler_mit_staenden("SELECT * FROM zaehler WHERE immobilie_id = ? "
+                                        "ORDER BY art, ausgebaut IS NULL, bezeichnung COLLATE NATUERLICH, id", (iid,))
+    hauptverbrauch = []
+    for art in ZAEHLERARTEN:
+        uhren = [{**z, "staende": [(s["datum"], s["stand"]) for s in z["staende"]]}
+                 for z in hauptzaehler if z["art"] == art]
+        if uhren:
+            hauptverbrauch.append({"art": art, "anzahl": sum(1 for z in uhren if not z["ausgebaut"]),
+                                   "verbrauch": verbrauch_zeitraum(uhren, date(j, 1, 1), date(j, 12, 31)),
+                                   "ab": messbeginn(uhren, date(j, 1, 1), date(j, 12, 31))})
+    mit_uhr = [r["wasser"] for r in erg["wohnungen"].values() if r["wasser"] is not None]
+    wohnungen_wasser = sum(mit_uhr) if mit_uhr else None
     mvs = rows("SELECT m.*, w.bezeichnung AS wohnung FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id "
                "WHERE w.immobilie_id = ? ORDER BY m.nummer", (iid,))
     for mv in mvs:
@@ -246,7 +257,7 @@ def immobilie(iid):
                  "(SELECT COUNT(*) FROM kosten WHERE immobilie_id = :i) AS kosten, "
                  "(SELECT COUNT(*) FROM dokument WHERE immobilie_id = :i) AS dokumente", {"i": iid})
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
-                           umfang=umfang,
+                           umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()),
                            std_schluessel=standard_schluessel(immo, len(erg["wohnungen"])),
                            vorhanden=vorhandene_kostenarten(iid, j),
@@ -572,8 +583,9 @@ def zaehler_neu():
     wid = int(f["wohnung_id"]) if f.get("wohnung_id") else None
     iid = int(f["immobilie_id"]) if f.get("immobilie_id") else None
     _zaehler_recht({"wohnung_id": wid})
-    zid = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, eingebaut) VALUES (?, ?, ?, ?, ?)",
-              (wid, None if wid else iid, art, f.get("nummer", "").strip(), f.get("eingebaut") or None))
+    zid = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, bezeichnung, eingebaut) VALUES (?, ?, ?, ?, ?, ?)",
+              (wid, None if wid else iid, art, f.get("nummer", "").strip(), f.get("bezeichnung", "").strip(),
+               f.get("eingebaut") or None))
     if f.get("stand", "").strip() and f.get("eingebaut"):
         exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Einbau')",
             (zid, f["eingebaut"], parse_num(f["stand"])))
@@ -592,11 +604,21 @@ def zaehler_tausch(zid):
     exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Ausbau')",
         (zid, datum, parse_num(f.get("endstand"))))
     exe("UPDATE zaehler SET ausgebaut = ? WHERE id = ?", (datum, zid))
-    neu = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, eingebaut) VALUES (?, ?, ?, ?, ?)",
-              (z["wohnung_id"], z["immobilie_id"], z["art"], f.get("nummer", "").strip(), datum))
+    neu = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, bezeichnung, eingebaut) VALUES (?, ?, ?, ?, ?, ?)",
+              (z["wohnung_id"], z["immobilie_id"], z["art"], f.get("nummer", "").strip(), z["bezeichnung"], datum))
     exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Einbau')",
         (neu, datum, parse_num(f.get("anfangsstand"))))
     flash("Zähler getauscht. Der alte Zähler bleibt mit seinen Ständen erhalten.")
+    return zurueck()
+
+
+@app.post("/zaehler/<int:zid>/bearbeiten")
+def zaehler_bearbeiten(zid):
+    z = row("SELECT * FROM zaehler WHERE id = ?", (zid,))
+    _zaehler_recht(z)
+    f = request.form
+    exe("UPDATE zaehler SET bezeichnung = ?, nummer = ? WHERE id = ?",
+        (f.get("bezeichnung", "").strip(), f.get("nummer", "").strip(), zid))
     return zurueck()
 
 
