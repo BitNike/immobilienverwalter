@@ -210,6 +210,7 @@ table.dokumente td { vertical-align: top; }
 .ueber-kopf h1 { margin: 0 0 4px; }
 table.ueber th { vertical-align: top; width: 130px; }
 table.ueber p { margin: 6px 0 0; }
+table.ueber tr:last-child th, table.ueber tr:last-child td { border-bottom: none; }
 .lizenz-badge { display: inline-flex; font: 600 12px/1 var(--schrift); border-radius: 3px; overflow: hidden; text-decoration: none; }
 .lizenz-badge span { padding: 5px 8px; color: #fff; }
 .lizenz-badge span:first-child { background: #555; }
