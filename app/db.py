@@ -174,6 +174,18 @@ MIGRATIONEN = [
     """
     ALTER TABLE dokument ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
     """,
+    # 9: Ablage-Kategorien pflegbar (vorher fest im Code; die Schlüssel bleiben gleich)
+    """
+    CREATE TABLE ablage_kategorie (
+        schluessel TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        sortierung INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO ablage_kategorie (schluessel, name, sortierung) VALUES
+        ('protokolle', 'Protokolle', 10), ('plaene', 'Pläne & Grundrisse', 20),
+        ('angebote', 'Angebote & Aufträge', 30), ('vertraege', 'Verträge & Versicherungen', 40),
+        ('sonstiges', 'Sonstiges', 90);
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

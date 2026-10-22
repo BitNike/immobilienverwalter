@@ -3,12 +3,10 @@ import os
 
 from flask import g, redirect, render_template, request, url_for
 
-from core import ABLAGE_KATEGORIEN, app, exe, ist_admin, person_name, rows, wohnung_bearbeitbar
+from core import ablage_kategorien, app, exe, ist_admin, person_name, rows, wohnung_bearbeitbar
 from db import _natuerlich_schluessel
 from immobilien import _ablage_laden, _dokument_laden
 
-ARTEN = {"belege": "Abrechnungsbelege", "ablage": "Ablage (alle Kategorien)",
-         **{k: f"Ablage · {t}" for k, t in ABLAGE_KATEGORIEN.items()}}
 SPALTEN = {"titel": "Dokument", "notiz": "Kommentar", "immobilie": "Immobilie", "wohnung": "Mietobjekt",
            "art": "Art", "jahr": "Jahr", "datum": "Hochgeladen am"}
 ABLAGEORT = {"mieter": "Mieter", "vermieter": "Vermieter"}
@@ -35,6 +33,7 @@ def _alle_dokumente():
         eigene_w = {w["id"] for w in eigene}
         eigene_i = {w["immobilie_id"] for w in eigene}
 
+    kategorien = ablage_kategorien()
     erg = []
     for d in belege:
         if not admin and not (d["wid"] in eigene_w if d["wid"] else
@@ -48,7 +47,7 @@ def _alle_dokumente():
         if not admin and (a["intern"] or not (a["wid"] in eigene_w if a["wid"] else a["immobilie_id"] in eigene_i)):
             continue
         erg.append({**_gemeinsam(a), "typ": "ablage", "art_schluessel": a["kategorie"],
-                    "art": f"Ablage · {ABLAGE_KATEGORIEN.get(a['kategorie'], a['kategorie'])}",
+                    "art": f"Ablage · {kategorien.get(a['kategorie'], a['kategorie'])}",
                     "kategorie": a["kategorie"], "intern": a["intern"],
                     "link": url_for("ablage_anzeigen", aid=a["id"])})
     return erg
@@ -108,7 +107,9 @@ def dokumente_uebersicht():
                        key=lambda x: (_natuerlich_schluessel(x[1]), _natuerlich_schluessel(x[2])))
     jahre = sorted({d["jahr"] for d in alle if d["jahr"]}, reverse=True)
     return render_template("dokumente.html", treffer=treffer, anzahl=len(alle), immobilien=immobilien,
-                           wohnungen=wohnungen, jahre=jahre, arten=ARTEN, spalten=SPALTEN, sort=sort,
+                           wohnungen=wohnungen, jahre=jahre, spalten=SPALTEN, sort=sort,
+                           arten={"belege": "Abrechnungsbelege", "ablage": "Ablage (alle Kategorien)",
+                                  **{k: f"Ablage · {t}" for k, t in ablage_kategorien().items()}},
                            absteigend=absteigend, sortier_link=sortier_link, filter_aktiv=any(
                                a.get(k) for k in ("q", "immobilie", "wohnung", "art", "jahr")),
                            bearbeiten=a.get("bearbeiten", ""))
@@ -126,7 +127,7 @@ def dokument_bearbeiten(typ, did):
     elif typ == "ablage":
         _ablage_laden(did, bearbeiten=True)
         kategorie = f.get("kategorie")
-        if kategorie not in ABLAGE_KATEGORIEN:
+        if kategorie not in ablage_kategorien():
             raise ValueError("Bitte eine Kategorie wählen.")
         jahr = int(f["jahr"]) if f.get("jahr", "").strip() else None
         exe("UPDATE ablage SET titel = ?, notiz = ?, kategorie = ?, jahr = ? WHERE id = ?",

@@ -21,10 +21,11 @@
           {{ eintrag('vermieter_neu', 'Vermieter anlegen', 'plus', bereich == 'admin_vermieter') }}
           {{ eintrag('wohnungen_liste', 'Mietobjekte (Wohnungen)', 'home', bereich == 'admin_wohnungen') }}
           {{ eintrag('kostenarten_admin', 'Kostenarten', 'list', bereich == 'admin_kostenarten') }}
+          {{ eintrag('ablage_kategorien_admin', 'Ablage-Kategorien', 'folder', bereich == 'admin_ablage') }}
           {{ eintrag('logo_admin', 'Logo & Brief', 'image', bereich == 'admin_logo') }}
           {{ eintrag('smtp_admin', 'SMTP / E-Mail', 'mail', bereich == 'admin_smtp') }}
         {% else %}
-          {% for t in ['Vermieter anlegen', 'Mietobjekte (Wohnungen)', 'Kostenarten', 'Logo & Brief', 'SMTP / E-Mail'] %}<span>{{ t }}</span>{% endfor %}
+          {% for t in ['Vermieter anlegen', 'Mietobjekte (Wohnungen)', 'Kostenarten', 'Ablage-Kategorien', 'Logo & Brief', 'SMTP / E-Mail'] %}<span>{{ t }}</span>{% endfor %}
         {% endif %}
       </div>
     {% endif %}

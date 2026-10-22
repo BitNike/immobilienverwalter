@@ -168,7 +168,7 @@ def test_gesamter_ablauf():
                 "/wohnungen/1/export/brief?partei=eigentuemer", "/einstellungen/vermieter",
                 "/einstellungen/admin/vermieter/neu", "/einstellungen/admin/vermieter/1",
                 "/einstellungen/admin/wohnungen", "/einstellungen/admin/wohnungen/1", "/einstellungen/admin/wohnungen/neu",
-                "/einstellungen/admin/kostenarten", "/einstellungen/admin/logo", "/einstellungen/admin/smtp",
+                "/einstellungen/admin/kostenarten", "/einstellungen/admin/ablage", "/einstellungen/admin/logo", "/einstellungen/admin/smtp",
                 "/profil", "/profil/immobilien", "/profil/passwort", "/immobilien/neu", "/benutzer/1/foto",
                 "/dokumente/1", "/dokumente/2"]:
         ok(c.get(url))
@@ -249,6 +249,16 @@ def test_gesamter_ablauf():
     post(c, "/dokumente/beleg/1/bearbeiten", data={"titel": "Grundsteuerbescheid 2025", "notiz": "Stadt Musterstadt"})
     assert "Stadt Musterstadt" in ok(c.get("/dokumente?q=musterstadt")).get_data(as_text=True)
     ok(c.get("/dokumente?bearbeiten=ablage-1&sort=titel&richtung=auf"))
+    # neue Ablage-Kategorie direkt beim Hochladen; gleichnamige wird wiederverwendet; volle Kategorie nicht löschbar
+    for _ in range(2):
+        post(c, "/immobilien/1/ablage", data={"kategorie": "neu", "neue_kategorie": "Energieausweis",
+                                             "dateien": pdf_datei("ea.pdf")}, content_type="multipart/form-data")
+    seite = ok(c.get("/einstellungen/admin/ablage")).get_data(as_text=True)
+    assert seite.count('value="Energieausweis"') == 1 and "Energieausweis" in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    ok(c.post("/einstellungen/admin/ablage/protokolle/loeschen"), 302)
+    assert "Protokolle" in ok(c.get("/einstellungen/admin/ablage")).get_data(as_text=True)
+    post(c, "/einstellungen/admin/ablage/sonstiges/loeschen")
+    assert 'value="Sonstiges"' not in ok(c.get("/einstellungen/admin/ablage")).get_data(as_text=True)
 
     # Eigentümer ohne Zugang direkt beim Mietobjekt anlegen (nur der Name ist Pflicht)
     post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Garage", "wohnflaeche": "15", "immobilie_id": "",

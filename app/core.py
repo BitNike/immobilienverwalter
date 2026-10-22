@@ -47,8 +47,6 @@ ROLLEN = {
 }
 ZAEHLERARTEN = {"wasser": "Wasser", "strom": "Strom", "gas": "Gas", "waerme": "Wärme"}
 EINHEITEN = {"wasser": "m³", "strom": "kWh", "gas": "m³", "waerme": "kWh"}
-ABLAGE_KATEGORIEN = {"protokolle": "Protokolle", "plaene": "Pläne & Grundrisse", "angebote": "Angebote & Aufträge",
-                     "vertraege": "Verträge & Versicherungen", "sonstiges": "Sonstiges"}
 BEREICHE = {"mieter": "Mieter (Nebenkosten)", "vermieter": "Vermieter (z. B. Steuer)", "mieterordner": "Mieterordner"}
 
 
@@ -214,6 +212,26 @@ def person_name(b):
         ("" if benutzername.startswith("~") else benutzername)
 
 
+def ablage_kategorien():
+    """{schluessel: name} der Ablage-Kategorien in der gepflegten Reihenfolge."""
+    return {r["schluessel"]: r["name"] for r in
+            rows("SELECT * FROM ablage_kategorie ORDER BY sortierung, name COLLATE NATUERLICH")}
+
+
+def ablage_kategorie_anlegen(name):
+    """Neue Kategorie anlegen bzw. eine gleichnamige wiederverwenden; gibt den Schlüssel zurück."""
+    name = " ".join(name.split())
+    if not name:
+        raise ValueError("Bitte einen Namen für die neue Kategorie angeben.")
+    vorhanden = one("SELECT schluessel FROM ablage_kategorie WHERE name = ? COLLATE NOCASE", (name,))
+    if vorhanden:
+        return vorhanden["schluessel"]
+    schluessel = "k" + secrets.token_hex(4)
+    sortierung = (one("SELECT MAX(sortierung) AS m FROM ablage_kategorie WHERE schluessel <> 'sonstiges'")["m"] or 0) + 5
+    exe("INSERT INTO ablage_kategorie (schluessel, name, sortierung) VALUES (?, ?, ?)", (schluessel, name, sortierung))
+    return schluessel
+
+
 def eigentuemer_anlegen(vals):
     """Eigentümer ohne Zugang: nur Kontaktdaten. Platzhalter-Benutzername (~…) und leeres Passwort,
     Anmeldung und „Passwort vergessen“ sind für diese Gruppe gesperrt."""
@@ -226,7 +244,7 @@ def eigentuemer_anlegen(vals):
 
 app.jinja_env.globals.update(
     ICONS=ICONS, ROLLEN=ROLLEN, SCHLUESSEL=SCHLUESSEL, ZAEHLERARTEN=ZAEHLERARTEN, EINHEITEN=EINHEITEN, BEREICHE=BEREICHE,
-    ABLAGE_KATEGORIEN=ABLAGE_KATEGORIEN,
+    ablage_kategorien=lambda: ablage_kategorien(),
     person_name=person_name,
 )
 

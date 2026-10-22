@@ -9,7 +9,8 @@ import dateien
 import mail
 from auth import link_senden, passwort_pruefen
 from calc import SCHLUESSEL, parse_num
-from core import (OHNE_ZUGANG, ROLLEN, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, einstellung,
+from core import (OHNE_ZUGANG, ROLLEN, ZAEHLERARTEN, ablage_kategorie_anlegen, admin_noetig, app, eigentuemer_anlegen,
+                  einstellung,
                   einstellung_setzen, exe, ist_admin, one,
                   row, rows, sichtbare_immobilien, wohnungen_der_immobilie, zurueck)
 from immobilien import wohnung_werte, zaehler_aus_formular
@@ -260,6 +261,43 @@ def kostenart_loeschen(kid):
     else:
         exe("DELETE FROM kostenart WHERE id = ?", (kid,))
     return redirect(url_for("kostenarten_admin"))
+
+
+# ---------- Administration: Ablage-Kategorien ----------
+
+@app.route("/einstellungen/admin/ablage", methods=["GET", "POST"])
+@admin_noetig
+def ablage_kategorien_admin():
+    if request.method == "POST":
+        ablage_kategorie_anlegen(request.form.get("name", ""))
+        flash("Kategorie angelegt.")
+        return redirect(url_for("ablage_kategorien_admin"))
+    kategorien = rows("SELECT k.*, (SELECT COUNT(*) FROM ablage a WHERE a.kategorie = k.schluessel) AS anzahl "
+                      "FROM ablage_kategorie k ORDER BY sortierung, name COLLATE NATUERLICH")
+    return render_template("einstellungen/ablage_kategorien.html", bereich="admin_ablage", kategorien=kategorien)
+
+
+@app.post("/einstellungen/admin/ablage/<schluessel>")
+@admin_noetig
+def ablage_kategorie_speichern(schluessel):
+    row("SELECT 1 FROM ablage_kategorie WHERE schluessel = ?", (schluessel,))
+    name = " ".join(request.form.get("name", "").split())
+    if not name:
+        raise ValueError("Bitte einen Namen angeben.")
+    exe("UPDATE ablage_kategorie SET name = ?, sortierung = ? WHERE schluessel = ?",
+        (name, int(parse_num(request.form.get("sortierung"), 0)), schluessel))
+    flash("Kategorie gespeichert. Bereits abgelegte Dateien bleiben im bisherigen Ordner.")
+    return redirect(url_for("ablage_kategorien_admin"))
+
+
+@app.post("/einstellungen/admin/ablage/<schluessel>/loeschen")
+@admin_noetig
+def ablage_kategorie_loeschen(schluessel):
+    if one("SELECT 1 FROM ablage WHERE kategorie = ?", (schluessel,)):
+        raise ValueError("Die Kategorie enthält noch Dokumente. Bitte diese zuerst in eine andere Kategorie verschieben.")
+    exe("DELETE FROM ablage_kategorie WHERE schluessel = ?", (schluessel,))
+    flash("Kategorie gelöscht.")
+    return redirect(url_for("ablage_kategorien_admin"))
 
 
 # ---------- Administration: Logo & SMTP ----------

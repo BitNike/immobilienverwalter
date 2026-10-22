@@ -1,0 +1,33 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, loeschen %}
+{% block title %}Ablage-Kategorien{% endblock %}
+{% block panel %}
+<h1>Ablage-Kategorien</h1>
+<p class="leise">Kategorien für die Ablage (Protokolle, Pläne, Angebote …) aller Immobilien. Neue Kategorien kannst du auch direkt
+  beim Hochladen anlegen. Löschen geht nur, wenn die Kategorie leer ist.</p>
+<div class="tabelle">
+<table>
+  <thead><tr><th>Name</th><th>Reihenfolge</th><th class="zahl">Dokumente</th><th></th></tr></thead>
+  <tbody>
+  {% for k in kategorien %}
+  <tr>
+    <td><input name="name" form="ak{{ loop.index }}" value="{{ k.name }}" required></td>
+    <td><input name="sortierung" form="ak{{ loop.index }}" value="{{ k.sortierung }}" size="4" inputmode="numeric"></td>
+    <td class="zahl">{{ k.anzahl }}</td>
+    <td class="aktionen">
+      <form id="ak{{ loop.index }}" method="post" action="{{ url_for('ablage_kategorie_speichern', schluessel=k.schluessel) }}" class="inline"><button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+      {% if not k.anzahl %}{{ loeschen(url_for('ablage_kategorie_loeschen', schluessel=k.schluessel), 'Kategorie „%s“ löschen?' % k.name) }}{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<section class="block">
+  <h2>Neue Kategorie</h2>
+  <form method="post" class="zeile">
+    <label>Name *<input name="name" required placeholder="z. B. Energieausweis"></label>
+    <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+  </form>
+</section>
+{% endblock %}

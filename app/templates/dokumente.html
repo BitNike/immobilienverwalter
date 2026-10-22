@@ -57,7 +57,7 @@
     <td><input name="titel" form="b{{ loop.index }}" value="{{ d.titel }}" required></td>
     <td colspan="2"><textarea name="notiz" form="b{{ loop.index }}" rows="2" placeholder="Kommentar">{{ d.notiz }}</textarea></td>
     <td>{{ d.wohnung or '–' }}</td>
-    <td>{% if d.typ == 'ablage' %}<select name="kategorie" form="b{{ loop.index }}">{% for k, t in ABLAGE_KATEGORIEN.items() %}<option value="{{ k }}" {{ 'selected' if k == d.kategorie }}>{{ t }}</option>{% endfor %}</select>{% else %}{{ d.art }}{% endif %}</td>
+    <td>{% if d.typ == 'ablage' %}<select name="kategorie" form="b{{ loop.index }}">{% for k, t in ablage_kategorien().items() %}<option value="{{ k }}" {{ 'selected' if k == d.kategorie }}>{{ t }}</option>{% endfor %}</select>{% else %}{{ d.art }}{% endif %}</td>
     <td>{% if d.typ == 'ablage' %}<input type="number" name="jahr" form="b{{ loop.index }}" value="{{ d.jahr or '' }}" min="1900" max="2200" style="width: 90px">{% else %}{{ d.jahr }}{% endif %}</td>
     <td class="zahl">{{ d.datum|datum }}</td>
     <td class="aktionen">

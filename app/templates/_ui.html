@@ -262,7 +262,10 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
     <form method="post" action="{{ url_for('ablage_hochladen', iid=iid) }}" enctype="multipart/form-data">
       <div class="raster">
         <label class="breit">Dateien (PDF, JPG, PNG, auch mehrere)<input type="file" name="dateien" accept=".pdf,.jpg,.jpeg,.png" multiple required></label>
-        <label>Kategorie<select name="kategorie">{% for k, t in ABLAGE_KATEGORIEN.items() %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select></label>
+        <label>Kategorie<select name="kategorie" {% if admin %}onchange="this.form.querySelector('.neue-kategorie').hidden = this.value !== 'neu'"{% endif %}>
+          {% for k, t in ablage_kategorien().items() %}<option value="{{ k }}">{{ t }}</option>{% endfor %}
+          {% if admin %}<option value="neu">+ Neue Kategorie …</option>{% endif %}</select></label>
+        {% if admin %}<label class="neue-kategorie" hidden>Name der neuen Kategorie<input name="neue_kategorie" placeholder="z. B. Energieausweis"></label>{% endif %}
         <label>Titel<input name="titel" placeholder="leer = Dateiname"><small>nur bei einer einzelnen Datei</small></label>
         <label>Jahr<input type="number" name="jahr" min="1900" max="2200" placeholder="optional"><small>z. B. bei Protokollen</small></label>
         {% if wid %}<input type="hidden" name="wohnung_id" value="{{ wid }}">

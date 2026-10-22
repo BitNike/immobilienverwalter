@@ -7,7 +7,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 import dateien
 import db
 from calc import berechne, de_num, messbeginn, parse_date, parse_mea, parse_num, verbrauch_zeitraum
-from core import (ABLAGE_KATEGORIEN, BEREICHE, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
+from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
 
@@ -759,7 +759,7 @@ def ablage_sichtbar(iid, wohnung_id=None):
         sql += " AND a.intern = 0 AND (a.wohnung_id IS NULL OR w.eigentuemer_id = ?)"
         args.append(g.user["id"])
     eintraege = rows(sql + " ORDER BY a.jahr IS NULL, a.jahr DESC, a.titel COLLATE NATUERLICH", args)
-    return [(k, t, [e for e in eintraege if e["kategorie"] == k]) for k, t in ABLAGE_KATEGORIEN.items()
+    return [(k, t, [e for e in eintraege if e["kategorie"] == k]) for k, t in ablage_kategorien().items()
             if any(e["kategorie"] == k for e in eintraege)]
 
 
@@ -775,7 +775,10 @@ def ablage_hochladen(iid):
     elif not ist_admin():
         abort(403)
     kategorie = f.get("kategorie")
-    if kategorie not in ABLAGE_KATEGORIEN:
+    if kategorie == "neu" and ist_admin():
+        kategorie = ablage_kategorie_anlegen(f.get("neue_kategorie", ""))
+    kategorien = ablage_kategorien()
+    if kategorie not in kategorien:
         raise ValueError("Bitte eine Kategorie wählen.")
     jahr_ = int(f["jahr"]) if f.get("jahr", "").strip() else None
     if jahr_ is not None and not 1900 <= jahr_ <= 2200:
@@ -786,7 +789,7 @@ def ablage_hochladen(iid):
     ordner = [immo["ordner"], "Ablage"]
     if wid:
         ordner.append(dateien.ordnername(w["bezeichnung"]))
-    ordner.append(dateien.ordnername(ABLAGE_KATEGORIEN[kategorie]))
+    ordner.append(dateien.ordnername(kategorien[kategorie]))
     for d in dateiliste:
         pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(*ordner))
         titel = (f.get("titel", "").strip() if len(dateiliste) == 1 else "") or os.path.splitext(d.filename)[0]
