@@ -15,35 +15,30 @@ Web-App im Docker-Container für Vermieter: Immobilien, Mietobjekte, Mieter, Zä
 ### Mit dem fertigen Image (empfohlen)
 
 Kein Git und kein Bauen nötig – läuft auf PC/Server (amd64) sowie Raspberry Pi und Synology (arm64).
-Die Datei [`docker-compose.image.yml`](docker-compose.image.yml) herunterladen, z. B. als `docker-compose.yml`
-in einen eigenen Ordner, dann:
+Die Datei [`docker-compose.yml`](docker-compose.yml) in einen eigenen Ordner herunterladen, dann:
 
 ```bash
 docker compose up -d
 ```
 
 Oder in **Portainer, Dockge, Unraid oder dem Synology Container Manager** einen neuen Stack anlegen und den Inhalt
-der Datei einfügen.
+der [`docker-compose.yml`](docker-compose.yml) einfügen. Mehr braucht es nicht, der Quellcode ist dafür nicht nötig.
 
 Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.9.2` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.9.3` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.
 
-### Aus dem Quellcode
-
+### Aus dem Quellcode (für Entwickler)
 
 ```bash
 git clone https://github.com/BitNike/immobilienverwalter.git
 cd immobilienverwalter
-cp .env.example .env      # SMTP und APP_URL eintragen (optional)
-docker compose up -d --build
+docker compose -f docker-compose.build.yml up -d --build
 ```
-
-Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 ## Aufbau
 
@@ -78,13 +73,17 @@ Pro Mietobjekt gibt es eine **Mieter-Abrechnung** und eine **Eigentümer-Abrechn
 
 | Volume | Inhalt |
 |---|---|
-| `nk-daten` → `/data` | SQLite-Datenbank, Profilfotos, Logo |
-| `nk-dokumente` → `/dokumente` | Belege: `<Immobilie>/<Jahr>/Vermieter`, `<Immobilie>/<Jahr>/Mieter`, `<Immobilie>/<Jahr>/Mieter/<Nr - Name>` |
+| `immobilienverwalter_daten` → `/data` | SQLite-Datenbank, Profilfotos, Logo |
+| `immobilienverwalter_dokumente` → `/dokumente` | Belege `<Immobilie>/<Jahr>/…` und Ablage `<Immobilie>/Ablage/…` |
 
 ```bash
-docker run --rm -v nebenkostenabrechnung_nk-daten:/data -v nebenkostenabrechnung_nk-dokumente:/dokumente \
+docker run --rm -v immobilienverwalter_daten:/data -v immobilienverwalter_dokumente:/dokumente \
   -v "$PWD":/backup debian:bookworm-slim tar czf /backup/backup-$(date +%F).tgz /data /dokumente
 ```
+
+Umzug einer bestehenden Installation mit anderen Volume-Namen: in der `docker-compose.yml` unter `volumes:` den alten
+Namen eintragen und `external: true` ergänzen. Dann bindet Docker die vorhandenen Daten ein und legt nie ein leeres
+Volume an. Bei einer Neuinstallation ist nichts zu tun, die Volumes entstehen beim ersten Start.
 
 ## Sicherheit
 

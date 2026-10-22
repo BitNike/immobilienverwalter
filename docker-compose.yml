@@ -1,20 +1,24 @@
+# Immobilienverwalter mit dem fertigen Image.
+# Start:  docker compose up -d
+# Update: docker compose pull && docker compose up -d
+# Danach im Browser: http://<IP-des-Rechners>:8080
+
 services:
-  nebenkosten:
-    build: .
-    container_name: nebenkosten
+  immobilienverwalter:
+    image: ghcr.io/bitnike/immobilienverwalter:latest
+    container_name: immobilienverwalter
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     ports:
-      - "${NK_PORT:-8080}:8080"   # Port auf dem Server, einstellbar in .env
+      - "${NK_PORT:-8080}:8080"
     volumes:
-      - nk-daten:/data            # Datenbank, Profilfotos, Logo
-      - nk-dokumente:/dokumente   # hochgeladene Belege: <Immobilie>/<Jahr>/Vermieter|Mieter/...
+      - daten:/data
+      - dokumente:/dokumente
 
-# Feste Volume-Namen: Daten bleiben erhalten, auch wenn Ordner oder Projekt umbenannt werden.
 volumes:
-  nk-daten:
-    name: nebenkostenabrechnung_nk-daten
-  nk-dokumente:
-    name: nebenkostenabrechnung_nk-dokumente
+  daten:
+    name: immobilienverwalter_daten
+  dokumente:
+    name: immobilienverwalter_dokumente

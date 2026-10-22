@@ -1,0 +1,23 @@
+# Nur für Entwickler: Image aus dem Quellcode bauen.
+# Voraussetzung: das ganze Repository (git clone), nicht nur diese Datei.
+# Start: docker compose -f docker-compose.build.yml up -d --build
+
+services:
+  immobilienverwalter:
+    build: .
+    container_name: immobilienverwalter
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "${NK_PORT:-8080}:8080"
+    volumes:
+      - daten:/data
+      - dokumente:/dokumente
+
+volumes:
+  daten:
+    name: immobilienverwalter_daten
+  dokumente:
+    name: immobilienverwalter_dokumente
