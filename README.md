@@ -7,6 +7,8 @@ Web-App im Docker-Container für Vermieter: Immobilien, Mietobjekte, Mieter, Zä
 ## Starten
 
 ```bash
+git clone https://github.com/BitNike/immobilienverwalter.git
+cd immobilienverwalter
 cp .env.example .env      # SMTP und APP_URL eintragen (optional)
 docker compose up -d --build
 ```

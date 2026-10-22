@@ -12,7 +12,7 @@ from icons import ICONS
 
 VERSION = "0.8.1"
 NAME = "Immobilienverwalter"
-URL = ""  # öffentliche Projektseite, sobald es eine gibt (Fußzeile des Briefs, Seite „Über“)
+URL = "https://github.com/BitNike/immobilienverwalter"  # Projektseite (Fußzeile des Briefs, Seite „Über“)
 ENTWICKLER = "Sascha Benecke"
 LIZENZ = "AGPL-3.0"
 SPENDEN_URL = "https://www.paypal.com/paypalme/saschabenecke"
