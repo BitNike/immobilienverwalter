@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker-Image bauen (wie bei einer Installation)
+        run: docker build -t immobilienverwalter .
+
+      - name: Tests im Image
+        run: >
+          docker run --rm -u 0 -v "$PWD:/t" -w /t immobilienverwalter
+          sh -c "pip install -q pytest && python -m pytest -q tests -p no:cacheprovider"
+
+      - name: App startet mit leerer Datenbank
+        run: |
+          docker run -d --name app -p 8080:8080 immobilienverwalter
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8080/einrichtung; then echo "Ersteinrichtung erreichbar"; exit 0; fi
+            sleep 1
+          done
+          docker logs app
+          exit 1

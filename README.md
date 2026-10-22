@@ -1,5 +1,11 @@
 <p align="center"><img src="design/logo-readme.png" alt="Immobilienverwalter" width="480"></p>
 
+<p align="center">
+  <a href="https://github.com/BitNike/immobilienverwalter/actions/workflows/tests.yml"><img src="https://github.com/BitNike/immobilienverwalter/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Lizenz-AGPL--3.0-17325c" alt="Lizenz: AGPL-3.0"></a>
+  <a href="https://github.com/BitNike/immobilienverwalter/releases/latest"><img src="https://img.shields.io/github/v/release/BitNike/immobilienverwalter?label=Version" alt="Version"></a>
+</p>
+
 # Immobilienverwalter
 
 Web-App im Docker-Container für Vermieter: Immobilien, Mietobjekte, Mieter, Zähler, Belege und die jährliche Betriebskostenabrechnung (§ 556 BGB, § 2 BetrKV).
