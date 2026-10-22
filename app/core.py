@@ -10,7 +10,7 @@ import db
 from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 NAME = "Immobilienverwalter"
 URL = ""  # öffentliche Projektseite, sobald es eine gibt (Fußzeile des Briefs, Seite „Über“)
 ENTWICKLER = "Sascha Benecke"
