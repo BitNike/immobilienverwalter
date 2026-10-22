@@ -28,7 +28,7 @@ der Datei einfügen.
 Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.9.1` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.9.2` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.
