@@ -113,7 +113,8 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
             punkt(f"{w['bezeichnung']}: Keine Wohnfläche hinterlegt. Kosten nach Wohnfläche entfallen auf dieses "
                   "Mietobjekt mit 0 €.", stamm)
         if (immo["weg"] or w["mieter_extern"]) and (wid, None) not in erg["vz_gespeichert"]:
-            punkt(f"{w['bezeichnung']}: Das Hausgeld des Eigentümers ist noch nicht eingetragen.", abrechnung, "hinweis")
+            punkt(f"{w['bezeichnung']}: Das Hausgeld des Eigentümers ist noch nicht eingetragen.",
+                  url_for("immobilie", iid=immo["id"]) + "#hausgeld" if immo["weg"] else abrechnung, "hinweis")
         for p in ([] if w["mieter_extern"] else r["parteien"]):
             if (wid, p["mv"]["id"]) not in erg["vz_gespeichert"]:
                 punkt(f"{w['bezeichnung']}: Die Vorauszahlung von {mv_name(p['mv'])} ist nur vorgeschlagen "
@@ -565,6 +566,26 @@ def vorauszahlungen_speichern(wid):
     con.commit()
     flash("Vorauszahlungen gespeichert.")
     return redirect(url_for("wohnung", wid=wid) + "#abrechnung")
+
+
+@app.post("/immobilien/<int:iid>/hausgeld")
+@admin_noetig
+def hausgeld_speichern(iid):
+    """Hausgeld aller Mietobjekte einer WEG auf einmal (gleiche Daten wie „Eigentümer-Abrechnung“ beim Mietobjekt)."""
+    j = jahr()
+    wohnungen = {w["id"] for w in rows("SELECT id FROM wohnung WHERE immobilie_id = ?", (iid,))}
+    con = db.get_db()
+    for k, v in request.form.items():
+        if not k.startswith("hg_") or int(k[3:]) not in wohnungen:
+            continue
+        wid = int(k[3:])
+        con.execute("DELETE FROM vorauszahlung WHERE jahr = ? AND wohnung_id = ? AND mv_id IS NULL", (j, wid))
+        if v.strip():
+            con.execute("INSERT INTO vorauszahlung (jahr, wohnung_id, mv_id, betrag) VALUES (?, ?, NULL, ?)",
+                        (j, wid, parse_num(v)))
+    con.commit()
+    flash("Hausgeld gespeichert.")
+    return redirect(url_for("immobilie", iid=iid) + "#hausgeld")
 
 
 # ---------- Zähler ----------

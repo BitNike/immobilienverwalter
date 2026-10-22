@@ -229,6 +229,11 @@ def test_gesamter_ablauf():
     assert "rechnet der Eigentümer" in html and "Leerstand" not in html and "Eigentümer-Abrechnung (WEG)" in html
     html = ok(c.get("/immobilien/1")).get_data(as_text=True)
     assert "rechnet Eigentümer ab" in html and "OG: Das Hausgeld des Eigentümers" in html
+    # Hausgeld aller Wohnungen auf einmal: dieselben Werte wie beim einzelnen Mietobjekt
+    assert "Hausgeld der Eigentümer" in html
+    post(c, "/immobilien/1/hausgeld", data={"hg_1": "500", "hg_2": "300,50"})
+    assert 'value="300,50"' in ok(c.get("/wohnungen/2")).get_data(as_text=True)
+    assert "Das Hausgeld des Eigentümers" not in ok(c.get("/immobilien/1")).get_data(as_text=True)
 
     # Ablage: jahresunabhängig, nicht in den Anlagen des Briefs, „nur Admin“ für Eigentümer unsichtbar
     post(c, "/immobilien/1/ablage", data={"kategorie": "protokolle", "titel": "Protokoll Versammlung", "jahr": "2024",

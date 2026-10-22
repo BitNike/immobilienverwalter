@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte, ablage_bereich %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte, ablage_bereich, saldo %}
 {% block title %}{{ immo.name }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
@@ -81,6 +81,38 @@
   </form>
   {% endif %}
 </section>
+
+{% if ist_admin and immo.weg and verteilung %}
+<section class="block" id="hausgeld">
+  <h2>Hausgeld der Eigentümer {{ jahr }}</h2>
+  <p class="leise">Eigentümer-Abrechnungen gegenüber der WEG: Kosten der Wohnung gegen das gezahlte Hausgeld. Trag die Zahlungen
+    vom WEG-Konto hier für alle Wohnungen ein; es sind dieselben Werte wie in der Zeile „Eigentümer-Abrechnung“ beim Mietobjekt.</p>
+  <form method="post" action="{{ url_for('hausgeld_speichern', iid=immo.id) }}" id="hg"></form>
+  <div class="tabelle">
+  <table class="abrechnung">
+    <thead><tr><th>Mietobjekt</th><th>Eigentümer</th><th class="zahl">Kosten</th><th class="zahl">Hausgeld</th>
+      <th class="zahl">Ergebnis</th><th></th></tr></thead>
+    <tbody>
+    {% for r in verteilung %}{% set w = r.wohnung %}
+    <tr>
+      <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a></td>
+      <td>{{ person_name(r.eigentuemer) if r.eigentuemer else '–' }}</td>
+      <td class="zahl">{{ r.summe|eur }}</td>
+      <td class="zahl"><input class="betrag" form="hg" name="hg_{{ w.id }}" inputmode="decimal" placeholder="Hausgeld"
+          value="{{ r.vorauszahlung|num if (w.id, None) in erg.vz_gespeichert else '' }}"></td>
+      <td class="zahl">{% if (w.id, None) in erg.vz_gespeichert %}{{ saldo(r.saldo) }}{% else %}<span class="leise">noch offen</span>{% endif %}</td>
+      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}">{{ icon('download', 16) }}<span>Export</span></a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th colspan="2">Summe</th><th class="zahl">{{ verteilung|sum(attribute='summe')|eur }}</th>
+      <th class="zahl">{{ verteilung|sum(attribute='vorauszahlung')|eur }}</th>
+      <th class="zahl">{{ saldo(verteilung|sum(attribute='saldo')) }}</th><th></th></tr></tfoot>
+  </table>
+  </div>
+  <div class="knopfleiste">{{ speichern("Hausgeld speichern", form="hg") }}</div>
+</section>
+{% endif %}
 
 <section class="block">
   <h2>Verteilung auf die Mietobjekte {{ jahr }}</h2>
