@@ -91,7 +91,7 @@
   <div class="tabelle">
   <table class="abrechnung">
     <thead><tr><th>Mietobjekt</th><th>Eigentümer</th><th class="zahl">Kosten</th><th class="zahl">Hausgeld</th>
-      <th class="zahl">Ergebnis</th><th></th></tr></thead>
+      <th class="zahl">Ergebnis</th><th class="aktionen">Abrechnung</th></tr></thead>
     <tbody>
     {% for r in verteilung %}{% set w = r.wohnung %}
     <tr>
@@ -101,7 +101,7 @@
       <td class="zahl"><input class="betrag" form="hg" name="hg_{{ w.id }}" inputmode="decimal" placeholder="Hausgeld"
           value="{{ r.vorauszahlung|num if (w.id, None) in erg.vz_gespeichert else '' }}"></td>
       <td class="zahl">{% if (w.id, None) in erg.vz_gespeichert %}{{ saldo(r.saldo) }}{% else %}<span class="leise">noch offen</span>{% endif %}</td>
-      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}">{{ icon('download', 16) }}<span>Export</span></a></td>
+      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}" title="Abrechnung des Eigentümers gegenüber der WEG">{{ icon('download', 16) }}<span>Eigentümer</span></a></td>
     </tr>
     {% endfor %}
     </tbody>

@@ -30,7 +30,7 @@
   <div class="tabelle">
   <table class="abrechnung">
     <thead><tr><th>Partei</th><th>Nutzungszeitraum</th><th class="zahl">Monate</th><th class="zahl">Kosten</th>
-      <th class="zahl">Vorauszahlungen</th><th class="zahl">Ergebnis</th><th></th></tr></thead>
+      <th class="zahl">Vorauszahlungen</th><th class="zahl">Ergebnis</th><th class="aktionen">Abrechnung</th></tr></thead>
     {% if not extern %}
     <tbody>
     {% for p in r.parteien %}
@@ -45,7 +45,7 @@
           {% if p.mv.id not in vz_gespeichert %}<br><small class="warnung">nur Vorschlag, nicht gespeichert</small>{% endif %}
           {% else %}{{ p.vorauszahlung|eur }}{% endif %}</td>
       <td class="zahl">{{ saldo(p.saldo) }}</td>
-      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei=p.mv.id) }}">{{ icon('download', 16) }}<span>Export</span></a></td>
+      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei=p.mv.id) }}" title="Nebenkostenabrechnung für diesen Mieter">{{ icon('download', 16) }}<span>Mieter</span></a></td>
     </tr>
     {% else %}
     <tr><td colspan="7" class="leise">Kein Mietverhältnis in {{ jahr }}.</td></tr>
@@ -76,7 +76,7 @@
       <td class="zahl">{% if darf %}<input class="betrag" form="vz" name="vz_eigentuemer" inputmode="decimal"
           value="{{ vz_gespeichert[None]|num if None in vz_gespeichert else '' }}" placeholder="Hausgeld" title="An die WEG gezahltes Hausgeld">{% else %}{{ r.vorauszahlung|eur }}{% endif %}</td>
       <td class="zahl">{{ saldo(r.saldo) }}</td>
-      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}">{{ icon('download', 16) }}<span>Export</span></a></td>
+      <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}" title="Abrechnung des Eigentümers gegenüber der WEG">{{ icon('download', 16) }}<span>Eigentümer</span></a></td>
     </tr>
     {% endif %}
     </tfoot>
