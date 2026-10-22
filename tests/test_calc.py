@@ -116,3 +116,11 @@ def test_totp_rfc6238():
         assert zf.code_pruefen(geheimnis, code, jetzt=zeit) == zeit // 30
     assert zf.code_pruefen(geheimnis, "287082", letzter_schritt=1, jetzt=59) is None   # schon verbraucht
     assert zf.code_pruefen(geheimnis, "287082", jetzt=59 + 120) is None                 # zu alt
+
+
+def test_cent_genaue_verteilung():
+    from calc import cent_genau
+    teile = cent_genau({1: 136.85 / 3, 2: 136.85 / 3, 3: 136.85 / 3})
+    assert round(sum(teile.values()), 2) == 136.85 and sorted(teile.values()) == [45.61, 45.62, 45.62]
+    assert cent_genau({1: 0.005, 2: 0.005}) in ({1: 0.01, 2: 0.0}, {1: 0.0, 2: 0.01})
+    assert cent_genau({1: 10.0, 2: 5.0}) == {1: 10.0, 2: 5.0}

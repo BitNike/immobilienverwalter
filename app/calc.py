@@ -49,6 +49,17 @@ def rund(x):
     return float(Decimal(f"{x:.6f}").quantize(Decimal("0.01"), ROUND_HALF_UP))
 
 
+def cent_genau(betraege):
+    """{schluessel: ungerundet} auf Cent runden, sodass die Summe der gerundeten Werte der gerundeten Gesamtsumme
+    entspricht (z. B. 136,85 € auf 3 Wohnungen: 45,62 + 45,62 + 45,61). Der Ausgleich geht an die größten Rundungsreste."""
+    gerundet = {k: rund(v) for k, v in betraege.items()}
+    diff = round((rund(sum(betraege.values())) - sum(gerundet.values())) * 100)
+    reihenfolge = sorted(betraege, key=lambda k: betraege[k] - gerundet[k], reverse=diff > 0)
+    for k in reihenfolge[:abs(diff)]:
+        gerundet[k] = rund(gerundet[k] + (0.01 if diff > 0 else -0.01))
+    return gerundet
+
+
 def de_num(v, stellen=2):
     s = f"{v:,.{stellen}f}"
     return s.replace(",", "\0").replace(".", ",").replace("\0", ".")
@@ -193,8 +204,9 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
             continue
         anteile, warnung = verteile(k)
         verteilt = 0.0
-        for wid, (x, text) in anteile.items():
-            x = rund(x)
+        betraege = cent_genau({wid: x for wid, (x, _) in anteile.items()})
+        for wid, (_, text) in anteile.items():
+            x = betraege[wid]
             verteilt += x
             erg[wid]["posten"].append({**basis, "gesamt": k["betrag"], "betrag": x, "basis": text,
                                        "art": "wasser" if k["schluessel"] == "wasser" else "zeit", "mv_id": None})
