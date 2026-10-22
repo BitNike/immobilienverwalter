@@ -1,0 +1,72 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, speichern %}
+{% block title %}Sicherheit{% endblock %}
+{% block panel %}
+<h1>Sicherheit</h1>
+
+<section class="block">
+  <h2>Passwort ändern</h2>
+  <form method="post" action="{{ url_for('profil_passwort') }}" class="schmal">
+    <label>Aktuelles Passwort<input type="password" name="alt" autocomplete="current-password" required></label>
+    <label>Neues Passwort<input type="password" name="passwort" autocomplete="new-password" minlength="8" required></label>
+    <label>Wiederholen<input type="password" name="passwort2" autocomplete="new-password" minlength="8" required></label>
+    <div class="knopfleiste">{{ speichern("Passwort speichern") }}</div>
+  </form>
+</section>
+
+<section class="block" id="zweifaktor">
+  <h2>Zwei-Faktor-Anmeldung</h2>
+  {% if notfallcodes %}
+  <div class="meldung">
+    <strong>Deine Notfall-Codes</strong> – jetzt ausdrucken oder sicher aufbewahren, sie werden nur dieses eine Mal angezeigt.
+    Jeder Code funktioniert genau einmal, falls du keinen Zugriff auf die Authenticator-App hast.
+    <ul class="notfallcodes">{% for c in notfallcodes %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if b.totp_aktiv %}
+  <p><span class="marke aktiv-marke">aktiv</span> Bei der Anmeldung wird nach dem Passwort ein Code aus deiner Authenticator-App abgefragt.
+    Noch {{ (b.totp_notfall or '').split('\n')|select|list|length }} Notfall-Codes übrig.</p>
+  <details>
+    <summary>{{ icon('list') }} Neue Notfall-Codes erzeugen</summary>
+    <form method="post" action="{{ url_for('zweifaktor_notfallcodes') }}" class="zeile">
+      <label>Passwort<input type="password" name="passwort" autocomplete="current-password" required></label>
+      <button class="btn hell">{{ icon('list') }}<span>Erzeugen</span></button>
+    </form>
+  </details>
+  <details>
+    <summary>{{ icon('x') }} Zwei-Faktor-Anmeldung ausschalten</summary>
+    <form method="post" action="{{ url_for('zweifaktor_deaktivieren') }}" class="zeile">
+      <label>Passwort<input type="password" name="passwort" autocomplete="current-password" required></label>
+      <label>Code aus der App<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+      <button class="btn hell">{{ icon('x') }}<span>Ausschalten</span></button>
+    </form>
+  </details>
+
+  {% elif totp_neu %}
+  <ol class="schritte">
+    <li>Öffne deine Authenticator-App (z. B. Google oder Microsoft Authenticator, Aegis, 1Password) und scanne den QR-Code.</li>
+    <li>Gib den 6-stelligen Code ein, den die App anzeigt.</li>
+  </ol>
+  <div class="zweifaktor-einrichtung">
+    <div class="qr">{{ qr|safe }}</div>
+    <div>
+      <p class="leise">QR-Code lässt sich nicht scannen? Schlüssel von Hand eintragen:<br>
+        <code class="geheimnis">{{ totp_neu|batch(4)|map('join')|join(' ') }}</code></p>
+      <form method="post" action="{{ url_for('zweifaktor_bestaetigen') }}" class="zeile">
+        <label>Code aus der App<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" required autofocus></label>
+        <button class="btn">{{ icon('lock') }}<span>Aktivieren</span></button>
+      </form>
+      <form method="post" action="{{ url_for('zweifaktor_abbrechen') }}" class="inline"><button class="btn-icon">{{ icon('x', 15) }}<span>Abbrechen</span></button></form>
+    </div>
+  </div>
+
+  {% else %}
+  <p class="leise">Schützt deinen Zugang zusätzlich: Nach dem Passwort wird ein Code abgefragt, den nur eine App auf deinem Handy
+    erzeugt. Wer dein Passwort kennt, kommt ohne dein Handy nicht hinein. Empfohlen, sobald das Tool aus dem Internet erreichbar ist.</p>
+  <form method="post" action="{{ url_for('zweifaktor_start') }}" class="inline">
+    <button class="btn">{{ icon('lock') }}<span>Zwei-Faktor-Anmeldung einrichten</span></button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

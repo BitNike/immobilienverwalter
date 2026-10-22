@@ -2,7 +2,7 @@
 import os
 import secrets
 
-from flask import abort, flash, g, redirect, render_template, request, send_file, url_for
+from flask import abort, flash, g, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import dateien
@@ -385,8 +385,11 @@ def profil_passwort():
         exe("UPDATE benutzer SET passwort_hash = ? WHERE id = ?",
             (passwort_pruefen(request.form.get("passwort", ""), request.form.get("passwort2", "")), g.user["id"]))
         flash("Passwort geändert.")
-        return redirect(url_for("profil"))
-    return render_template("profil/passwort.html", bereich="profil_passwort")
+        return redirect(url_for("profil_passwort"))
+    from zweifaktor import otpauth_uri, qr_svg
+    neu = session.get("totp_neu")
+    return render_template("profil/sicherheit.html", bereich="profil_passwort", b=g.user, totp_neu=neu,
+                           qr=qr_svg(otpauth_uri(neu, g.user["benutzername"])) if neu else None)
 
 
 @app.post("/profil/foto/loeschen")

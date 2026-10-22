@@ -58,6 +58,11 @@
   {% endif %}
 </section>
 <div class="knopfleiste">
+  {% if b.totp_aktiv %}
+  <form method="post" action="{{ url_for('zweifaktor_admin_zuruecksetzen', uid=b.id) }}" class="inline"
+        onsubmit="return confirm('Zwei-Faktor-Anmeldung für diesen Benutzer zurücksetzen? Er meldet sich danach nur mit Passwort an.')">
+    <button class="btn hell">{{ icon('lock') }}<span>Zwei-Faktor zurücksetzen</span></button></form>
+  {% endif %}
   {% if smtp and b.email and b.rolle != 'ohne_zugang' %}
   <form method="post" action="{{ url_for('vermieter_einladen', uid=b.id) }}" class="inline"><button class="btn hell">{{ icon('mail') }}<span>Einladung / Passwort-Link senden</span></button></form>
   {% endif %}

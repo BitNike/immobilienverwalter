@@ -10,7 +10,7 @@
       <div class="baum-titel">Profil</div>
       {{ eintrag('profil', 'Benutzerinformation', 'user', bereich == 'profil_info') }}
       {{ eintrag('profil_immobilien', 'Immobilien', 'building', bereich == 'profil_immobilien') }}
-      {{ eintrag('profil_passwort', 'Passwort ändern', 'lock', bereich == 'profil_passwort') }}
+      {{ eintrag('profil_passwort', 'Sicherheit', 'lock', bereich == 'profil_passwort') }}
       <form method="post" action="{{ url_for('logout') }}"><button class="baum-knopf">{{ icon('logout', 16) }}<span>Abmelden</span></button></form>
     {% else %}
       <div class="baum-titel">Einstellungen</div>

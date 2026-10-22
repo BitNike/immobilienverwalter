@@ -75,10 +75,13 @@ def login():
         b = one("SELECT * FROM benutzer WHERE benutzername = ?", (request.form.get("benutzername", "").strip(),))
         if b and b["rolle"] != OHNE_ZUGANG and b["passwort_hash"] and \
                 check_password_hash(b["passwort_hash"], request.form.get("passwort", "")):
+            ziel = request.args.get("next") or ""
+            if b["totp_aktiv"]:
+                from zweifaktor import zweiten_schritt_starten
+                return zweiten_schritt_starten(b, ziel)
             session.clear()
             session["uid"] = b["id"]
             session.permanent = True
-            ziel = request.args.get("next") or ""
             return redirect(ziel if ziel.startswith("/") and not ziel.startswith("//") else url_for("start"))
         flash("Benutzername oder Passwort ist falsch.", "fehler")
     return render_template("auth/login.html", smtp=mail.konfiguriert())
@@ -123,9 +126,12 @@ def passwort_setzen(token):
     if request.method == "POST":
         exe("UPDATE benutzer SET passwort_hash = ? WHERE id = ?",
             (passwort_pruefen(request.form.get("passwort", ""), request.form.get("passwort2", "")), b["id"]))
+        flash("Passwort gespeichert.")
+        if b["totp_aktiv"]:  # Passwort-Link ersetzt nicht den zweiten Faktor
+            from zweifaktor import zweiten_schritt_starten
+            return zweiten_schritt_starten(b)
         session.clear()
         session["uid"] = b["id"]
-        flash("Passwort gespeichert.")
         return redirect(url_for("start"))
     g.user = None
     return render_template("auth/passwort_setzen.html", b=b)

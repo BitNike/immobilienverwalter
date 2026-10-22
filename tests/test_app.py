@@ -282,6 +282,37 @@ def test_gesamter_ablauf():
                                                       "passwort": "passwort9", "passwort2": "passwort9"})
     post(x, "/login", data={"benutzername": "otto", "passwort": "passwort9"})
     ok(x.get("/"))
+
+    # Zwei-Faktor-Anmeldung: einrichten, Anmeldung mit Code, Notfall-Code, Zurücksetzen durch den Admin
+    import re
+    import time
+    import zweifaktor
+    ok(x.get("/profil/passwort"))
+    post(x, "/profil/zweifaktor/start")
+    with x.session_transaction() as sitzung:
+        geheimnis = sitzung["totp_neu"]
+    assert "<svg" in ok(x.get("/profil/passwort")).get_data(as_text=True)
+    jetzt = int(time.time() // 30)
+    html = ok(x.post("/profil/zweifaktor/bestaetigen", data={"code": zweifaktor._hotp(geheimnis, jetzt)})).get_data(as_text=True)
+    notfall = re.findall(r"<code>([0-9a-f]{4}-[0-9a-f]{4})</code>", html)
+    assert len(notfall) == 8
+    post(x, "/logout")
+    assert x.post("/login", data={"benutzername": "otto", "passwort": "passwort9"}).headers["Location"].endswith("/login/code")
+    assert x.get("/").status_code == 302                       # ohne Code nicht angemeldet
+    ok(x.post("/login/code", data={"code": "000000"}))
+    post(x, "/login/code", data={"code": zweifaktor._hotp(geheimnis, jetzt + 1)})
+    ok(x.get("/"))
+    post(x, "/logout")
+    post(x, "/login", data={"benutzername": "otto", "passwort": "passwort9"})
+    post(x, "/login/code", data={"code": notfall[0]})
+    ok(x.get("/"))
+    post(x, "/logout")
+    post(x, "/login", data={"benutzername": "otto", "passwort": "passwort9"})
+    ok(x.post("/login/code", data={"code": notfall[0]}))        # Notfall-Code gilt nur einmal
+    post(c, "/einstellungen/admin/vermieter/3/zweifaktor-zuruecksetzen")
+    x = app.test_client()
+    post(x, "/login", data={"benutzername": "otto", "passwort": "passwort9"})
+    ok(x.get("/"))
     post(c, "/logout")
 
     a = app.test_client()

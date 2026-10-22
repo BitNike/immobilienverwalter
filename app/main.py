@@ -4,6 +4,7 @@ import dokumente  # noqa: F401
 import einstellungen  # noqa: F401
 import export  # noqa: F401
 import immobilien  # noqa: F401
+import zweifaktor  # noqa: F401
 from core import app
 
 if __name__ == "__main__":

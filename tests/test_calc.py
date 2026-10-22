@@ -106,3 +106,13 @@ def test_wasser_erste_ablesung_im_jahr():
     assert messbeginn(uhr, VON, BIS) == date(2025, 3, 17)
     # mit Stand zum Jahresanfang: kein Hinweis
     assert messbeginn([wasseruhr(1, [("2024-12-31", 1300.0), ("2025-12-31", 1356.0)])], VON, BIS) is None
+
+
+def test_totp_rfc6238():
+    import zweifaktor as zf
+    geheimnis = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"  # „12345678901234567890“, Testwerte aus RFC 6238 (6 Stellen)
+    for zeit, code in ((59, "287082"), (1111111109, "081804"), (1234567890, "005924"), (2000000000, "279037")):
+        assert zf._hotp(geheimnis, zeit // 30) == code
+        assert zf.code_pruefen(geheimnis, code, jetzt=zeit) == zeit // 30
+    assert zf.code_pruefen(geheimnis, "287082", letzter_schritt=1, jetzt=59) is None   # schon verbraucht
+    assert zf.code_pruefen(geheimnis, "287082", jetzt=59 + 120) is None                 # zu alt

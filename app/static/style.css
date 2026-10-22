@@ -201,6 +201,11 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 .filter .suche input { width: 100%; }
 table.dokumente th a { color: inherit; }
 table.dokumente td { vertical-align: top; }
+.zweifaktor-einrichtung { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.zweifaktor-einrichtung .qr svg { width: 180px; height: 180px; display: block; }
+.geheimnis { font-size: 15px; letter-spacing: .05em; }
+.notfallcodes { columns: 2; max-width: 320px; margin: 8px 0 0; padding-left: 18px; }
+.aktiv-marke { border-color: #2e7d32; color: #2e7d32; }
 #ablage h3 { display: flex; align-items: center; gap: 6px; margin: 18px 0 4px; }
 .jahr-spalte { width: 56px; }
 .verwalten { border-top: 1px solid var(--linie); padding-top: 18px; }

@@ -87,7 +87,7 @@ def einstellung_setzen(schluessel, wert):
 
 # ---------- Anmeldung & Rechte ----------
 
-OFFEN = {"login", "einrichtung", "passwort_vergessen", "passwort_setzen", "static", "logo_datei"}
+OFFEN = {"login", "login_zweifaktor", "einrichtung", "passwort_vergessen", "passwort_setzen", "static", "logo_datei"}
 
 
 @app.before_request

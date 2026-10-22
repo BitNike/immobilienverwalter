@@ -186,6 +186,13 @@ MIGRATIONEN = [
         ('angebote', 'Angebote & Aufträge', 30), ('vertraege', 'Verträge & Versicherungen', 40),
         ('sonstiges', 'Sonstiges', 90);
     """,
+    # 10: Zwei-Faktor-Anmeldung (TOTP) mit Notfall-Codes (Hashes, zeilenweise)
+    """
+    ALTER TABLE benutzer ADD COLUMN totp_geheimnis TEXT NOT NULL DEFAULT '';
+    ALTER TABLE benutzer ADD COLUMN totp_aktiv INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE benutzer ADD COLUMN totp_schritt INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE benutzer ADD COLUMN totp_notfall TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)
