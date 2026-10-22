@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, speichern %}
+{% block title %}Dokumente{% endblock %}
+{% block content %}
+<div class="kopf">
+  <div>
+    <h1>Dokumente</h1>
+    <p class="leise">Abrechnungsbelege und Ablage aller Immobilien. Hochladen kannst du bei der jeweiligen Immobilie bzw. dem Mietobjekt.</p>
+  </div>
+</div>
+
+<form method="get" class="zeile filter">
+  <label class="suche">Suche<input type="search" name="q" value="{{ request.args.get('q', '') }}" placeholder="Titel, Kommentar, Dateiname …"></label>
+  <label>Immobilie
+    <select name="immobilie" onchange="this.form.wohnung.value = ''; this.form.submit()">
+      <option value="">alle</option>
+      {% for id, name, archiviert in immobilien %}<option value="{{ id }}" {{ 'selected' if request.args.get('immobilie')|int == id }}>{{ name }}{% if archiviert %} (Archiv){% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Mietobjekt
+    <select name="wohnung">
+      <option value="">alle</option>
+      {% for id, immobilie, name in wohnungen %}<option value="{{ id }}" {{ 'selected' if request.args.get('wohnung')|int == id }}>{% if not request.args.get('immobilie') %}{{ immobilie }} – {% endif %}{{ name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Art
+    <select name="art">
+      <option value="">alle</option>
+      {% for k, t in arten.items() %}<option value="{{ k }}" {{ 'selected' if request.args.get('art') == k }}>{{ t }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Jahr
+    <select name="jahr">
+      <option value="">alle</option>
+      {% for j in jahre %}<option value="{{ j }}" {{ 'selected' if request.args.get('jahr')|int == j }}>{{ j }}</option>{% endfor %}
+    </select>
+  </label>
+  <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="richtung" value="{{ 'ab' if absteigend else 'auf' }}">
+  <button class="btn">{{ icon('eye') }}<span>Anzeigen</span></button>
+  {% if filter_aktiv %}<a class="btn hell" href="{{ url_for('dokumente_uebersicht') }}">{{ icon('x') }}<span>Filter zurücksetzen</span></a>{% endif %}
+</form>
+
+<p class="leise">{{ treffer|length }} von {{ anzahl }} Dokument{{ 'en' if anzahl != 1 }}</p>
+{% if treffer %}
+<div class="tabelle">
+<table class="dokumente">
+  <thead><tr>
+    {% for k, t in spalten.items() %}
+    <th class="{{ 'zahl' if k == 'datum' }}"><a href="{{ sortier_link(k) }}">{{ t }}{% if sort == k %} {{ '▼' if absteigend else '▲' }}{% endif %}</a></th>
+    {% endfor %}
+    <th></th>
+  </tr></thead>
+  <tbody>
+  {% for d in treffer %}
+  {% if bearbeiten == d.schluessel and d.darf %}
+  <tr class="in-bearbeitung">
+    <td><input name="titel" form="b{{ loop.index }}" value="{{ d.titel }}" required></td>
+    <td colspan="2"><textarea name="notiz" form="b{{ loop.index }}" rows="2" placeholder="Kommentar">{{ d.notiz }}</textarea></td>
+    <td>{{ d.wohnung or '–' }}</td>
+    <td>{% if d.typ == 'ablage' %}<select name="kategorie" form="b{{ loop.index }}">{% for k, t in ABLAGE_KATEGORIEN.items() %}<option value="{{ k }}" {{ 'selected' if k == d.kategorie }}>{{ t }}</option>{% endfor %}</select>{% else %}{{ d.art }}{% endif %}</td>
+    <td>{% if d.typ == 'ablage' %}<input type="number" name="jahr" form="b{{ loop.index }}" value="{{ d.jahr or '' }}" min="1900" max="2200" style="width: 90px">{% else %}{{ d.jahr }}{% endif %}</td>
+    <td class="zahl">{{ d.datum|datum }}</td>
+    <td class="aktionen">
+      <form id="b{{ loop.index }}" method="post" action="{{ url_for('dokument_bearbeiten', typ=d.typ, did=d.id) }}" class="inline">
+        <input type="hidden" name="next" value="{{ request.full_path|replace('bearbeiten=' ~ d.schluessel, '') }}">
+        <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+      <a class="btn-icon" href="{{ request.full_path|replace('bearbeiten=' ~ d.schluessel, '') }}" title="Abbrechen">{{ icon('x', 16) }}</a>
+    </td>
+  </tr>
+  {% else %}
+  <tr>
+    <td><a href="{{ d.link }}" target="_blank">{{ icon('file', 15) }} {{ d.titel }}</a>
+      {% if d.titel not in d.dateiname %}<br><small class="leise">{{ d.dateiname }}</small>{% endif %}</td>
+    <td class="notiz leise">{{ d.notiz }}</td>
+    <td>{{ d.immobilie }}{% if d.archiviert %} <span class="marke">Archiv</span>{% endif %}</td>
+    <td>{{ d.wohnung or '–' }}</td>
+    <td class="leise">{{ d.art }}{% if d.intern %} <span class="marke">nur Admin</span>{% endif %}</td>
+    <td>{{ d.jahr or '' }}</td>
+    <td class="zahl">{{ d.datum|datum }}{% if d.von %}<br><small class="leise">{{ d.von }}</small>{% endif %}</td>
+    <td class="aktionen">
+      {% if d.darf %}<a class="btn-icon" href="{{ url_for('dokumente_uebersicht', **dict(request.args.to_dict(), bearbeiten=d.schluessel)) }}" title="Titel und Kommentar bearbeiten">{{ icon('edit', 16) }}</a>{% endif %}
+      <a class="btn-icon" href="{{ d.link }}?download=1" title="Herunterladen">{{ icon('download', 16) }}</a>
+    </td>
+  </tr>
+  {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% elif anzahl %}
+<p class="leise">Keine Dokumente passen zu den Filtern.</p>
+{% else %}
+<p class="leise">Noch keine Dokumente hochgeladen.</p>
+{% endif %}
+{% endblock %}

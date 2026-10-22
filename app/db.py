@@ -170,6 +170,10 @@ MIGRATIONEN = [
         hochgeladen_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 8: Kommentar auch für Abrechnungsbelege
+    """
+    ALTER TABLE dokument ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

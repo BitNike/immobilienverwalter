@@ -79,7 +79,7 @@ details[open] > summary { margin-bottom: 14px; }
 .karte-flach.gedimmt { background: #fafafa; }
 .karte-kopf { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .karte-kopf .rechts { margin-left: auto; }
-.marke { font-family: var(--schrift); font-size: 11px; vertical-align: middle; padding: 1px 7px; border: 1px solid var(--linie); border-radius: 2px; color: var(--leise); }
+.marke { white-space: nowrap; font-family: var(--schrift); font-size: 11px; vertical-align: middle; padding: 1px 7px; border: 1px solid var(--linie); border-radius: 2px; color: var(--leise); }
 .marke.admin { border-color: var(--primaer); color: var(--primaer); text-transform: uppercase; letter-spacing: .05em; }
 .leer { border: 1px dashed var(--linie); padding: 28px; text-align: center; }
 .liste { padding-left: 18px; }
@@ -197,6 +197,10 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 [hidden] { display: none !important; }
 .archiv-link { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 6px 4px; font-size: 13px; color: var(--leise); }
 .archiv-link.aktiv, .archiv-link:hover { color: var(--primaer); text-decoration: none; }
+.filter .suche { flex: 1 1 260px; }
+.filter .suche input { width: 100%; }
+table.dokumente th a { color: inherit; }
+table.dokumente td { vertical-align: top; }
 #ablage h3 { display: flex; align-items: center; gap: 6px; margin: 18px 0 4px; }
 .jahr-spalte { width: 56px; }
 .verwalten { border-top: 1px solid var(--linie); padding-top: 18px; }

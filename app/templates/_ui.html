@@ -210,6 +210,7 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   </label>
   {% endif %}
   {{ feld('titel', 'Titel (optional)', '', hinweis='bei einer Datei; sonst der Dateiname') }}
+  <label class="breit">Kommentar<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
 </div>
 {%- endmacro %}
 
@@ -221,7 +222,8 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   {% for d in dokumente %}
   <tr>
     <td class="leise">{{ icon('folder', 15) }} {% if d.bereich == 'vermieter' %}Vermieter{% elif d.bereich == 'mieterordner' %}Mieter / {{ d.mv_ordner }}{% else %}Mieter{% endif %}</td>
-    <td><a href="{{ url_for('dokument_anzeigen', did=d.id) }}" target="_blank">{{ icon('file', 15) }} {{ d.titel }}</a></td>
+    <td><a href="{{ url_for('dokument_anzeigen', did=d.id) }}" target="_blank">{{ icon('file', 15) }} {{ d.titel }}</a>
+      {% if d.notiz %}<br><small class="leise notiz">{{ d.notiz }}</small>{% endif %}</td>
     <td>{{ d.kostenart or '' }}</td>
     <td class="zahl leise">{{ [(d.groesse / 1024)|round|int, 1]|max }} KB</td>
     <td class="aktionen">{% if darf_loeschen %}{{ loeschen(url_for('dokument_loeschen', did=d.id), 'Dokument löschen?') }}{% endif %}</td>
@@ -266,7 +268,7 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
         {% if wid %}<input type="hidden" name="wohnung_id" value="{{ wid }}">
         {% else %}<label>Gehört zu<select name="wohnung_id"><option value="">ganze Immobilie</option>
           {% for w in wohnungen %}<option value="{{ w.id }}">{{ w.bezeichnung }}</option>{% endfor %}</select></label>{% endif %}
-        <label class="breit">Notiz<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
+        <label class="breit">Kommentar<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
       </div>
       {% if admin %}<label class="haken"><input type="checkbox" name="intern"> nur für Administrator sichtbar (z. B. Angebote, die nicht alle Eigentümer sehen sollen)</label>{% endif %}
       <button class="btn">{{ icon('upload') }}<span>Hochladen</span></button>

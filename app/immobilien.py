@@ -686,9 +686,10 @@ def _dokumente_hochladen(iid, wohnung_id=None):
     for d in dateiliste:
         pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(*ordner))
         titel = (f.get("titel", "").strip() if len(dateiliste) == 1 else "") or os.path.splitext(d.filename)[0]
-        exe("INSERT INTO dokument (immobilie_id, jahr, bereich, mv_id, wohnung_id, kostenart_id, titel, pfad, mime, "
-            "groesse, hochgeladen_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (iid, j, bereich, mv_id, wohnung_id, kostenart_id, titel, pfad, mime, groesse, g.user["id"]))
+        exe("INSERT INTO dokument (immobilie_id, jahr, bereich, mv_id, wohnung_id, kostenart_id, titel, notiz, pfad, "
+            "mime, groesse, hochgeladen_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (iid, j, bereich, mv_id, wohnung_id, kostenart_id, titel, f.get("notiz", "").strip(), pfad, mime, groesse,
+             g.user["id"]))
     return len(dateiliste)
 
 

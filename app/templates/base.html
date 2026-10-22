@@ -18,6 +18,7 @@
   </a>
   {% if user %}
   <div class="top-aktionen">
+    <a class="rund {{ 'aktiv' if request.endpoint in ('dokumente_uebersicht',) }}" href="{{ url_for('dokumente_uebersicht') }}" title="Dokumente">{{ icon('folder', 22) }}</a>
     <a class="rund {{ 'aktiv' if request.path.startswith('/einstellungen') }}" href="{{ url_for('einstellungen') }}" title="Einstellungen">{{ icon('gear', 22) }}</a>
     <a class="rund avatar {{ 'aktiv' if request.path.startswith('/profil') }}" href="{{ url_for('profil') }}" title="Profil – {{ person_name(user) }}">
       {% if user.foto %}<img src="{{ url_for('foto', uid=user.id) }}?v={{ user.foto }}" alt="">{% else %}{{ icon('user', 26) }}{% endif %}

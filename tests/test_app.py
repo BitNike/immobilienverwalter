@@ -240,6 +240,16 @@ def test_gesamter_ablauf():
     assert "Protokoll Versammlung" not in ok(c.get("/wohnungen/1/export?partei=1")).get_data(as_text=True)
     ok(c.get("/ablage/1"))
 
+    # Dokumentenübersicht: Belege und Ablage zusammen, Filter, Suche, Kommentar bearbeiten
+    html = ok(c.get("/dokumente")).get_data(as_text=True)
+    assert "Protokoll Versammlung" in html and "Grundsteuerbescheid" in html
+    html = ok(c.get("/dokumente?art=ablage")).get_data(as_text=True)
+    assert "Protokoll Versammlung" in html and "Grundsteuerbescheid" not in html
+    assert "Angebot Dach" not in ok(c.get("/dokumente?q=protokoll")).get_data(as_text=True)
+    post(c, "/dokumente/beleg/1/bearbeiten", data={"titel": "Grundsteuerbescheid 2025", "notiz": "Stadt Musterstadt"})
+    assert "Stadt Musterstadt" in ok(c.get("/dokumente?q=musterstadt")).get_data(as_text=True)
+    ok(c.get("/dokumente?bearbeiten=ablage-1&sort=titel&richtung=auf"))
+
     # Eigentümer ohne Zugang direkt beim Mietobjekt anlegen (nur der Name ist Pflicht)
     post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Garage", "wohnflaeche": "15", "immobilie_id": "",
                                                           "eigentuemer_id": "neu", "neu_name": "Ohnezugang"})
@@ -280,5 +290,7 @@ def test_gesamter_ablauf():
     assert "Protokoll Versammlung" in seite and "Angebot Dach" not in seite
     ok(a.get("/ablage/1"))
     ok(a.get("/ablage/2"), 403)
+    html = ok(a.get("/dokumente")).get_data(as_text=True)
+    assert "Protokoll Versammlung" in html and "Angebot Dach" not in html
     ok(a.post("/immobilien/1/ablage", data={"kategorie": "sonstiges", "dateien": pdf_datei()},
               content_type="multipart/form-data"), 403)
