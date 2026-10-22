@@ -118,6 +118,15 @@ def test_gesamter_ablauf():
     brief = ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
     assert "77,66 €" in brief and "712,37 €" in brief and "75 %" in brief
     assert "Erstellt mit Immobilienverwalter" in brief  # Fußzeile standardmäßig an
+    # eigenes Konto beim Mietobjekt gilt nur für die Mieter-Abrechnung, die Eigentümer-Abrechnung zahlt aufs Konto der Immobilie
+    post(c, "/einstellungen/admin/wohnungen/1", data={"bezeichnung": "EG", "wohnflaeche": "65", "mea": "86,13/1.000",
+                                                        "immobilie_id": "1", "eigentuemer_id": "1",
+                                                        "umlageschluessel": "Heizung nach Verbrauch",
+                                                        "iban": "DE89 3704 0044 0532 0130 00", "bank": "Meine Bank"})
+    post(c, "/wohnungen/1/vorauszahlungen", data={"vz_1": "0"})  # Nachzahlung, damit die Bankverbindung im Brief steht
+    assert "DE89 3704 0044 0532 0130 00" in ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
+    eig_brief = ok(c.get("/wohnungen/1/export/brief?partei=eigentuemer")).get_data(as_text=True)
+    assert "DE89" not in eig_brief and "DE00 1234" in eig_brief
     from export import girocode, sepa_text
     assert sepa_text("Gartenstraße 5, Klara Krämer & Söhne") == "Gartenstrasse 5, Klara Kraemer Soehne"
     assert girocode("Max", "DE89 3704 0044 0532 0130 00", 162.43, "Nebenkosten").startswith("<svg")

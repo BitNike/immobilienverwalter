@@ -13,7 +13,7 @@ from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLER
 
 IMMOBILIE_FELDER = ("name", "strasse", "hausnummer", "plz", "ort", "absender", "kontoinhaber", "iban", "bank", "notiz",
                     "schluessel")
-WOHNUNG_FELDER = ("bezeichnung", "umlageschluessel", "iban", "notiz")
+WOHNUNG_FELDER = ("bezeichnung", "umlageschluessel", "kontoinhaber", "iban", "bank", "notiz")
 
 
 # ---------- Hilfen ----------

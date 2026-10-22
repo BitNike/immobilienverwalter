@@ -193,6 +193,11 @@ MIGRATIONEN = [
     ALTER TABLE benutzer ADD COLUMN totp_schritt INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE benutzer ADD COLUMN totp_notfall TEXT NOT NULL DEFAULT '';
     """,
+    # 11: eigene Bankverbindung für die Mieter-Abrechnung eines Mietobjekts (z. B. eigene Wohnung in einer WEG)
+    """
+    ALTER TABLE wohnung ADD COLUMN kontoinhaber TEXT NOT NULL DEFAULT '';
+    ALTER TABLE wohnung ADD COLUMN bank TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

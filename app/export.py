@@ -53,7 +53,7 @@ def brief_daten(wid, partei):
     d = {
         "jahr": j, "erstellt": date.today(), "immo": immo, "w": w, "objekt": [x for x in objekt if x],
         "abrechnung_von": date(j, 1, 1), "abrechnung_bis": date(j, 12, 31),
-        "iban": w["iban"] or immo["iban"], "kontoinhaber": immo["kontoinhaber"], "bank": immo["bank"],
+        "iban": immo["iban"], "kontoinhaber": immo["kontoinhaber"], "bank": immo["bank"],
         "umlageschluessel": ", ".join(x for x in (
             f"Wohnfläche {de_num(w['wohnflaeche'])} m²"
             + (f" ({de_num(w['mea'])}/{de_num(w['mea_basis'], 0)} MEA)" if w["mea"] else ""),
@@ -81,6 +81,8 @@ def brief_daten(wid, partei):
             partei=str(mv["id"]), partei_name=mv_name(mv), mv=mv,
             empfaenger=[person_name(x) for x in mv["personen"]] + anschrift,
             absender=_zeile(person_name(eig), eig) if eig else immo["absender"],
+            **({"iban": w["iban"], "kontoinhaber": w["kontoinhaber"] or (person_name(eig) if eig else ""),
+                "bank": w["bank"]} if w["iban"] else {}),
             nutzung_von=p["von"], nutzung_bis=p["bis"], monate=p["monate"], prozent=p["prozent"],
             posten=p["posten"], summe=p["summe"], vorauszahlung=p["vorauszahlung"], saldo=p["saldo"],
             spalte_gesamt="Gesamtkosten im Jahr")

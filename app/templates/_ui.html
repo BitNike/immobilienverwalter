@@ -161,7 +161,15 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   {{ feld('mea', 'MEA', w.mea|num if w.mea else '', attrs='inputmode="decimal" placeholder="86,13"', hinweis='Miteigentumsanteil laut Teilungserklärung, z. B. 86,13. Nur bei WEG, sonst leer lassen.' ~ (' Aktuell ' ~ (w.mea / w.mea_basis * 100)|num ~ ' %.' if w.mea and w.mea_basis else '')) }}
   {{ feld('mea_basis', 'MEA-Basis', w.mea_basis|num(0) if w.mea_basis else '1.000', attrs='inputmode="decimal"', hinweis='z. B. 1.000 (für 86,13/1.000)') }}
   {{ feld('umlageschluessel', 'Umlageschlüssel (Text für die Abrechnung)', w.umlageschluessel, breit=True, attrs='placeholder="z. B. Heizung nach Verbrauch und Fläche laut Abrechnung der Eigentümergemeinschaft"') }}
-  {{ feld('iban', 'Abweichende IBAN', w.iban, hinweis='nur falls anders als bei der Immobilie') }}
+  <fieldset class="breit"><legend>Konto für die Mieter-Abrechnung</legend>
+    <p class="leise">Nur ausfüllen, wenn die Mieter dieser Wohnung auf ein anderes Konto zahlen als bei der Immobilie hinterlegt –
+      z. B. deine eigene Wohnung in einer WEG. Die Eigentümer-Abrechnung nutzt immer das Konto der Immobilie (WEG-Konto).</p>
+    <div class="raster">
+      {{ feld('kontoinhaber', 'Kontoinhaber', w.kontoinhaber, hinweis='leer = Eigentümer') }}
+      {{ feld('iban', 'IBAN', w.iban, attrs='autocomplete="off"') }}
+      {{ feld('bank', 'Bank', w.bank) }}
+    </div>
+  </fieldset>
   {% if zaehler_neu %}
   {{ feld('wasser_nummer', 'Wasseruhr (Nummer)', '') }}
   {{ feld('strom_nummer', 'Stromzähler (Nummer)', '') }}
