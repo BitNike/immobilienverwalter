@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte, ablage_bereich %}
 {% block title %}{{ immo.name }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
@@ -133,6 +133,8 @@
   </details>
   {% endif %}
 </section>
+
+{{ ablage_bereich(ablage, immo.id, ist_admin, ist_admin, wohnungen, admin=ist_admin) }}
 
 {% if ist_admin or hauptzaehler %}
 <section class="block" id="hauptzaehler">

@@ -152,6 +152,24 @@ MIGRATIONEN = [
     """
     ALTER TABLE zaehler ADD COLUMN bezeichnung TEXT NOT NULL DEFAULT '';
     """,
+    # 7: Ablage für Dokumente außerhalb der Abrechnung (Protokolle, Pläne, Angebote …), Jahr optional
+    """
+    CREATE TABLE ablage (
+        id INTEGER PRIMARY KEY,
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        wohnung_id INTEGER REFERENCES wohnung(id) ON DELETE CASCADE,
+        kategorie TEXT NOT NULL,
+        titel TEXT NOT NULL,
+        jahr INTEGER,
+        notiz TEXT NOT NULL DEFAULT '',
+        intern INTEGER NOT NULL DEFAULT 0,
+        pfad TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        groesse INTEGER NOT NULL DEFAULT 0,
+        hochgeladen_von INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
+        hochgeladen_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

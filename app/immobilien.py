@@ -7,7 +7,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 import dateien
 import db
 from calc import berechne, de_num, messbeginn, parse_date, parse_mea, parse_num, verbrauch_zeitraum
-from core import (BEREICHE, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
+from core import (ABLAGE_KATEGORIEN, BEREICHE, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
 
@@ -255,7 +255,8 @@ def immobilie(iid):
     umfang = one("SELECT (SELECT COUNT(*) FROM wohnung WHERE immobilie_id = :i) AS wohnungen, "
                  "(SELECT COUNT(*) FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id WHERE w.immobilie_id = :i) AS mieter, "
                  "(SELECT COUNT(*) FROM kosten WHERE immobilie_id = :i) AS kosten, "
-                 "(SELECT COUNT(*) FROM dokument WHERE immobilie_id = :i) AS dokumente", {"i": iid})
+                 "(SELECT COUNT(*) FROM dokument WHERE immobilie_id = :i) + "
+                 "(SELECT COUNT(*) FROM ablage WHERE immobilie_id = :i) AS dokumente", {"i": iid})
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()),
@@ -263,6 +264,7 @@ def immobilie(iid):
                            vorhanden=vorhandene_kostenarten(iid, j),
                            vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
                            dokumente=dokumente_sichtbar(iid, j), hauptzaehler=hauptzaehler, mvs=mvs,
+                           ablage=ablage_sichtbar(iid),
                            wohnungen=rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung COLLATE NATUERLICH", (iid,)))
 
 
@@ -457,7 +459,7 @@ def wohnung(wid):
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
         zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? ORDER BY art, ausgebaut IS NULL, id",
                                      (wid,)),
-        dokumente=dokumente_sichtbar(immo["id"], j, wid),
+        dokumente=dokumente_sichtbar(immo["id"], j, wid), ablage=ablage_sichtbar(immo["id"], wid),
         vz_gespeichert={x["mv_id"]: x["betrag"] for x in
                         rows("SELECT * FROM vorauszahlung WHERE wohnung_id = ? AND jahr = ?", (wid, j))})
 
@@ -738,6 +740,93 @@ def dokument_loeschen(did):
     except FileNotFoundError:
         pass
     exe("DELETE FROM dokument WHERE id = ?", (did,))
+    return zurueck()
+
+
+# ---------- Ablage (unabhängig von der Abrechnung) ----------
+
+def ablage_sichtbar(iid, wohnung_id=None):
+    """Einträge einer Immobilie (wohnung_id=None) bzw. eines Mietobjekts. Eigentümer sehen die gemeinsamen
+    Unterlagen ihrer Immobilie (außer „nur für Administrator“) und die ihrer eigenen Mietobjekte."""
+    sql = ("SELECT a.*, w.bezeichnung AS wohnung FROM ablage a LEFT JOIN wohnung w ON w.id = a.wohnung_id "
+           "WHERE a.immobilie_id = ?")
+    args = [iid]
+    if wohnung_id is not None:
+        sql += " AND a.wohnung_id = ?"
+        args.append(wohnung_id)
+    if not ist_admin():
+        sql += " AND a.intern = 0 AND (a.wohnung_id IS NULL OR w.eigentuemer_id = ?)"
+        args.append(g.user["id"])
+    eintraege = rows(sql + " ORDER BY a.jahr IS NULL, a.jahr DESC, a.titel COLLATE NATUERLICH", args)
+    return [(k, t, [e for e in eintraege if e["kategorie"] == k]) for k, t in ABLAGE_KATEGORIEN.items()
+            if any(e["kategorie"] == k for e in eintraege)]
+
+
+@app.post("/immobilien/<int:iid>/ablage")
+def ablage_hochladen(iid):
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    f = request.form
+    wid = int(f["wohnung_id"]) if f.get("wohnung_id") else None
+    if wid:
+        w = wohnung_laden(wid, bearbeiten=True)
+        if w["immobilie_id"] != iid:
+            abort(400)
+    elif not ist_admin():
+        abort(403)
+    kategorie = f.get("kategorie")
+    if kategorie not in ABLAGE_KATEGORIEN:
+        raise ValueError("Bitte eine Kategorie wählen.")
+    jahr_ = int(f["jahr"]) if f.get("jahr", "").strip() else None
+    if jahr_ is not None and not 1900 <= jahr_ <= 2200:
+        raise ValueError("Bitte ein gültiges Jahr angeben oder das Feld leer lassen.")
+    dateiliste = [d for d in request.files.getlist("dateien") if d and d.filename]
+    if not dateiliste:
+        raise ValueError("Bitte mindestens eine Datei auswählen.")
+    ordner = [immo["ordner"], "Ablage"]
+    if wid:
+        ordner.append(dateien.ordnername(w["bezeichnung"]))
+    ordner.append(dateien.ordnername(ABLAGE_KATEGORIEN[kategorie]))
+    for d in dateiliste:
+        pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(*ordner))
+        titel = (f.get("titel", "").strip() if len(dateiliste) == 1 else "") or os.path.splitext(d.filename)[0]
+        exe("INSERT INTO ablage (immobilie_id, wohnung_id, kategorie, titel, jahr, notiz, intern, pfad, mime, groesse, "
+            "hochgeladen_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (iid, wid, kategorie, titel, jahr_, f.get("notiz", "").strip(), 1 if f.get("intern") and ist_admin() else 0,
+             pfad, mime, groesse, g.user["id"]))
+    flash(f"{len(dateiliste)} Dokument(e) in der Ablage gespeichert.")
+    return zurueck()
+
+
+def _ablage_laden(aid, bearbeiten=False):
+    a = row("SELECT * FROM ablage WHERE id = ?", (aid,))
+    if ist_admin():
+        return a
+    if a["intern"]:
+        abort(403)
+    if a["wohnung_id"]:
+        wohnung_laden(a["wohnung_id"], bearbeiten=bearbeiten)
+    elif bearbeiten:
+        abort(403)
+    else:
+        immobilie_laden(a["immobilie_id"])
+    return a
+
+
+@app.get("/ablage/<int:aid>")
+def ablage_anzeigen(aid):
+    a = _ablage_laden(aid)
+    return send_file(dateien.dokument_pfad(a["pfad"]), mimetype=a["mime"],
+                     download_name=os.path.basename(a["pfad"]), as_attachment=bool(request.args.get("download")))
+
+
+@app.post("/ablage/<int:aid>/loeschen")
+def ablage_loeschen(aid):
+    a = _ablage_laden(aid, bearbeiten=True)
+    try:
+        os.remove(dateien.dokument_pfad(a["pfad"]))
+    except FileNotFoundError:
+        pass
+    exe("DELETE FROM ablage WHERE id = ?", (aid,))
     return zurueck()
 
 

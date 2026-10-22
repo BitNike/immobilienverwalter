@@ -232,6 +232,50 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
 {% else %}<p class="leise">Keine Dokumente für dieses Jahr.</p>{% endif %}
 {%- endmacro %}
 
+{% macro ablage_bereich(ablage, iid, darf_hochladen, darf_loeschen, wohnungen=[], wid=None, admin=False) -%}
+<section class="block" id="ablage">
+  <h2>Ablage</h2>
+  <p class="leise">Unterlagen unabhängig von der Nebenkostenabrechnung, z. B. Protokolle der Eigentümerversammlung, Pläne, Angebote
+    oder Verträge. Sie erscheinen nicht als Anlage im Brief.</p>
+  {% for kategorie, name, eintraege in ablage %}
+  <h3>{{ icon('folder', 16) }} {{ name }}</h3>
+  <table>
+    <tbody>
+    {% for a in eintraege %}
+    <tr>
+      <td class="jahr-spalte leise">{{ a.jahr or '' }}</td>
+      <td><a href="{{ url_for('ablage_anzeigen', aid=a.id) }}" target="_blank">{{ icon('file', 15) }} {{ a.titel }}</a>
+        {% if a.notiz %}<br><small class="leise notiz">{{ a.notiz }}</small>{% endif %}</td>
+      <td class="leise">{% if a.wohnung and not wid %}{{ a.wohnung }}{% endif %}{% if a.intern %} <span class="marke">nur Admin</span>{% endif %}</td>
+      <td class="zahl leise">{{ [(a.groesse / 1024)|round|int, 1]|max }} KB</td>
+      <td class="aktionen">{% if darf_loeschen %}{{ loeschen(url_for('ablage_loeschen', aid=a.id), 'Dokument aus der Ablage löschen?') }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="leise">Noch nichts abgelegt.</p>{% endfor %}
+  {% if darf_hochladen %}
+  <details>
+    <summary>{{ icon('upload') }} In die Ablage hochladen</summary>
+    <form method="post" action="{{ url_for('ablage_hochladen', iid=iid) }}" enctype="multipart/form-data">
+      <div class="raster">
+        <label class="breit">Dateien (PDF, JPG, PNG, auch mehrere)<input type="file" name="dateien" accept=".pdf,.jpg,.jpeg,.png" multiple required></label>
+        <label>Kategorie<select name="kategorie">{% for k, t in ABLAGE_KATEGORIEN.items() %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select></label>
+        <label>Titel<input name="titel" placeholder="leer = Dateiname"><small>nur bei einer einzelnen Datei</small></label>
+        <label>Jahr<input type="number" name="jahr" min="1900" max="2200" placeholder="optional"><small>z. B. bei Protokollen</small></label>
+        {% if wid %}<input type="hidden" name="wohnung_id" value="{{ wid }}">
+        {% else %}<label>Gehört zu<select name="wohnung_id"><option value="">ganze Immobilie</option>
+          {% for w in wohnungen %}<option value="{{ w.id }}">{{ w.bezeichnung }}</option>{% endfor %}</select></label>{% endif %}
+        <label class="breit">Notiz<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
+      </div>
+      {% if admin %}<label class="haken"><input type="checkbox" name="intern"> nur für Administrator sichtbar (z. B. Angebote, die nicht alle Eigentümer sehen sollen)</label>{% endif %}
+      <button class="btn">{{ icon('upload') }}<span>Hochladen</span></button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{%- endmacro %}
+
 {% macro saldo(v) -%}
 <span class="{{ 'nachzahlung' if v > 0 else 'gutschrift' }}">{{ v|abs|eur }} {{ 'Nachzahlung' if v > 0 else 'Gutschrift' }}</span>
 {%- endmacro %}

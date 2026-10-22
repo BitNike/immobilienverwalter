@@ -230,6 +230,16 @@ def test_gesamter_ablauf():
     html = ok(c.get("/immobilien/1")).get_data(as_text=True)
     assert "rechnet Eigentümer ab" in html and "OG: Das Hausgeld des Eigentümers" in html
 
+    # Ablage: jahresunabhängig, nicht in den Anlagen des Briefs, „nur Admin“ für Eigentümer unsichtbar
+    post(c, "/immobilien/1/ablage", data={"kategorie": "protokolle", "titel": "Protokoll Versammlung", "jahr": "2024",
+                                         "dateien": pdf_datei("protokoll.pdf")}, content_type="multipart/form-data")
+    post(c, "/immobilien/1/ablage", data={"kategorie": "angebote", "titel": "Angebot Dach", "intern": "on",
+                                         "dateien": pdf_datei("angebot.pdf")}, content_type="multipart/form-data")
+    html = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert "Protokoll Versammlung" in html and "Angebot Dach" in html and "nur Admin" in html
+    assert "Protokoll Versammlung" not in ok(c.get("/wohnungen/1/export?partei=1")).get_data(as_text=True)
+    ok(c.get("/ablage/1"))
+
     # Eigentümer ohne Zugang direkt beim Mietobjekt anlegen (nur der Name ist Pflicht)
     post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Garage", "wohnflaeche": "15", "immobilie_id": "",
                                                           "eigentuemer_id": "neu", "neu_name": "Ohnezugang"})
@@ -266,3 +276,9 @@ def test_gesamter_ablauf():
     ok(a.get("/dokumente/1"))       # gemeinsamer Mieterbeleg
     post(a, "/wohnungen/2/mieter", data={"name": "Neu", "von": "2026-01-01"})
     ok(a.post("/immobilien/1/kosten", data={"kostenart_id": "1", "betrag": "1"}), 403)
+    seite = ok(a.get("/immobilien/1")).get_data(as_text=True)
+    assert "Protokoll Versammlung" in seite and "Angebot Dach" not in seite
+    ok(a.get("/ablage/1"))
+    ok(a.get("/ablage/2"), 403)
+    ok(a.post("/immobilien/1/ablage", data={"kategorie": "sonstiges", "dateien": pdf_datei()},
+              content_type="multipart/form-data"), 403)
