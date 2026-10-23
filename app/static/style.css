@@ -178,6 +178,8 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 /* ---------- Anmeldung ---------- */
 .anmeldung { max-width: 380px; margin: 40px auto; border: 1px solid var(--linie); padding: 28px 30px; }
 .anmeldung form { display: flex; flex-direction: column; gap: 12px; }
+.anmeldung-fuss { max-width: 460px; margin: -28px auto 40px; text-align: center; font-size: 12px; color: var(--leise); }
+.anmeldung-fuss a { white-space: nowrap; }
 
 /* ---------- Export ---------- */
 .export { display: flex; gap: 24px; align-items: flex-start; }

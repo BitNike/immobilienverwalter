@@ -10,7 +10,7 @@ import db
 from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
-VERSION = "0.9.3"
+VERSION = "0.10.0"
 NAME = "Immobilienverwalter"
 URL = "https://github.com/BitNike/immobilienverwalter"  # Projektseite (Fußzeile des Briefs, Seite „Über“)
 ENTWICKLER = "Sascha Benecke"
@@ -255,7 +255,7 @@ def eigentuemer_anlegen(vals):
 app.jinja_env.globals.update(
     ICONS=ICONS, ROLLEN=ROLLEN, SCHLUESSEL=SCHLUESSEL, ZAEHLERARTEN=ZAEHLERARTEN, EINHEITEN=EINHEITEN, BEREICHE=BEREICHE,
     ablage_kategorien=lambda: ablage_kategorien(),
-    person_name=person_name,
+    person_name=person_name, NAME=NAME, LIZENZ=LIZENZ, PROJEKT_URL=URL,
 )
 
 

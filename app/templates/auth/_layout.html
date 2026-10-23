@@ -3,4 +3,8 @@
 <div class="anmeldung">
   {% block karte %}{% endblock %}
 </div>
+{% if PROJEKT_URL %}
+<p class="anmeldung-fuss">{{ NAME }} {{ version }} · freie Software ({{ LIZENZ }}) ·
+  <a href="{{ PROJEKT_URL }}" target="_blank" rel="noopener">Quellcode auf GitHub</a></p>
+{% endif %}
 {% endblock %}
