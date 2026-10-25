@@ -16,8 +16,21 @@
   </div>
   <form class="export-auswahl" method="post" action="{{ url_for('export_pdf', wid=wid) }}">
     <input type="hidden" name="partei" value="{{ d.partei }}">
+    <h2>Inhalt</h2>
+    <label class="haken"><input type="checkbox" checked disabled><span>Abrechnung (Brief)</span></label>
+    {% if d.ruecklage %}
+    <label class="haken"><input type="checkbox" name="teile" value="ruecklage" checked>
+      <span>Erhaltungsrücklage {{ d.jahr }}<br><small class="leise">im Brief auf Seite 2</small></span></label>
+    {% endif %}
+    {% if belege %}
+    <label class="haken"><input type="checkbox" name="teile" value="belegliste">
+      <span>Belegliste {{ d.jahr }}<br><small class="leise">{{ belege }} Buchung{{ 'en' if belege != 1 }} nach Kostenart{{ ', nur umlagefähige' if d.partei != 'eigentuemer' }}</small></span></label>
+    {% endif %}
+
     <h2>Anlagen</h2>
-    <p class="leise">Welche Belege aus {{ d.jahr }} sollen hinter dem Deckblatt angehängt werden?</p>
+    <p class="leise">Welche Belege aus {{ d.jahr }} sollen hinter dem Deckblatt angehängt werden?
+      {% if dokumente|length > 1 %}<br><button type="button" class="link-knopf" onclick="this.form.querySelectorAll('[name=dokumente]').forEach(function (x) { x.checked = true })">alle</button>
+      · <button type="button" class="link-knopf" onclick="this.form.querySelectorAll('[name=dokumente]').forEach(function (x) { x.checked = false })">keine</button>{% endif %}</p>
     {% for doc in dokumente %}
     <label class="haken">
       <input type="checkbox" name="dokumente" value="{{ doc.id }}" {{ 'checked' if doc.vorauswahl }}>

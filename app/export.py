@@ -7,8 +7,8 @@ from flask import abort, g, render_template, request, send_file
 
 import dateien
 from calc import de_num, parse_num, rund
-from core import NAME, URL, app, einstellung, ist_admin, jahr, one, person_name, row, wohnung_laden
-from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen
+from core import NAME, URL, app, einstellung, ist_admin, jahr, one, person_name, row, rows, wohnung_laden
+from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen, ruecklage
 
 HINWEIS_NACHZAHLUNG = ("Bitte überweisen Sie die Nachzahlung innerhalb von 30 Tagen nach Erhalt dieser Abrechnung "
                        "auf folgendes Konto:")
@@ -68,6 +68,10 @@ def brief_daten(wid, partei):
             nutzung_von=d["abrechnung_von"], nutzung_bis=d["abrechnung_bis"], monate=erg["monate"], prozent=100.0,
             posten=r["posten"], summe=r["summe"], vorauszahlung=r["vorauszahlung"], saldo=r["saldo"],
             spalte_gesamt="Gesamtkosten Immobilie", mv=None)
+        rl = ruecklage(immo["id"], j) if immo["weg"] else None
+        if rl and rl["vorhanden"]:
+            d["ruecklage"] = rl
+            d["ruecklage_anteil"] = rund(rl["ende"] * w["mea"] / w["mea_basis"]) if w["mea"] and w["mea_basis"] else None
     else:
         p = next((x for x in r["parteien"] if str(x["mv"]["id"]) == str(partei)), None)
         if p is None:
@@ -98,6 +102,28 @@ def brief_daten(wid, partei):
     return d
 
 
+def belegliste(d):
+    """Buchungen des Jahres nach Kostenart gruppiert. Mieter sehen nur umlagefähige Kostenarten, Eigentümer zusätzlich
+    die nicht umlagefähigen und die Erhaltungsrücklage. „wert“: Kosten positiv, in der Rücklage Zuflüsse positiv."""
+    eigentuemer = d["partei"] == "eigentuemer"
+    gruppen = []
+    for b in rows("SELECT b.*, ka.name AS kostenart, ka.umlagefaehig FROM buchung b "
+                  "LEFT JOIN kostenart ka ON ka.id = b.kostenart_id WHERE b.immobilie_id = ? AND b.jahr = ? "
+                  "ORDER BY b.kostenart_id IS NULL, ka.sortierung, ka.name, b.datum IS NULL, b.datum, b.id",
+                  (d["immo"]["id"], d["jahr"])):
+        if not eigentuemer and not (b["kostenart_id"] and b["umlagefaehig"]):
+            continue
+        name = b["kostenart"] or "Erhaltungsrücklage"
+        if not gruppen or gruppen[-1]["name"] != name:
+            gruppen.append({"name": name, "buchungen": [], "summe": 0.0})
+        einnahme = b["art"] == "einnahme"
+        b["wert"] = (b["betrag"] if einnahme else -b["betrag"]) if not b["kostenart_id"] else \
+            (-b["betrag"] if einnahme else b["betrag"])
+        gruppen[-1]["buchungen"].append(b)
+        gruppen[-1]["summe"] = rund(gruppen[-1]["summe"] + b["wert"])
+    return gruppen
+
+
 def export_dokumente(d):
     """Belege des Jahres; vorausgewählt sind die Mieterbelege dieser Wohnung bzw. dieses Mieters."""
     docs = dokumente_sichtbar(d["immo"]["id"], d["jahr"], d["w"]["id"])
@@ -117,7 +143,8 @@ def export(wid):
     partei = request.args.get("partei", "eigentuemer")
     d = brief_daten(wid, partei)
     pruefung = pruefungen(d["immo"], berechnung(d["immo"], d["jahr"]), {wid})
-    return render_template("export/export.html", d=d, dokumente=export_dokumente(d), wid=wid, pruefung=pruefung)
+    return render_template("export/export.html", d=d, dokumente=export_dokumente(d), wid=wid, pruefung=pruefung,
+                           belege=sum(len(gr["buchungen"]) for gr in belegliste(d)))
 
 
 @app.get("/wohnungen/<int:wid>/export/brief")
@@ -134,8 +161,12 @@ def export_pdf(wid):
     d = brief_daten(wid, request.form.get("partei", "eigentuemer"))
     erlaubt = {doc["id"]: doc for doc in export_dokumente(d)}
     gewaehlt = [erlaubt[int(x)] for x in request.form.getlist("dokumente") if int(x) in erlaubt]
+    teile = request.form.getlist("teile")
+    if "ruecklage" not in teile:
+        d.pop("ruecklage", None)
+    liste = belegliste(d) if "belegliste" in teile else None
 
-    html = render_template("export/brief.html", d=d, vorschau=False, anlagen=gewaehlt)
+    html = render_template("export/brief.html", d=d, vorschau=False, anlagen=gewaehlt, belegliste=liste)
     writer = PdfWriter()
     writer.append(PdfReader(io.BytesIO(HTML(string=html, base_url=request.url_root).write_pdf())))
     for doc in gewaehlt:

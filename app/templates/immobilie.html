@@ -1,8 +1,30 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, doppelt_rueckfrage, zaehler_karte, ablage_bereich, saldo %}
+{% from "_ui.html" import icon, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, zaehler_karte, ablage_bereich, saldo %}
 {% block title %}{{ immo.name }}{% endblock %}
+
+{% macro buchung_felder(form, b, kostenarten, BEZAHLT) -%}
+<td><input type="date" name="datum" form="{{ form }}" value="{{ b.datum or '' }}" {{ 'required' if form == 'bneu' }} {{ 'autofocus' if form == 'bneu' and request.args.get('neu') }}></td>
+<td><input name="text" form="{{ form }}" value="{{ b.text or '' }}" placeholder="z. B. Lampe Flur Haus 2" required></td>
+<td><select name="art" form="{{ form }}">
+  <option value="ausgabe" {{ 'selected' if b.art != 'einnahme' }}>Ausgabe</option>
+  <option value="einnahme" {{ 'selected' if b.art == 'einnahme' }}>Einnahme</option></select></td>
+<td><select name="ziel" form="{{ form }}" required>
+  <option value="">– wählen –</option>
+  <option value="ruecklage" {{ 'selected' if b.ziel == 'ruecklage' }}>Erhaltungsrücklage</option>
+  <optgroup label="Kostenart (wird umgelegt)">
+  {% if b.ziel and b.ziel != 'ruecklage' and b.ziel not in kostenarten|map(attribute='id')|map('string')|list %}<option value="{{ b.ziel }}" selected>{{ b.kostenart }}</option>{% endif %}
+  {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if k.id|string == b.ziel }}>{{ k.name }}{% if k.ruecklage %} (Zuführung){% elif not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
+  </optgroup></select></td>
+<td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
+<td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }}>{{ t }}</option>{% endfor %}</select>
+  {% if form != 'bneu' %}<label class="erstattet">erstattet am<input type="date" name="erstattet" form="{{ form }}" value="{{ b.erstattet or '' }}"></label>{% endif %}</td>
+<td><label class="btn-icon beleg-wahl" title="Beleg anhängen (Foto oder PDF)">{{ icon('file', 16) }}<input type="file" name="beleg" form="{{ form }}" accept=".pdf,image/*" hidden
+  onchange="this.parentNode.classList.toggle('gewaehlt', this.files.length > 0); this.parentNode.title = this.files.length ? this.files[0].name : 'Beleg anhängen (Foto oder PDF)'"></label></td>
+{%- endmacro %}
+
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
+{% set bb = request.args.get('buchung')|int %}
 <div class="kopf">
   <div>
     <h1>{{ immo.name }}</h1>
@@ -18,10 +40,75 @@
 {% endif %}
 {{ pruefliste(pruefung) }}
 
+<section class="block" id="buchungen">
+  <h2>Belege und Buchungen {{ jahr }}</h2>
+  <p class="leise">Eine Zeile je Rechnung, Kassenbon oder Einnahme. Mit einer <strong>Kostenart</strong> zählt der Betrag zu den
+    Gebäudekosten und wird umgelegt, eine Einnahme mindert sie (z. B. eine Erstattung der Stadtwerke). Mit
+    <strong>Erhaltungsrücklage</strong> wird nichts umgelegt: Einnahmen (z. B. PV-Anlage) fließen in die Rücklage, Ausgaben werden ihr
+    entnommen. Kosten nur einer Wohnung (z. B. Heizkostenabrechnung) trägst du beim Mietobjekt ein.</p>
+  {% if ist_admin %}
+  <form id="bneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data"></form>
+  {% endif %}
+  <div class="tabelle">
+  <table class="buchungen">
+    <thead><tr><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Kostenart / Ziel</th><th class="zahl">Betrag</th>
+      <th>Bezahlt</th><th>Beleg</th><th></th></tr></thead>
+    <tbody>
+    {% if ist_admin and not bb %}
+    <tr class="in-bearbeitung">
+      {{ buchung_felder('bneu', vorlage, kostenarten, BEZAHLT) }}
+      <td class="aktionen"><button class="btn-icon" form="bneu" title="Speichern (Enter)">{{ icon('save', 16) }}</button></td>
+    </tr>
+    {% endif %}
+    {% for b in buchungen %}
+    {% if ist_admin and bb == b.id %}
+    <tr class="in-bearbeitung">
+      {{ buchung_felder('b%d' % b.id, dict(b, ziel=(b.kostenart_id|string if b.kostenart_id else 'ruecklage')), kostenarten, BEZAHLT) }}
+      <td class="aktionen">
+        <form id="b{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id) }}#buchungen" title="Abbrechen">{{ icon('x', 16) }}</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td>{{ b.datum|datum(True) if b.datum else '–' }}</td>
+      <td>{{ b.text }}</td>
+      <td>{{ 'Einnahme' if b.art == 'einnahme' else 'Ausgabe' }}</td>
+      <td>{{ b.kostenart if b.kostenart_id else 'Erhaltungsrücklage' }}</td>
+      <td class="zahl {{ 'gutschrift' if b.art == 'einnahme' }}">{{ '+ ' if b.art == 'einnahme' }}{{ b.betrag|eur }}</td>
+      <td>{{ BEZAHLT[b.bezahlt] }}
+        {% if b.art == 'ausgabe' and b.bezahlt == 'bar' %}<br>
+        {% if b.erstattet %}<small class="leise">erstattet {{ b.erstattet|datum(True) }}</small>
+        {% else %}<small class="warnung">noch nicht erstattet</small>
+          {% if ist_admin %}<form method="post" action="{{ url_for('buchung_erstattet', bid=b.id) }}" class="inline">
+            <button class="link-knopf" title="Heute von der WEG erstattet">erstattet</button></form>{% endif %}
+        {% endif %}{% endif %}</td>
+      <td>{% if b.dokument_id and ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('file', 16) }}</a>{% endif %}</td>
+      <td class="aktionen">
+        {% if ist_admin %}
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, buchung=b.id) }}#buchungen" title="Bearbeiten">{{ icon('edit', 16) }}</a>
+        {{ loeschen(url_for('buchung_loeschen', bid=b.id), 'Buchung „%s“ löschen? Ein angehängter Beleg bleibt unter Dokumente erhalten.' % b.text) }}
+        {% endif %}
+      </td>
+    </tr>
+    {% endif %}
+    {% else %}
+    <tr><td colspan="8" class="leise">Für {{ jahr }} sind noch keine Buchungen erfasst.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if offen_bar %}
+  <p class="warnung">Bar ausgelegt und noch nicht von der WEG erstattet: {{ offen_bar|length }} Beleg{{ 'e' if offen_bar|length != 1 }},
+    zusammen {{ offen_bar|sum(attribute='betrag')|eur }}.</p>
+  {% endif %}
+</section>
+
 <section class="block" id="kosten">
   <h2>Gebäudekosten {{ jahr }}</h2>
-  <p class="leise">Kosten der gesamten Immobilie. Sie werden nach dem Umlageschlüssel auf die Mietobjekte verteilt.
-    Kosten, die nur eine Wohnung betreffen (z. B. Heizkostenabrechnung), trägst du direkt beim Mietobjekt ein.</p>
+  <p class="leise">Summe der Buchungen je Kostenart. Sie wird nach dem Umlageschlüssel auf die Mietobjekte verteilt; den Schlüssel
+    änderst du über den Stift.</p>
   {% if erg.gebaeude %}
   <div class="tabelle">
   <table>
@@ -33,7 +120,7 @@
       <td>{{ kostenart_auswahl(kostenarten, k.kostenart_id, gk.kostenart, form="k%d" % k.id) }}
         <textarea name="notiz" form="k{{ k.id }}" rows="3" placeholder="Notiz (optional)">{{ k.notiz }}</textarea></td>
       <td>{{ schluessel_auswahl(k.schluessel, form="k%d" % k.id) }}</td>
-      <td class="zahl"><input class="betrag" name="betrag" form="k{{ k.id }}" inputmode="decimal" value="{{ k.betrag|num }}" required></td>
+      <td class="zahl">{{ k.betrag|eur }}<br><small class="leise">aus {{ belege.get(k.id, 0) }} Buchung{{ 'en' if belege.get(k.id, 0) != 1 }}</small></td>
       <td class="zahl">{{ gk.verteilt|eur }}</td>
       <td class="aktionen">
         <form id="k{{ k.id }}" method="post" action="{{ url_for('kosten_speichern', kid=k.id) }}" class="inline">
@@ -47,12 +134,12 @@
       <td>{{ gk.kostenart }}{% if k.notiz %}<br><small class="leise notiz">{{ k.notiz }}</small>{% endif %}
         {% if gk.warnung %}<br><small class="warnung">{{ gk.warnung }}</small>{% endif %}</td>
       <td>{{ SCHLUESSEL[k.schluessel] }}</td>
-      <td class="zahl">{{ k.betrag|eur }}</td>
+      <td class="zahl">{{ k.betrag|eur }}<br><small class="leise">aus {{ belege.get(k.id, 0) }} Buchung{{ 'en' if belege.get(k.id, 0) != 1 }}</small></td>
       <td class="zahl">{{ gk.verteilt|eur }}{% if gk.rest %}<br><small class="leise">nicht im System: {{ gk.rest|eur }}</small>{% endif %}</td>
       <td class="aktionen">
         {% if ist_admin %}
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, bearbeiten=k.id) }}#kosten" title="Bearbeiten">{{ icon('edit', 16) }}</a>
-        {{ loeschen(url_for('kosten_loeschen', kid=k.id), 'Kostenposition löschen?') }}
+        {{ loeschen(url_for('kosten_loeschen', kid=k.id), 'Kostenposition „%s“ mit %d Buchung(en) löschen?' % (gk.kostenart, belege.get(k.id, 0))) }}
         {% endif %}
       </td>
     </tr>
@@ -63,24 +150,44 @@
   </table>
   </div>
   {% else %}
-  <p class="leise">Für {{ jahr }} sind noch keine Gebäudekosten erfasst.</p>
+  <p class="leise">Für {{ jahr }} sind noch keine Gebäudekosten erfasst. Sie entstehen aus den Buchungen oben.</p>
   {% endif %}
 
-  {% if ist_admin %}
-  {% if vorjahr_vorhanden %}
+  {% if ist_admin and vorjahr_vorhanden %}
   <form method="post" action="{{ url_for('vorjahr_uebernehmen', iid=immo.id) }}" class="inline">
-    <button class="btn hell">{{ icon('list') }}<span>Kostenarten aus {{ jahr - 1 }} übernehmen</span></button>
-  </form>
-  {% endif %}
-  <form method="post" action="{{ url_for('kosten_neu', iid=immo.id) }}" class="zeile" {{ doppelt_rueckfrage(vorhanden, jahr) }}>
-    <label>Kostenart{{ kostenart_auswahl(kostenarten, mit_schluessel=not std_schluessel) }}</label>
-    <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
-    <label>Umlageschlüssel{{ schluessel_auswahl(std_schluessel or 'mea') }}</label>
-    <label class="notizfeld">Notiz<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
-    <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+    <button class="btn hell">{{ icon('list') }}<span>Kostenarten und Schlüssel aus {{ jahr - 1 }} übernehmen</span></button>
   </form>
   {% endif %}
 </section>
+
+{% if immo.weg or rl.vorhanden %}
+<section class="block" id="ruecklage">
+  <h2>Erhaltungsrücklage {{ jahr }}</h2>
+  <p class="leise">Gehört zur Jahresabrechnung der WEG (Vermögensbericht, § 28 Abs. 4 WEG) und steht in der Eigentümer-Abrechnung.
+    Die Zuführung kommt aus den Gebäudekosten (Kostenart mit Haken „Rücklage“), Einnahmen und Entnahmen aus den Buchungen mit
+    Ziel „Erhaltungsrücklage“.</p>
+  <table class="schmal ruecklage">
+    <tbody>
+    <tr><th>Anfangsbestand 01.01.{{ jahr }}</th>
+      <td class="zahl">{% if rl.anfang is not none %}{{ rl.anfang|eur }}{% else %}<span class="warnung">fehlt</span>{% endif %}</td>
+      <td class="leise">{% if rl.eingetragen %}eingetragen{% elif rl.anfang is not none %}fortgeschrieben aus {{ jahr - 1 }}{% endif %}</td></tr>
+    <tr><th>+ Zuführung aus dem Hausgeld</th><td class="zahl">{{ rl.zufuehrung|eur }}</td><td></td></tr>
+    {% for b in rl.einnahmen %}<tr><th>+ {{ b.text }}{% if b.datum %} <small>({{ b.datum|datum(True) }})</small>{% endif %}</th><td class="zahl">{{ b.betrag|eur }}</td><td></td></tr>{% endfor %}
+    {% for b in rl.entnahmen %}<tr><th>− {{ b.text }}{% if b.datum %} <small>({{ b.datum|datum(True) }})</small>{% endif %}</th><td class="zahl">− {{ b.betrag|eur }}</td><td></td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr><th>Endbestand 31.12.{{ jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th><th></th></tr></tfoot>
+  </table>
+  {% if ist_admin %}
+  <form method="post" action="{{ url_for('ruecklage_speichern', iid=immo.id) }}" class="zeile">
+    <label>Anfangsbestand 01.01.{{ jahr }} (€)<input class="betrag" name="anfang" inputmode="decimal"
+      value="{{ rl.anfang|num if rl.eingetragen else '' }}" placeholder="{{ rl.anfang|num if rl.anfang is not none else '' }}"></label>
+    {{ speichern() }}
+  </form>
+  <p class="leise"><small>Den Anfangsbestand brauchst du nur im ersten Jahr, danach wird der Endbestand des Vorjahres übernommen.
+    Leer speichern = fortschreiben.</small></p>
+  {% endif %}
+</section>
+{% endif %}
 
 {% if ist_admin and immo.weg and verteilung %}
 <section class="block" id="hausgeld">

@@ -51,15 +51,19 @@ docker compose -f docker-compose.build.yml up -d --build
 
 | Wo erfasst | Verteilung |
 |---|---|
-| Immobilie (Gebäudekosten) | auf die Mietobjekte nach MEA, Wohnfläche, Einheiten oder Wasserverbrauch |
+| Immobilie, Belege und Buchungen | je Kostenart zusammengezählt, auf die Mietobjekte nach MEA, Wohnfläche, Einheiten oder Wasserverbrauch |
 | Mietobjekt | zeitanteilig nach Monaten auf die Mieter |
 | Mietobjekt, „für Mieter …“ | zu 100 % für diesen Mieter (z. B. Heizkostenabrechnung des Messdienstes) |
+
+Gebäudekosten erfasst du als Buchungen, eine Zeile je Rechnung oder Kassenbon (Datum, Beschreibung, Kostenart, Betrag, Konto oder bar ausgelegt, optional mit Belegfoto). Einnahmen mindern die Kostenart. Bar Ausgelegtes bleibt als „noch nicht erstattet“ markiert, bis du die Erstattung einträgst.
+
+**Erhaltungsrücklage (WEG):** Buchungen mit dem Ziel „Erhaltungsrücklage“ werden nicht umgelegt; Einnahmen (z. B. PV-Anlage) fließen hinein, Ausgaben werden entnommen. Die Zuführung kommt aus einer Kostenart mit Haken „Rücklage“. Anfangsbestand, Zuführung, Einnahmen, Entnahmen und Endbestand stehen auf der Immobilie und in der Eigentümer-Abrechnung.
 
 Auf Leerstand entfallende und nicht umlagefähige Kosten trägt der Eigentümer. Der Wasserverbrauch ergibt sich aus den Zählerständen. Bei einem Zählertausch bleibt der alte Zähler mit seinen Ständen erhalten.
 
 ### Export
 
-Pro Mietobjekt gibt es eine **Mieter-Abrechnung** und eine **Eigentümer-Abrechnung** (z. B. für eine WEG). Der Export erzeugt ein PDF mit Deckblatt und den ausgewählten Belegen; vorher siehst du eine Vorschau.
+Pro Mietobjekt gibt es eine **Mieter-Abrechnung** und eine **Eigentümer-Abrechnung** (z. B. für eine WEG). Der Export erzeugt ein PDF mit Deckblatt; wählbar sind die Erhaltungsrücklage, eine Belegliste nach Kostenart (Mieter sehen nur umlagefähige Kosten) und die hochgeladenen Belege als Anlagen. Vorher siehst du eine Vorschau.
 
 ### Benutzergruppen
 

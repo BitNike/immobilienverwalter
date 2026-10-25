@@ -2,11 +2,11 @@
 import os
 from datetime import date
 
-from flask import abort, flash, g, redirect, render_template, request, send_file, url_for
+from flask import abort, flash, g, redirect, render_template, request, send_file, session, url_for
 
 import dateien
 import db
-from calc import berechne, de_num, messbeginn, parse_date, parse_mea, parse_num, verbrauch_zeitraum
+from calc import berechne, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
 from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
@@ -91,6 +91,11 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         elif ganze_immobilie and gk["rest"] > 0:
             punkt(f"{name}: {de_num(gk['rest'])} € sind keinem Mietobjekt zugeordnet. "
                   "Fehlen Mietobjekte oder deren MEA bzw. Wohnfläche?", link, "hinweis")
+    if ganze_immobilie and immo["weg"]:
+        rl = ruecklage(immo["id"], jahr())
+        if rl["vorhanden"] and rl["anfang"] is None:
+            punkt("Erhaltungsrücklage: Der Anfangsbestand fehlt, der Endbestand stimmt deshalb nicht.",
+                  url_for("immobilie", iid=immo["id"]) + "#ruecklage", "hinweis")
     schluessel = {gk["kosten"]["schluessel"] for gk in erg["gebaeude"] if not gk["warnung"]}
     if not immo["iban"] and any(not erg["wohnungen"][i]["wohnung"]["iban"] for i in wids if i in erg["wohnungen"]):
         punkt("Bei der Immobilie ist keine IBAN hinterlegt; im Brief fehlt dann die Bankverbindung.",
@@ -253,6 +258,16 @@ def immobilie(iid):
     mea = [r["wohnung"] for r in verteilung if r["wohnung"]["mea"]]
     mea_summe = {"anteil": sum(w["mea"] / w["mea_basis"] for w in mea if w["mea_basis"]),
                  "basen": {w["mea_basis"] for w in mea}} if mea else None
+    buchungen = rows("SELECT b.*, ka.name AS kostenart, ka.ruecklage AS zufuehrung FROM buchung b "
+                     "LEFT JOIN kostenart ka ON ka.id = b.kostenart_id WHERE b.immobilie_id = ? AND b.jahr = ? "
+                     "ORDER BY b.datum IS NULL, b.datum DESC, b.id DESC", (iid, j))
+    belege = {}
+    for b in buchungen:
+        if b["kosten_id"]:
+            belege[b["kosten_id"]] = belege.get(b["kosten_id"], 0) + 1
+    vorlage = dict(session.get("buchung_vorlage") or {})
+    if not (vorlage.get("datum") or "").startswith(str(j)):
+        vorlage["datum"] = date.today().isoformat() if date.today().year == j else ""
     umfang = one("SELECT (SELECT COUNT(*) FROM wohnung WHERE immobilie_id = :i) AS wohnungen, "
                  "(SELECT COUNT(*) FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id WHERE w.immobilie_id = :i) AS mieter, "
                  "(SELECT COUNT(*) FROM kosten WHERE immobilie_id = :i) AS kosten, "
@@ -261,8 +276,10 @@ def immobilie(iid):
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()),
-                           std_schluessel=standard_schluessel(immo, len(erg["wohnungen"])),
-                           vorhanden=vorhandene_kostenarten(iid, j),
+                           buchungen=buchungen, belege=belege, vorlage=vorlage, BEZAHLT=BEZAHLT,
+                           offen_bar=[b for b in buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
+                                      and not b["erstattet"]],
+                           rl=ruecklage(iid, j),
                            vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
                            dokumente=dokumente_sichtbar(iid, j), hauptzaehler=hauptzaehler, mvs=mvs,
                            ablage=ablage_sichtbar(iid),
@@ -308,19 +325,6 @@ def _kostenart_id(f):
     return kid
 
 
-@app.post("/immobilien/<int:iid>/kosten")
-@admin_noetig
-def kosten_neu(iid):
-    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
-    f = request.form
-    schl = f.get("schluessel", "mea")
-    if schl not in ("mea", "flaeche", "einheiten", "wasser"):
-        raise ValueError("Unbekannter Umlageschlüssel.")
-    exe("INSERT INTO kosten (immobilie_id, jahr, kostenart_id, betrag, schluessel, notiz) VALUES (?, ?, ?, ?, ?, ?)",
-        (iid, jahr(), _kostenart_id(f), parse_num(f.get("betrag")), schl, f.get("notiz", "").strip()))
-    return redirect(url_for("immobilie", iid=iid) + "#kosten")
-
-
 @app.post("/wohnungen/<int:wid>/kosten")
 def wohnung_kosten_neu(wid):
     w = wohnung_laden(wid, bearbeiten=True)
@@ -358,8 +362,11 @@ def kosten_speichern(kid):
         mv_id = int(f["mv_id"]) if f["mv_id"] else None
         if mv_id:
             row("SELECT id FROM mietverhaeltnis WHERE id = ? AND wohnung_id = ?", (mv_id, k["wohnung_id"]))
+    # Gebäudekosten haben keinen eigenen Betrag mehr, er ist die Summe ihrer Buchungen.
+    betrag = parse_num(f.get("betrag")) if k["wohnung_id"] else k["betrag"]
     exe("UPDATE kosten SET kostenart_id = ?, betrag = ?, schluessel = ?, mv_id = ?, notiz = ? WHERE id = ?",
-        (kostenart_id, parse_num(f.get("betrag")), schl, mv_id, f.get("notiz", k["notiz"] or "").strip(), kid))
+        (kostenart_id, betrag, schl, mv_id, f.get("notiz", k["notiz"] or "").strip(), kid))
+    exe("UPDATE buchung SET kostenart_id = ? WHERE kosten_id = ?", (kostenart_id, kid))
     return zurueck()
 
 
@@ -381,8 +388,170 @@ def vorjahr_uebernehmen(iid):
                    FROM kosten WHERE immobilie_id = ? AND jahr = ? AND mv_id IS NULL ORDER BY id""",
                 (j, iid, j - 1))
     con.commit()
-    flash(f"Kostenarten aus {j - 1} übernommen (Beträge auf 0). Bitte die neuen Beträge eintragen.")
+    flash(f"Kostenarten aus {j - 1} übernommen (Beträge auf 0). Die Beträge ergeben sich aus den Buchungen.")
     return redirect(url_for("immobilie", iid=iid) + "#kosten")
+
+
+# ---------- Buchungen (Belege) ----------
+
+BEZAHLT = {"konto": "Konto", "bar": "Bar ausgelegt"}
+
+
+def kostenposition(immo, j, kostenart_id):
+    """Gebäudekosten-Position der Kostenart im Jahr; fehlt sie, wird sie mit dem passenden Schlüssel angelegt."""
+    k = one("SELECT id FROM kosten WHERE immobilie_id = ? AND jahr = ? AND kostenart_id = ? AND wohnung_id IS NULL "
+            "ORDER BY id", (immo["id"], j, kostenart_id))
+    if k:
+        return k["id"]
+    ka = row("SELECT * FROM kostenart WHERE id = ?", (kostenart_id,))
+    anzahl = one("SELECT COUNT(*) AS n FROM wohnung WHERE immobilie_id = ?", (immo["id"],))["n"]
+    schl = ka["schluessel"] if ka["schluessel"] == "wasser" else standard_schluessel(immo, anzahl) or ka["schluessel"]
+    return exe("INSERT INTO kosten (immobilie_id, jahr, kostenart_id, betrag, schluessel) VALUES (?, ?, ?, 0, ?)",
+               (immo["id"], j, kostenart_id, schl))
+
+
+def kosten_aus_buchungen(kid):
+    """Betrag der Kostenposition = Summe ihrer Buchungen (Einnahmen mindern); ohne Buchungen fällt sie weg."""
+    s = one("SELECT COUNT(*) AS n, SUM(CASE art WHEN 'einnahme' THEN -betrag ELSE betrag END) AS summe "
+            "FROM buchung WHERE kosten_id = ?", (kid,))
+    if s["n"]:
+        exe("UPDATE kosten SET betrag = ? WHERE id = ?", (rund(s["summe"]), kid))
+    else:
+        exe("DELETE FROM kosten WHERE id = ?", (kid,))
+
+
+def buchung_werte():
+    f = request.form
+    vals = {"datum": f.get("datum") or None, "text": f.get("text", "").strip(), "art": f.get("art"),
+            "betrag": parse_num(f.get("betrag")), "bezahlt": f.get("bezahlt", "konto")}
+    if not vals["text"]:
+        raise ValueError("Bitte eine Beschreibung angeben, z. B. „Lampe Flur Haus 2“.")
+    if vals["art"] not in ("ausgabe", "einnahme"):
+        raise ValueError("Bitte Ausgabe oder Einnahme wählen.")
+    if not vals["betrag"]:
+        raise ValueError("Bitte einen Betrag angeben.")
+    if vals["bezahlt"] not in BEZAHLT:
+        raise ValueError("Bitte angeben, wie bezahlt wurde.")
+    ziel = f.get("ziel", "")
+    if not ziel:
+        raise ValueError("Bitte eine Kostenart oder die Erhaltungsrücklage wählen.")
+    vals["kostenart_id"] = None if ziel == "ruecklage" else _kostenart_id({"kostenart_id": ziel})
+    vals["erstattet"] = (f.get("erstattet") or None) if vals["bezahlt"] == "bar" and vals["art"] == "ausgabe" else None
+    return vals
+
+
+def _beleg_speichern(immo, j, vals):
+    """Optionaler Beleg (Foto oder PDF) landet als Vermieter-Dokument des Jahres."""
+    d = request.files.get("beleg")
+    if not d or not d.filename:
+        return None
+    pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(immo["ordner"], str(j), "Vermieter"))
+    return exe("INSERT INTO dokument (immobilie_id, jahr, bereich, kostenart_id, titel, pfad, mime, groesse, "
+               "hochgeladen_von) VALUES (?, ?, 'vermieter', ?, ?, ?, ?, ?, ?)",
+               (immo["id"], j, vals["kostenart_id"], vals["text"], pfad, mime, groesse, g.user["id"]))
+
+
+@app.post("/immobilien/<int:iid>/buchungen")
+@admin_noetig
+def buchung_neu(iid):
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    j = jahr()
+    vals = buchung_werte()
+    if not vals["datum"]:
+        raise ValueError("Bitte das Datum des Belegs angeben.")
+    vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"]) if vals["kostenart_id"] else None
+    vals["dokument_id"] = _beleg_speichern(immo, j, vals)
+    exe(f"INSERT INTO buchung (immobilie_id, jahr, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
+        [iid, j, *vals.values()])
+    if vals["kosten_id"]:
+        kosten_aus_buchungen(vals["kosten_id"])
+    # Für die nächste Zeile vorbelegen, damit mehrere Belege schnell hintereinander gehen
+    session["buchung_vorlage"] = {"datum": vals["datum"], "art": vals["art"], "bezahlt": vals["bezahlt"],
+                                  "ziel": str(vals["kostenart_id"] or "ruecklage")}
+    return redirect(url_for("immobilie", iid=iid, neu=1) + "#buchungen")
+
+
+@app.post("/buchungen/<int:bid>")
+@admin_noetig
+def buchung_speichern(bid):
+    b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (b["immobilie_id"],))
+    vals = buchung_werte()
+    vals["kosten_id"] = kostenposition(immo, b["jahr"], vals["kostenart_id"]) if vals["kostenart_id"] else None
+    dok = _beleg_speichern(immo, b["jahr"], vals)
+    if dok:
+        vals["dokument_id"] = dok
+    exe(f"UPDATE buchung SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), bid])
+    if vals["kosten_id"]:
+        kosten_aus_buchungen(vals["kosten_id"])
+    if b["kosten_id"] and b["kosten_id"] != vals["kosten_id"]:
+        kosten_aus_buchungen(b["kosten_id"])
+    return redirect(url_for("immobilie", iid=immo["id"]) + "#buchungen")
+
+
+@app.post("/buchungen/<int:bid>/erstattet")
+@admin_noetig
+def buchung_erstattet(bid):
+    b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
+    exe("UPDATE buchung SET erstattet = ? WHERE id = ?", (date.today().isoformat(), bid))
+    return redirect(url_for("immobilie", iid=b["immobilie_id"]) + "#buchungen")
+
+
+@app.post("/buchungen/<int:bid>/loeschen")
+@admin_noetig
+def buchung_loeschen(bid):
+    b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
+    exe("DELETE FROM buchung WHERE id = ?", (bid,))
+    if b["kosten_id"]:
+        kosten_aus_buchungen(b["kosten_id"])
+    return redirect(url_for("immobilie", iid=b["immobilie_id"]) + "#buchungen")
+
+
+# ---------- Erhaltungsrücklage ----------
+
+def ruecklage(iid, j):
+    """Entwicklung der Erhaltungsrücklage im Jahr j (Vermögensbericht der WEG). Der Anfangsbestand ist eingetragen
+    oder wird ab dem letzten eingetragenen Jahr fortgeschrieben; None, wenn noch nie einer eingetragen wurde."""
+    def bewegungen(jj):
+        zufuehrung = one("SELECT COALESCE(SUM(k.betrag), 0) AS s FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id "
+                         "WHERE k.immobilie_id = ? AND k.jahr = ? AND k.wohnung_id IS NULL AND ka.ruecklage = 1",
+                         (iid, jj))["s"]
+        buchungen = rows("SELECT * FROM buchung WHERE immobilie_id = ? AND jahr = ? AND kostenart_id IS NULL "
+                         "ORDER BY datum IS NULL, datum, id", (iid, jj))
+        return zufuehrung, buchungen
+
+    def saldo(zufuehrung, buchungen):
+        return zufuehrung + sum(b["betrag"] if b["art"] == "einnahme" else -b["betrag"] for b in buchungen)
+
+    basis = one("SELECT * FROM ruecklage_bestand WHERE immobilie_id = ? AND jahr <= ? ORDER BY jahr DESC LIMIT 1",
+                (iid, j))
+    anfang = None
+    if basis:
+        anfang = basis["betrag"]
+        for jj in range(basis["jahr"], j):
+            anfang += saldo(*bewegungen(jj))
+    zufuehrung, buchungen = bewegungen(j)
+    einnahmen = [b for b in buchungen if b["art"] == "einnahme"]
+    entnahmen = [b for b in buchungen if b["art"] == "ausgabe"]
+    return {"anfang": None if anfang is None else rund(anfang), "eingetragen": bool(basis) and basis["jahr"] == j,
+            "zufuehrung": rund(zufuehrung), "einnahmen": einnahmen, "entnahmen": entnahmen,
+            "summe_einnahmen": rund(sum(b["betrag"] for b in einnahmen)),
+            "summe_entnahmen": rund(sum(b["betrag"] for b in entnahmen)),
+            "ende": rund((anfang or 0) + saldo(zufuehrung, buchungen)),
+            "vorhanden": bool(basis or zufuehrung or buchungen)}
+
+
+@app.post("/immobilien/<int:iid>/ruecklage")
+@admin_noetig
+def ruecklage_speichern(iid):
+    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
+    j = jahr()
+    wert = request.form.get("anfang", "").strip()
+    exe("DELETE FROM ruecklage_bestand WHERE immobilie_id = ? AND jahr = ?", (iid, j))
+    if wert:
+        exe("INSERT INTO ruecklage_bestand (immobilie_id, jahr, betrag) VALUES (?, ?, ?)", (iid, j, parse_num(wert)))
+    flash("Anfangsbestand der Rücklage gespeichert." if wert else "Anfangsbestand wird aus dem Vorjahr fortgeschrieben.")
+    return redirect(url_for("immobilie", iid=iid) + "#ruecklage")
 
 
 # ---------- Mietobjekte ----------

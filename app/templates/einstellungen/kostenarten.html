@@ -4,16 +4,18 @@
 {% block panel %}
 <h1>Kostenarten</h1>
 <p class="leise">Diese Kostenarten stehen beim Erfassen der Kosten zur Auswahl. Nicht umlagefähige Kosten erscheinen nur in der
-  Eigentümer-Abrechnung, nicht in der Abrechnung für den Mieter.</p>
+  Eigentümer-Abrechnung, nicht in der Abrechnung für den Mieter. Mit Haken bei <strong>Rücklage</strong> zählt der Betrag als
+  Zuführung zur Erhaltungsrücklage der WEG.</p>
 <div class="tabelle">
 <table>
-  <thead><tr><th>Name</th><th>Nr. BetrKV</th><th>Umlagefähig</th><th>Standardschlüssel</th><th>Reihenfolge</th><th>Aktiv</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Nr. BetrKV</th><th>Umlagefähig</th><th>Rücklage</th><th>Standardschlüssel</th><th>Reihenfolge</th><th>Aktiv</th><th></th></tr></thead>
   <tbody>
   {% for k in kostenarten %}
   <tr class="{{ 'leise' if not k.aktiv }}">
     <td><input name="name" form="ka{{ k.id }}" value="{{ k.name }}" required></td>
     <td><input name="betrkv_nr" form="ka{{ k.id }}" value="{{ k.betrkv_nr }}" size="3"></td>
     <td><input type="checkbox" name="umlagefaehig" form="ka{{ k.id }}" {{ 'checked' if k.umlagefaehig }}></td>
+    <td><input type="checkbox" name="ruecklage" form="ka{{ k.id }}" {{ 'checked' if k.ruecklage }} title="Zuführung zur Erhaltungsrücklage"></td>
     <td><select name="schluessel" form="ka{{ k.id }}">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}" {{ 'selected' if k.schluessel == s }}>{{ t }}</option>{% endfor %}</select></td>
     <td><input name="sortierung" form="ka{{ k.id }}" value="{{ k.sortierung }}" size="3" inputmode="numeric"></td>
     <td><input type="checkbox" name="aktiv" form="ka{{ k.id }}" {{ 'checked' if k.aktiv }}></td>
@@ -37,6 +39,7 @@
     <label>Standardschlüssel<select name="schluessel">{% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}">{{ t }}</option>{% endfor %}</select></label>
     <label>Reihenfolge<input name="sortierung" value="200" size="4"></label>
     <label class="haken"><input type="checkbox" name="umlagefaehig" checked> umlagefähig</label>
+    <label class="haken"><input type="checkbox" name="ruecklage"> Zuführung Rücklage</label>
     <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
   </form>
 </section>

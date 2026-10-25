@@ -234,14 +234,15 @@ def kostenart_werte():
     if schl not in SCHLUESSEL:
         abort(400)
     return (name, f.get("betrkv_nr", "").strip(), 1 if f.get("umlagefaehig") else 0, schl,
-            int(parse_num(f.get("sortierung"), 0)))
+            int(parse_num(f.get("sortierung"), 0)), 1 if f.get("ruecklage") else 0)
 
 
 @app.route("/einstellungen/admin/kostenarten", methods=["GET", "POST"])
 @admin_noetig
 def kostenarten_admin():
     if request.method == "POST":
-        exe("INSERT INTO kostenart (name, betrkv_nr, umlagefaehig, schluessel, sortierung) VALUES (?, ?, ?, ?, ?)",
+        exe("INSERT INTO kostenart (name, betrkv_nr, umlagefaehig, schluessel, sortierung, ruecklage) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             kostenart_werte())
         return redirect(url_for("kostenarten_admin"))
     from betrkv import KOSTENARTEN
@@ -253,7 +254,8 @@ def kostenarten_admin():
 @app.post("/einstellungen/admin/kostenarten/<int:kid>")
 @admin_noetig
 def kostenart_speichern(kid):
-    exe("UPDATE kostenart SET name = ?, betrkv_nr = ?, umlagefaehig = ?, schluessel = ?, sortierung = ?, aktiv = ? "
+    exe("UPDATE kostenart SET name = ?, betrkv_nr = ?, umlagefaehig = ?, schluessel = ?, sortierung = ?, ruecklage = ?, "
+        "aktiv = ? "
         "WHERE id = ?", (*kostenart_werte(), 1 if request.form.get("aktiv") else 0, kid))
     flash("Kostenart gespeichert.")
     return redirect(url_for("kostenarten_admin"))

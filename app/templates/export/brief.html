@@ -64,6 +64,17 @@
   .konto td.feld { width: 38mm; color: #444; white-space: nowrap; }
   .girocode { width: 34mm; padding: 0 !important; text-align: center; font-size: 7.5pt; line-height: 1.3; color: #444; }
   .girocode svg { display: block; width: 28mm; height: 28mm; margin: 0 auto 1.5mm; }
+  .ruecklage { margin-top: 10mm; }
+  .rl { width: 125mm; font-size: 9.5pt; }
+  .rl td, .rl th { padding: 0.6mm 0; }
+  .rl tr.summe th { border-top: 1px solid #111; font-weight: bold; padding-top: 1.2mm; }
+  .belege { font-size: 9.5pt; }
+  .belege tbody { break-inside: avoid; }
+  .belege td, .belege th { padding: 0.6mm 0; }
+  .belege .gruppe th { font-weight: bold; padding-top: 4mm; }
+  .belege .datum { width: 20mm; }
+  .belege .art { color: #555; }
+  .belege .summe td { border-top: 1px solid #111; font-weight: bold; }
   .hinweise { margin-top: 12mm; padding-top: 4mm; border-top: 1px solid #bbb; font-size: 9.5pt; }
   .hinweise p { margin: 0 0 3mm; }
   .hinweise ul { margin: 0; padding-left: 5mm; }
@@ -141,16 +152,49 @@
     {% endif %}
   </div>
 
+  {% if d.ruecklage %}{% set rl = d.ruecklage %}
+  <div class="ruecklage">
+    <h2>Erhaltungsrücklage {{ d.jahr }}</h2>
+    <table class="rl">
+      <tr><td>Anfangsbestand 01.01.{{ d.jahr }}</td><td class="zahl">{{ rl.anfang|eur if rl.anfang is not none else 'nicht erfasst' }}</td></tr>
+      <tr><td>Zuführung aus dem Hausgeld</td><td class="zahl">{{ rl.zufuehrung|eur }}</td></tr>
+      {% for b in rl.einnahmen %}<tr><td>Einnahme: {{ b.text }}</td><td class="zahl">{{ b.betrag|eur }}</td></tr>{% endfor %}
+      {% for b in rl.entnahmen %}<tr><td>Entnahme: {{ b.text }}</td><td class="zahl">− {{ b.betrag|eur }}</td></tr>{% endfor %}
+      <tr class="summe"><th>Endbestand 31.12.{{ d.jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th></tr>
+      {% if d.ruecklage_anteil is not none %}<tr><td>davon rechnerisch Ihr Anteil ({{ d.w.mea|num }}/{{ d.w.mea_basis|num(0) }} MEA)</td><td class="zahl">{{ d.ruecklage_anteil|eur }}</td></tr>{% endif %}
+    </table>
+  </div>
+  {% endif %}
+
   <div class="hinweise">
     <h2>Hinweise</h2>
     <p><strong>Belegeinsicht:</strong> Sie können die Originalbelege zu dieser Abrechnung einsehen.
       Bitte vereinbaren Sie dazu vorher einen Termin.</p>
-    {% if anlagen %}
+    {% if anlagen or belegliste %}
     <p><strong>Anlagen</strong> (folgen auf den nächsten Seiten):</p>
-    <ul>{% for a in anlagen %}<li>{{ a.titel }}</li>{% endfor %}</ul>
+    <ul>{% if belegliste %}<li>Belegliste {{ d.jahr }}</li>{% endif %}{% for a in anlagen %}<li>{{ a.titel }}</li>{% endfor %}</ul>
     {% endif %}
   </div>
   <div class="seitenzahl"><span class="fuss">{{ d.fusszeile }}</span><span class="nr">Seite 2 von 2</span></div>
 </div>
+
+{% if belegliste %}
+<div class="seite">
+  <p class="fortsetzung">Betriebskostenabrechnung {{ d.jahr }} · {{ d.objekt|first }} · {{ d.partei_name }}</p>
+  <h2>Belegliste {{ d.jahr }}</h2>
+  <p class="unter">Einzelbelege zu den Gesamtkosten der Immobilie{{ ' und zur Erhaltungsrücklage' if belegliste|selectattr('name', 'equalto', 'Erhaltungsrücklage')|list }}.</p>
+  <table class="belege">
+    {% for gr in belegliste %}
+    <tbody>
+      <tr class="gruppe"><th colspan="3">{{ gr.name }}</th></tr>
+      {% for b in gr.buchungen %}
+      <tr><td class="datum">{{ b.datum|datum(True) if b.datum else '' }}</td><td>{{ b.text }}{% if b.art == 'einnahme' %} <span class="art">(Einnahme)</span>{% endif %}</td><td class="zahl">{{ b.wert|eur }}</td></tr>
+      {% endfor %}
+      <tr class="summe"><td></td><td>{{ 'Saldo Einnahmen/Entnahmen' if gr.name == 'Erhaltungsrücklage' else 'Summe ' ~ gr.name }}</td><td class="zahl">{{ gr.summe|eur }}</td></tr>
+    </tbody>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
 </body>
 </html>

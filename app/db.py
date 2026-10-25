@@ -198,6 +198,38 @@ MIGRATIONEN = [
     ALTER TABLE wohnung ADD COLUMN kontoinhaber TEXT NOT NULL DEFAULT '';
     ALTER TABLE wohnung ADD COLUMN bank TEXT NOT NULL DEFAULT '';
     """,
+    # 12: Buchungen (Belege) statt Einzelbetrag je Gebäudekosten-Position; Erhaltungsrücklage.
+    #     kostenart_id gesetzt -> fließt in die Kostenposition (kosten_id), Einnahmen mindern sie;
+    #     kostenart_id NULL     -> Rücklage (Einnahme = Zufluss, Ausgabe = Entnahme), wird nicht umgelegt.
+    #     Bisherige Gebäudekosten werden je eine Buchung (ohne Datum).
+    """
+    ALTER TABLE kostenart ADD COLUMN ruecklage INTEGER NOT NULL DEFAULT 0;
+    UPDATE kostenart SET ruecklage = 1 WHERE name LIKE '%cklage%';
+    CREATE TABLE buchung (
+        id INTEGER PRIMARY KEY,
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        jahr INTEGER NOT NULL,
+        datum TEXT,
+        text TEXT NOT NULL DEFAULT '',
+        art TEXT NOT NULL DEFAULT 'ausgabe',
+        betrag REAL NOT NULL DEFAULT 0,
+        kostenart_id INTEGER REFERENCES kostenart(id),
+        kosten_id INTEGER REFERENCES kosten(id) ON DELETE CASCADE,
+        bezahlt TEXT NOT NULL DEFAULT 'konto',
+        erstattet TEXT,
+        dokument_id INTEGER REFERENCES dokument(id) ON DELETE SET NULL
+    );
+    CREATE TABLE ruecklage_bestand (
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        jahr INTEGER NOT NULL,
+        betrag REAL NOT NULL,
+        PRIMARY KEY (immobilie_id, jahr)
+    );
+    INSERT INTO buchung (immobilie_id, jahr, text, art, betrag, kostenart_id, kosten_id)
+        SELECT k.immobilie_id, k.jahr, ka.name, 'ausgabe', k.betrag, k.kostenart_id, k.id
+        FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id
+        WHERE k.wohnung_id IS NULL AND k.betrag <> 0;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)
@@ -264,6 +296,10 @@ def init_db():
             con.executemany("INSERT INTO kostenart (name, betrkv_nr, umlagefaehig, schluessel, sortierung) "
                             "VALUES (?, ?, ?, ?, ?)",
                             [(*k, n * 10) for n, k in enumerate(STANDARD_KOSTENARTEN)])
+        if i == 12 and not con.execute("SELECT 1 FROM kostenart WHERE ruecklage = 1").fetchone():
+            con.execute("INSERT INTO kostenart (name, umlagefaehig, schluessel, sortierung, ruecklage) "
+                        "VALUES ('Zuführung Erhaltungsrücklage', 0, 'mea', "
+                        "(SELECT COALESCE(MAX(sortierung), 0) + 10 FROM kostenart), 1)")
         con.execute(f"PRAGMA user_version = {i}")
         con.commit()
     con.close()

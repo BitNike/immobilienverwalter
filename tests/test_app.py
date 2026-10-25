@@ -89,9 +89,10 @@ def test_gesamter_ablauf():
     c.get("/immobilien/1?jahr=2025")
     ka = {k: i + 1 for i, k in enumerate(["Heizkosten", "Warmwasser", "Allgemeinstrom", "Gebäudeversicherung",
                                           "Haftpflichtversicherung", "Hausmeister", "Grundsteuer"])}
-    post(c, "/immobilien/1/kosten", data={"kostenart_id": ka["Gebäudeversicherung"], "betrag": "1.000,00",
-                                            "schluessel": "mea"})
-    post(c, "/immobilien/1/kosten", data={"kostenart_id": 10, "betrag": "500", "schluessel": "wasser"})
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-03-01", "text": "Versicherung", "art": "ausgabe",
+                                               "ziel": ka["Gebäudeversicherung"], "betrag": "1.000,00", "bezahlt": "konto"})
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-12-01", "text": "Stadtwerke", "art": "ausgabe",
+                                               "ziel": "10", "betrag": "500", "bezahlt": "konto"})
     post(c, "/wohnungen/1/kosten", data={"kostenart_id": ka["Heizkosten"], "betrag": "712,37", "mv_id": "1"})
     post(c, "/wohnungen/1/kosten", data={"kostenart_id": ka["Grundsteuer"], "betrag": "103,54"})
 
@@ -101,8 +102,8 @@ def test_gesamter_ablauf():
     html = ok(c.get("/wohnungen/1?bearbeiten=3")).get_data(as_text=True)
     assert 'name="mv_id" form="k3"' in html
     assert "/immobilien/1?bearbeiten=1#kosten" in html  # Gebäudekosten: Stift führt zur Immobilie
-    post(c, "/kosten/1", data={"kostenart_id": ka["Gebäudeversicherung"], "betrag": "1.000,00", "schluessel": "mea",
-                               "notiz": "Police 2025\nZweite Zeile"})
+    post(c, "/kosten/1", data={"kostenart_id": ka["Gebäudeversicherung"], "betrag": "9", "schluessel": "mea",
+                               "notiz": "Police 2025\nZweite Zeile"})  # Betrag der Gebäudekosten kommt nur aus den Buchungen
     post(c, "/kosten/4", data={"kostenart_id": ka["Grundsteuer"], "betrag": "103,54", "mv_id": "", "notiz": "Bescheid"})
     assert "Police 2025" in ok(c.get("/immobilien/1")).get_data(as_text=True)
 
@@ -146,11 +147,11 @@ def test_gesamter_ablauf():
     post(c, "/immobilien/1/stammdaten", data={"name": "Lindenhof 7", "strasse": "Lindenhof", "hausnummer": "7",
                                               "plz": "12345", "ort": "Musterstadt", "iban": "DE00 1234", "weg": "on"})
 
-    # Standard-Umlageschlüssel einer Immobilie wird beim Erfassen neuer Gebäudekosten vorausgewählt
+    # Standard-Umlageschlüssel einer Immobilie gilt für Gebäudekosten, die aus einer Buchung neu entstehen
     post(c, "/immobilien/neu", data={"name": "Haus Test", "schluessel": "einheiten"})
-    html = ok(c.get("/immobilien/2")).get_data(as_text=True)
-    assert 'Umlageschlüssel<select name="schluessel" ><option value="mea" >' in html
-    assert '<option value="einheiten" selected>' in html
+    post(c, "/immobilien/2/buchungen", data={"datum": "2025-05-01", "text": "Versicherung", "art": "ausgabe",
+                                               "ziel": ka["Gebäudeversicherung"], "betrag": "10", "bezahlt": "konto"})
+    assert "<td>Wohneinheiten</td>" in ok(c.get("/immobilien/2")).get_data(as_text=True)
     # Archivieren blendet aus, Wiederherstellen holt zurück
     post(c, "/immobilien/2/wohnungen/neu", data={"bezeichnung": "Versehen", "wohnflaeche": "40"})
     post(c, "/immobilien/2/archiv", data={"archiviert": "1"})
@@ -190,10 +191,78 @@ def test_gesamter_ablauf():
     r = post(c, "/wohnungen/1/export/pdf", 200, data={"partei": "eigentuemer", "aktion": "vorschau"})
     assert "inline" in r.headers.get("Content-Disposition", "inline")
 
-    # Vorjahr übernehmen in 2026
+    # Belege und Buchungen: mehrere Belege je Kostenart, Einnahmen mindern, Rücklage wird nicht umgelegt
+    import sqlite3
+    dbcon = sqlite3.connect(os.path.join(TMP, "data", "nebenkosten.sqlite"))
+
+    def kosten(kostenart_id):
+        r = dbcon.execute("SELECT betrag FROM kosten WHERE immobilie_id = 1 AND jahr = 2025 AND wohnung_id IS NULL "
+                          "AND kostenart_id = ?", (kostenart_id,)).fetchall()
+        return [x[0] for x in r]
+
+    garten, hausmeister, zufuehrung = 13, 6, 20  # Zuführung: von Migration 12 angelegt
+    c.get("/immobilien/1?jahr=2025")
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-09-19", "text": "Esso, Rasenmäher", "art": "ausgabe",
+                                               "ziel": garten, "betrag": "18,01", "bezahlt": "bar"})
+    r = post(c, "/immobilien/1/buchungen", data={"datum": "2025-11-24", "text": "Obi", "art": "ausgabe", "ziel": garten,
+                                                   "betrag": "17,97", "bezahlt": "bar", "beleg": pdf_datei("Obi.pdf")},
+             content_type="multipart/form-data")
+    assert r.headers["Location"].endswith("neu=1#buchungen")
+    assert os.path.exists(os.path.join(TMP, "dokumente", "Lindenhof 7", "2025", "Vermieter", "Obi.pdf"))
+    assert kosten(garten) == [35.98]
+    html = ok(c.get("/immobilien/1?neu=1")).get_data(as_text=True)
+    assert "aus 2 Buchungen" in html and "noch nicht erstattet" in html and "zusammen 35,98 €" in html
+    assert 'value="2025-11-24" required autofocus' in html and f'<option value="{garten}" selected>' in html
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-12-10", "text": "Gutschrift", "art": "einnahme",
+                                               "ziel": garten, "betrag": "5,98", "bezahlt": "konto"})
+    assert kosten(garten) == [30.0]
+    post(c, "/buchungen/3/erstattet")
+    post(c, "/buchungen/4", data={"datum": "2025-11-24", "text": "Obi", "art": "ausgabe", "ziel": hausmeister,
+                                  "betrag": "17,97", "bezahlt": "bar", "erstattet": "2025-12-01"})
+    assert kosten(garten) == [12.03] and kosten(hausmeister) == [17.97]
+    assert "noch nicht erstattet" not in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    post(c, "/buchungen/3/loeschen")
+    post(c, "/buchungen/5/loeschen")
+    assert kosten(garten) == []  # ohne Buchungen fällt die Kostenposition weg
+    # Erhaltungsrücklage: Zuführung über die Kostenart, PV-Einnahme hinein, Energieausweise heraus
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-12-31", "text": "Zuführung", "art": "ausgabe",
+                                               "ziel": zufuehrung, "betrag": "1.900,00", "bezahlt": "konto"})
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-06-30", "text": "PV-Anlage", "art": "einnahme",
+                                               "ziel": "ruecklage", "betrag": "700", "bezahlt": "konto"})
+    post(c, "/immobilien/1/buchungen", data={"datum": "2025-05-09", "text": "Energieausweise", "art": "ausgabe",
+                                               "ziel": "ruecklage", "betrag": "800,00", "bezahlt": "konto"})
+    html = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert "Der Anfangsbestand fehlt" in html
+    post(c, "/immobilien/1/ruecklage", data={"anfang": "10.000,00"})
+    html = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert "11.800,00 €" in html and "Der Anfangsbestand fehlt" not in html  # 10.000 + 1.900 + 700 − 800
+    eig_brief = ok(c.get("/wohnungen/1/export/brief?partei=eigentuemer")).get_data(as_text=True)
+    assert "Erhaltungsrücklage 2025" in eig_brief and "11.800,00 €" in eig_brief
+    assert "1.016,33 €" in eig_brief  # Anteil 86,13/1.000 MEA
+    assert "Energieausweise" in eig_brief and "Zuführung Erhaltungsrücklage" in eig_brief
+    mieter_brief = ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
+    assert "Erhaltungsrücklage" not in mieter_brief and "Energieausweise" not in mieter_brief
+    # Export-Auswahl: Belegliste als Zusatzseite, Rücklage abwählbar; Mieter sehen nur umlagefähige Belege
+    assert "Belegliste 2025" in ok(c.get("/wohnungen/1/export?partei=eigentuemer")).get_data(as_text=True)
+
+    def pdf_text(daten):
+        r = post(c, "/wohnungen/1/export/pdf", 200, data={**daten, "aktion": "speichern"})
+        seiten = PdfReader(io.BytesIO(r.data)).pages
+        return len(seiten), " ".join(x.extract_text() for x in seiten)
+
+    n, text = pdf_text({"partei": "eigentuemer", "teile": ["ruecklage", "belegliste"]})
+    assert n == 3 and "Belegliste 2025" in text and "Energieausweise" in text and "Summe Gebäudeversicherung" in text
+    n, text = pdf_text({"partei": "eigentuemer"})
+    assert n == 2 and "Erhaltungsrücklage 2025" not in text
+    n, text = pdf_text({"partei": "1", "teile": ["belegliste"]})
+    assert n == 3 and "Versicherung" in text and "Energieausweise" not in text and "Zuführung" not in text
+
+    # Vorjahr übernehmen in 2026, Rücklage wird fortgeschrieben
     c.get("/immobilien/1?jahr=2026")
     post(c, "/immobilien/1/vorjahr")
-    assert "Gebäudeversicherung" in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    html = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert "Gebäudeversicherung" in html
+    assert "11.800,00 €" in html and "fortgeschrieben aus 2025" in html
 
     # Zählertausch
     post(c, "/zaehler/2/tausch", data={"datum": "2026-06-30", "endstand": "30", "nummer": "W-2b",
@@ -341,7 +410,9 @@ def test_gesamter_ablauf():
     ok(a.get("/dokumente/2"), 403)  # Mieterordner einer fremden Wohnung
     ok(a.get("/dokumente/1"))       # gemeinsamer Mieterbeleg
     post(a, "/wohnungen/2/mieter", data={"name": "Neu", "von": "2026-01-01"})
-    ok(a.post("/immobilien/1/kosten", data={"kostenart_id": "1", "betrag": "1"}), 403)
+    ok(a.post("/immobilien/1/buchungen", data={"datum": "2025-01-01", "text": "x", "art": "ausgabe", "ziel": "1",
+                                                "betrag": "1", "bezahlt": "konto"}), 403)
+    ok(a.post("/buchungen/1/loeschen"), 403)
     seite = ok(a.get("/immobilien/1")).get_data(as_text=True)
     assert "Protokoll Versammlung" in seite and "Angebot Dach" not in seite
     ok(a.get("/ablage/1"))

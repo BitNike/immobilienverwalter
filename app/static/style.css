@@ -132,6 +132,20 @@ table.abrechnung td, table.abrechnung th { vertical-align: middle; }
 .in-bearbeitung td { vertical-align: top; background: var(--flaeche); }
 .in-bearbeitung textarea { display: block; width: 100%; min-width: 260px; margin-top: 6px; }
 .notiz { white-space: pre-line; }
+/* Buchungen: Eingabezeile direkt in der Tabelle, Enter speichert */
+table.buchungen th, table.buchungen td { vertical-align: middle; padding-left: 5px; padding-right: 5px; }
+table.buchungen input, table.buchungen select { padding-left: 7px; }
+table.buchungen input[type=date] { width: 135px; }
+table.buchungen input[name=text] { width: 100%; min-width: 140px; }
+table.buchungen select[name=art] { width: 105px; }
+table.buchungen select[name=ziel] { width: 190px; }
+table.buchungen select[name=bezahlt] { width: 135px; }
+table.buchungen input.betrag { width: 90px; }
+table.buchungen label.erstattet { margin-top: 6px; font-size: 11.5px; }
+.beleg-wahl { cursor: pointer; }
+.beleg-wahl.gewaehlt { color: var(--gut); border-color: var(--gut); }
+.link-knopf { background: none; border: none; padding: 0; color: var(--primaer); cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; }
+table.ruecklage td, table.ruecklage th { padding-top: 4px; padding-bottom: 4px; }
 form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
 .knopfleiste { display: flex; gap: 10px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
 .knopfleiste.senkrecht { flex-direction: column; align-items: stretch; }
