@@ -676,6 +676,8 @@ def konten(iid, j):
             "anfang": rund(sum(k["anfang"]["betrag"] for k in erg if k["anfang"])),
             "ende": rund(sum(k["ende"]["betrag"] for k in erg if k["ende"])),
             "rl_konten": len(rl), "rl_ende": rund(sum(k["ende"]["betrag"] for k in rl if k["ende"])),
+            "rl_anfang": rund(sum(k["anfang"]["betrag"] for k in rl if k["anfang"])),
+            "rl_anfang_vorhanden": any(k["anfang"] for k in rl),
             "rl_vollstaendig": all(k["ende"] for k in rl),
             "staende": sorted(({**st, "konto": k["name"]} for k in erg for st in k["staende"]),
                               key=lambda st: (st["datum"], st["id"]))}

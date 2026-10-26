@@ -345,6 +345,19 @@ def test_gesamter_ablauf():
     post(c, f"/konten/{giro}", data={"name": "Girokonto WEG"})
     post(c, f"/konten/{giro}/loeschen")
     assert dbcon.execute("SELECT name FROM konto").fetchall() == [("Tagesgeld",)]
+    # Ohne Anfangsbestand: kein Alarm, sondern Übernahme der Kontostände vom 31.12. des Vorjahres als Anfangsbestand
+    c.get("/immobilien/1?jahr=2027")
+    seite = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "noch kein Anfangsbestand" not in seite  # 2027 wird aus 2026 fortgeschrieben
+    dbcon.execute("DELETE FROM ruecklage_bestand")
+    dbcon.commit()
+    seite = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "noch kein Anfangsbestand" in seite and "bitte Buchungen und Kontostände prüfen" not in seite
+    assert "aus den Kontoständen übernehmen (11.000,00 €)" in seite
+    post(c, "/immobilien/1/ruecklage", data={"anfang": "11.000,00", "notiz": "Summe der Rücklage-Konten am 31.12.2026"})
+    seite = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "Summe der Rücklage-Konten am 31.12.2026" in seite and "noch kein Anfangsbestand" not in seite
+    c.get("/immobilien/1?jahr=2026")
     assert not dbcon.execute("SELECT 1 FROM kontostand WHERE konto_id = ?", (giro,)).fetchone()
     assert "geändert" not in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
     # Reiter: jeder Bereich hat eine eigene Adresse, der Jahr-Umschalter behält den Reiter

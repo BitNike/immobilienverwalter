@@ -370,7 +370,17 @@
       <th class="zahl">{{ '+ ' if kt.ende > kt.anfang else '− ' if kt.ende < kt.anfang }}{{ (kt.ende - kt.anfang)|abs|eur }}</th><th></th></tr></tfoot>
   </table>
   </div>
-  {% if kt.rl_konten %}
+  {% if kt.rl_konten and rl.anfang is none %}
+  <div class="meldung">Für {{ jahr }} ist noch kein Anfangsbestand der Rücklage erfasst, deshalb ist kein Abgleich mit den Konten möglich.
+    {% if ist_admin and kt.rl_anfang_vorhanden %}
+    <form method="post" action="{{ url_for('ruecklage_speichern', iid=immo.id) }}" class="inline">
+      <input type="hidden" name="anfang" value="{{ kt.rl_anfang|num }}">
+      <input type="hidden" name="notiz" value="Summe der Rücklage-Konten am 31.12.{{ jahr - 1 }}">
+      <button class="btn klein">Anfangsbestand aus den Kontoständen übernehmen ({{ kt.rl_anfang|eur }})</button></form>
+    {% elif ist_admin %}<br><small class="leise">Trag den Anfangsbestand oben in der ersten Zeile ein (Stift), oder erfasse die
+      Kontostände zum 31.12.{{ jahr - 1 }} – dann lässt er sich hier mit einem Klick übernehmen.</small>{% endif %}
+  </div>
+  {% elif kt.rl_konten %}
   {% set diff = kt.rl_ende - rl.ende %}
   <p class="{{ 'warnung' if kt.rl_vollstaendig and diff|abs >= 0.005 else 'leise' }}">
     Rücklage-Konten am 31.12.{{ jahr }}: <strong>{{ kt.rl_ende|eur }}</strong> · Rücklage laut Kontoblatt: <strong>{{ rl.ende|eur }}</strong>
