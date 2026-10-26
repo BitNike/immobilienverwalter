@@ -360,6 +360,124 @@ def test_gesamter_ablauf():
     c.get("/immobilien/1?jahr=2026")
     assert not dbcon.execute("SELECT 1 FROM kontostand WHERE konto_id = ?", (giro,)).fetchone()
     assert "geändert" not in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    # Daueraufträge: gelten nur für ein Jahr; je Jahr eine Buchung mit Rechenweg; Betragswechsel über zwei Aufträge
+    c.get("/immobilien/1?jahr=2026")
+
+    def fehlermeldung(url, daten):
+        ok(c.post(url, data=daten), 302)
+        with c.session_transaction() as sitzung:
+            return " ".join(m for kat, m in sitzung.pop("_flashes", []) if kat == "fehler")
+
+    assert "nur für ein Jahr" in fehlermeldung("/immobilien/1/dauerauftraege", {
+        "text": "Hausmeister", "art": "ausgabe", "ziel": hausmeister, "betrag": "170", "rhythmus": "monat",
+        "von": "2025-01-01", "bis": "2026-06-30"})
+    post(c, "/immobilien/1/dauerauftraege", data={"text": "Hausmeister", "art": "ausgabe", "ziel": hausmeister,
+                                                  "betrag": "170", "rhythmus": "monat", "von": "2026-01-01", "bis": "2026-06-30"})
+    post(c, "/immobilien/1/dauerauftraege", data={"text": "Hausmeister", "art": "ausgabe", "ziel": hausmeister,
+                                                  "betrag": "180", "rhythmus": "monat", "von": "2026-07-01"})  # bis = 31.12.
+    post(c, "/immobilien/1/dauerauftraege", data={"text": "Rücklage-Anteil", "art": "ausgabe", "ziel": zufuehrung,
+                                                  "betrag": "480", "rhythmus": "quartal", "von": "2026-02-15"})
+    seite = ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert "6 × 170,00 €<br><strong>= 1.020,00 €" in seite and "6 × 180,00 €<br><strong>= 1.080,00 €" in seite
+    assert "4 × 480,00 €<br><strong>= 1.920,00 €" in seite and "für 2026 buchen" in seite
+    post(c, "/immobilien/1/dauerauftraege/buchen")
+
+    def kosten26(ka):
+        return [x[0] for x in dbcon.execute("SELECT betrag FROM kosten WHERE immobilie_id = 1 AND jahr = 2026 "
+                                           "AND wohnung_id IS NULL AND kostenart_id = ?", (ka,))]
+    assert kosten26(hausmeister) == [2100.0] and kosten26(zufuehrung) == [1920.0]  # 6×170 + 6×180; 4×480
+    seite = ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert seite.count("gebucht ✓") == 3 and "für 2026 buchen" not in seite
+    assert "Hausmeister 2026" in seite and "Dauerauftrag)" in seite
+    # Jahresbuchung von Hand geändert → Hinweis und „angleichen“
+    b_id, da_id = dbcon.execute("SELECT id, dauerauftrag_id FROM buchung WHERE text = 'Rücklage-Anteil 2026'").fetchone()
+    post(c, f"/buchungen/{b_id}", data={"datum": "2026-11-15", "text": "Rücklage-Anteil 2026", "art": "ausgabe",
+                                        "ziel": zufuehrung, "betrag": "1.440", "bezahlt": "konto", "notiz": "ein Quartal fehlt"})
+    seite = ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert "gebucht 1.440,00 €" in seite and "angleichen" in seite
+    assert "1.440,00 €" in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)  # Zuführung im Kontoblatt
+    post(c, f"/dauerauftraege/{da_id}/angleichen")
+    assert kosten26(zufuehrung) == [1920.0]
+    # 2027: nichts läuft weiter; Übernahme aus dem Vorjahr kopiert mit verschobenen Daten, aber nur einmal
+    seite = ok(c.get("/immobilien/1?jahr=2027&reiter=buchungen")).get_data(as_text=True)
+    assert "180,00 €" not in seite and "3 Dauerauftrag/-aufträge aus 2026 übernehmen" in seite
+    post(c, "/immobilien/1/dauerauftraege/vorjahr")
+    assert dbcon.execute("SELECT von, bis FROM dauerauftrag WHERE jahr = 2027 AND betrag = 180").fetchone() == \
+        ("2027-07-01", "2027-12-31")
+    assert "schon Daueraufträge" in fehlermeldung("/immobilien/1/dauerauftraege/vorjahr", {})
+    dbcon.execute("DELETE FROM dauerauftrag WHERE jahr = 2027")
+    dbcon.commit()
+    c.get("/immobilien/1?jahr=2026")
+    post(c, f"/dauerauftraege/{da_id}/loeschen")
+    assert kosten26(zufuehrung) == [1920.0]  # Buchung bleibt
+    assert 'class="info"' in ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+
+    # Hausgeld als Buchung: eigene WEG mit drei Wohnungen eines Eigentümers und einer Wohnung eines zweiten
+    post(c, "/immobilien/neu", data={"name": "Hausgeld-Test", "weg": "on"})
+    hid = dbcon.execute("SELECT id FROM immobilie WHERE name = 'Hausgeld-Test'").fetchone()[0]
+    for bez in ("W1", "W2", "W3"):
+        post(c, f"/immobilien/{hid}/wohnungen/neu", data={"bezeichnung": bez, "wohnflaeche": "50", "mea": "250/1000",
+                                                         "eigentuemer_id": "1"})
+    post(c, f"/immobilien/{hid}/wohnungen/neu", data={"bezeichnung": "W4", "wohnflaeche": "50", "mea": "250/1000",
+                                                     "eigentuemer_id": "neu", "neu_name": "Zweit"})
+    w1, w2, w3, w4 = [x[0] for x in dbcon.execute("SELECT id FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung",
+                                                  (hid,))]
+    zweit = dbcon.execute("SELECT eigentuemer_id FROM wohnung WHERE id = ?", (w4,)).fetchone()[0]
+    c.get(f"/immobilien/{hid}?jahr=2026")
+    seite = ok(c.get(f"/immobilien/{hid}?reiter=buchungen")).get_data(as_text=True)
+    assert 'value="e1"' in seite and f'value="w{w4}"' in seite and f'value="e{zweit}"' not in seite  # „alle“ nur bei mehreren
+    # 100 € für alle drei Wohnungen: cent-genau 33,34 + 33,33 + 33,33; Art wird immer „Einnahme“
+    post(c, f"/immobilien/{hid}/buchungen", data={"datum": "2026-01-05", "text": "Hausgeld Januar", "art": "ausgabe",
+                                                  "ziel": "e1", "betrag": "100", "bezahlt": "konto"})
+    # monatliches Hausgeld per Dauerauftrag, einzeln gebucht: 12 × 450 € für alle drei, 12 × 200 € für W4
+    post(c, f"/immobilien/{hid}/dauerauftraege", data={"text": "Hausgeld Eigentümer 1", "art": "einnahme", "ziel": "e1",
+                                                       "betrag": "450", "rhythmus": "monat", "einzeln": "on",
+                                                       "von": "2026-01-05"})
+    post(c, f"/immobilien/{hid}/dauerauftraege", data={"text": "Hausgeld Zweit", "art": "einnahme", "ziel": f"w{w4}",
+                                                       "betrag": "200", "rhythmus": "monat", "einzeln": "on",
+                                                       "von": "2026-01-01"})
+    post(c, f"/immobilien/{hid}/dauerauftraege/buchen")
+    assert dbcon.execute("SELECT COUNT(*), SUM(betrag) FROM buchung WHERE immobilie_id = ? AND dauerauftrag_id IS NOT NULL",
+                         (hid,)).fetchone() == (24, 7800.0)  # 12 × 450 + 12 × 200
+    assert dbcon.execute("SELECT DISTINCT art FROM buchung WHERE immobilie_id = ?", (hid,)).fetchall() == [("einnahme",)]
+    seite = ok(c.get(f"/immobilien/{hid}?reiter=buchungen")).get_data(as_text=True)
+    assert seite.count("gebucht ✓") == 2 and "Hausgeld Eigentümer 1 03/2026" in seite
+    from immobilien import hausgeld_aus_buchungen
+    with app.test_request_context():
+        hg = hausgeld_aus_buchungen(hid, 2026)[0]
+    assert sorted(hg[w]["betrag"] for w in (w1, w2, w3)) == [1833.33, 1833.33, 1833.34]  # 12 × 150 + 100/3
+    assert round(sum(hg[w]["betrag"] for w in (w1, w2, w3)), 2) == 5500.0 and hg[w4]["betrag"] == 2400.0
+    assert hg[w1]["anzahl"] == 13 and hg[w4]["anzahl"] == 12
+    # Hausgeld-Tabelle übernimmt die Summen, von Hand nicht mehr änderbar; Eigentümer-Brief zeigt die Jahressumme
+    seite = ok(c.get(f"/immobilien/{hid}")).get_data(as_text=True)
+    assert "aus 13 Buchungen" in seite and f'name="hg_{w1}"' not in seite and "2.400,00 €" in seite
+    assert ">fehlt<" not in ok(c.get(f"/immobilien/{hid}?reiter=buchungen")).get_data(as_text=True)
+    post(c, f"/immobilien/{hid}/hausgeld", data={f"hg_{w4}": "1"})  # wird ignoriert
+    assert "2.400,00 €" in ok(c.get(f"/wohnungen/{w4}/export/brief?partei=eigentuemer")).get_data(as_text=True)
+    assert "aus 12 Buchungen" in ok(c.get(f"/wohnungen/{w4}")).get_data(as_text=True)
+    # Hausgeld gehört weder in die Rücklage noch in Belegliste oder Anlagen
+    assert "Hausgeld" not in ok(c.get(f"/immobilien/{hid}?reiter=ruecklage")).get_data(as_text=True).split("<h3")[0] \
+        .split("</thead>")[-1]
+    assert "Belegliste" not in ok(c.get(f"/wohnungen/{w1}/export?partei=eigentuemer")).get_data(as_text=True)
+    # Filter und Suche
+    def zeilen(params):
+        html_ = ok(c.get(f"/immobilien/{hid}?reiter=buchungen&{params}")).get_data(as_text=True)
+        tbody = html_.split("<tbody>")[1].split("</tbody>")[0]
+        return tbody.count("<tr>") - tbody.count("Keine Buchung passt zum Filter")
+    assert zeilen("") == 25
+    assert zeilen("eigentuemer=1") == 13 and zeilen(f"wohnung={w2}") == 13 and zeilen(f"wohnung={w4}") == 12
+    assert zeilen("q=450") == 12 and zeilen("q=Januar") == 1 and zeilen("monat=1") == 3 and zeilen("ziel=hausgeld") == 25
+    assert zeilen("ziel=ruecklage") == 0 and zeilen("ohne=1") == 0  # Hausgeld braucht keinen Beleg
+    assert "Keine Buchung passt zum Filter" in ok(c.get(f"/immobilien/{hid}?reiter=buchungen&ziel=ruecklage")).get_data(as_text=True)
+    assert "Gefiltert: 12 von 25 Buchungen" in ok(c.get(f"/immobilien/{hid}?reiter=buchungen&q=450")).get_data(as_text=True)
+    # Eigentümer ohne Wohnung mehr: Hausgeld „für alle“ kann nicht zugeordnet werden → Prüfliste
+    dbcon.execute("UPDATE wohnung SET eigentuemer_id = NULL WHERE immobilie_id = ? AND eigentuemer_id = 1", (hid,))
+    dbcon.commit()
+    assert "keine Wohnung mehr" in ok(c.get(f"/immobilien/{hid}")).get_data(as_text=True)
+    post(c, f"/immobilien/{hid}/loeschen")
+    dbcon.execute("DELETE FROM benutzer WHERE id = ?", (zweit,))  # spätere Tests erwarten die bisherigen Nummern
+    dbcon.commit()
+    c.get("/immobilien/1?jahr=2026")
     # Reiter: jeder Bereich hat eine eigene Adresse, der Jahr-Umschalter behält den Reiter
     assert "/immobilien/1?jahr=2025&amp;reiter=ruecklage" in html
     for reiter, text in (("buchungen", "Belege und Buchungen"), ("zaehler", "Hauptzähler"), ("dokumente", "Ablage"),
@@ -517,6 +635,16 @@ def test_gesamter_ablauf():
     ok(a.post("/immobilien/1/buchungen", data={"datum": "2025-01-01", "text": "x", "art": "ausgabe", "ziel": "1",
                                                 "betrag": "1", "bezahlt": "konto"}), 403)
     ok(a.post("/buchungen/1/loeschen"), 403)
+    # Hausgeld fremder Wohnungen bleibt für Eigentümer unsichtbar, eigenes ist sichtbar
+    dbcon.execute("INSERT INTO buchung (immobilie_id, jahr, datum, text, art, betrag, hausgeld_eigentuemer_id, "
+                  "hausgeld_wohnung_id) VALUES (1, 2026, '2026-03-01', 'HG fremd', 'einnahme', 99, 1, 1), "
+                  "(1, 2026, '2026-03-01', 'HG eigen', 'einnahme', 77, 2, 2)")
+    dbcon.commit()
+    a.get("/immobilien/1?jahr=2026")
+    seite = ok(a.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert "HG eigen" in seite and "HG fremd" not in seite
+    dbcon.execute("DELETE FROM buchung WHERE text IN ('HG fremd', 'HG eigen')")
+    dbcon.commit()
     seite = ok(a.get("/immobilien/1?reiter=dokumente")).get_data(as_text=True)
     assert "Protokoll Versammlung" in seite and "Angebot Dach" not in seite
     ok(a.get("/ablage/1"))

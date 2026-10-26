@@ -2,6 +2,10 @@
 <svg class="i" width="{{ groesse }}" height="{{ groesse }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ICONS[name]|safe }}</svg>
 {%- endmacro %}
 
+{% macro info(text) -%}
+<span class="info" tabindex="0" role="note" aria-label="{{ text }}" data-tipp="{{ text }}">{{ icon('info', 15) }}</span>
+{%- endmacro %}
+
 {% macro speichern(label="Speichern", form=None) -%}
 <button class="btn" {% if form %}form="{{ form }}"{% endif %} title="{{ label }}">{{ icon('save') }}<span>{{ label }}</span></button>
 {%- endmacro %}

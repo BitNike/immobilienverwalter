@@ -6,7 +6,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 
 import dateien
 import db
-from calc import berechne, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
+from calc import berechne, cent_genau, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
 from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
@@ -33,6 +33,45 @@ def kostenarten_aktiv():
     return rows("SELECT * FROM kostenart WHERE aktiv = 1 ORDER BY sortierung, name")
 
 
+def hausgeld_wohnungen(iid, b):
+    """Wohnungen, auf die eine Hausgeld-Buchung entfällt: die gewählte oder alle des Eigentümers in der Immobilie."""
+    if b["hausgeld_wohnung_id"]:
+        return [b["hausgeld_wohnung_id"]]
+    return [w["id"] for w in rows("SELECT id FROM wohnung WHERE immobilie_id = ? AND eigentuemer_id = ? "
+                                   "ORDER BY bezeichnung COLLATE NATUERLICH", (iid, b["hausgeld_eigentuemer_id"]))]
+
+
+def hausgeld_aus_buchungen(iid, j):
+    """Hausgeld je Wohnung aus den Buchungen des Jahres. Zahlt ein Eigentümer für alle seine Wohnungen, wird der Betrag
+    gleichmäßig und cent-genau aufgeteilt. Ergebnis: ({wohnung_id: {betrag, anzahl}}, [nicht zuordenbare Buchungen])."""
+    erg, offen = {}, []
+    for b in rows("SELECT * FROM buchung WHERE immobilie_id = ? AND jahr = ? AND hausgeld_eigentuemer_id IS NOT NULL "
+                  "ORDER BY datum, id", (iid, j)):
+        wids = hausgeld_wohnungen(iid, b)
+        if not wids:
+            offen.append(b)
+            continue
+        wert = b["betrag"] if b["art"] == "einnahme" else -b["betrag"]
+        for wid, x in cent_genau({wid: wert / len(wids) for wid in wids}).items():
+            h = erg.setdefault(wid, {"betrag": 0.0, "anzahl": 0})
+            h["betrag"] = rund(h["betrag"] + x)
+            h["anzahl"] += 1
+    return erg, offen
+
+
+def hausgeld_optionen(iid):
+    """Eigentümer der Immobilie mit ihren Wohnungen – für die Auswahl „Hausgeld von …“ und den Filter."""
+    erg = {}
+    for w in rows("SELECT * FROM wohnung WHERE immobilie_id = ? AND eigentuemer_id IS NOT NULL "
+                  "ORDER BY bezeichnung COLLATE NATUERLICH", (iid,)):
+        e = erg.get(w["eigentuemer_id"])
+        if not e:
+            b = one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],))
+            e = erg[w["eigentuemer_id"]] = {"id": w["eigentuemer_id"], "name": person_name(b) if b else "?", "wohnungen": []}
+        e["wohnungen"].append(w)
+    return sorted(erg.values(), key=lambda e: e["name"].casefold())
+
+
 def berechnung(immo, j):
     """Lädt alle Daten einer Immobilie für ein Jahr und berechnet die Verteilung."""
     iid = immo["id"]
@@ -51,8 +90,46 @@ def berechnung(immo, j):
     vz = {(r["wohnung_id"], r["mv_id"]): r["betrag"] for r in rows(
         "SELECT v.* FROM vorauszahlung v JOIN wohnung w ON w.id = v.wohnung_id "
         "WHERE w.immobilie_id = ? AND v.jahr = ?", (iid, j))}
+    hausgeld, hausgeld_offen = hausgeld_aus_buchungen(iid, j)
+    for wid, h in hausgeld.items():  # Hausgeld aus Buchungen hat Vorrang vor dem von Hand eingetragenen
+        vz[(wid, None)] = h["betrag"]
     erg = berechne(date(j, 1, 1), date(j, 12, 31), immo, wohnungen, kosten, kostenarten, mvs, zaehler, vz)
     erg["vz_gespeichert"] = set(vz)
+    erg["hausgeld_buchungen"] = {wid: h["anzahl"] for wid, h in hausgeld.items()}
+    erg["hausgeld_offen"] = hausgeld_offen
+    return erg
+
+
+def buchungen_filtern(buchungen, f):
+    """Filter und Suche im Reiter Buchungen. f: q (Text oder Betrag), ziel (Kostenart-ID, ruecklage, hausgeld),
+    art, monat (1–12), wohnung, eigentuemer, ohne (nur ohne Beleg)."""
+    q = f["q"].casefold()
+    try:
+        q_betrag = parse_num(f["q"], None) if f["q"] else None
+    except ValueError:
+        q_betrag = None
+    erg = []
+    for b in buchungen:
+        if q and q not in f"{b['text']} {b['notiz']} {b['ziel_text']} {b['ziel_zusatz']}".casefold() \
+                and not (q_betrag is not None and abs(b["betrag"] - q_betrag) < 0.005):
+            continue
+        if f["ziel"] == "hausgeld" and not b["hausgeld_eigentuemer_id"]:
+            continue
+        if f["ziel"] == "ruecklage" and (b["kostenart_id"] or b["hausgeld_eigentuemer_id"]):
+            continue
+        if f["ziel"].isdigit() and b["kostenart_id"] != int(f["ziel"]):
+            continue
+        if f["art"] and b["art"] != f["art"]:
+            continue
+        if f["monat"].isdigit() and not (b["datum"] and int(b["datum"][5:7]) == int(f["monat"])):
+            continue
+        if f["wohnung"].isdigit() and int(f["wohnung"]) not in b["wohnungen"]:
+            continue
+        if f["eigentuemer"].isdigit() and b["hausgeld_eigentuemer_id"] != int(f["eigentuemer"]):
+            continue
+        if f["ohne"] and (b["dokument_id"] or b["hausgeld_eigentuemer_id"]):  # Hausgeld: Kontoauszug genügt
+            continue
+        erg.append(b)
     return erg
 
 
@@ -97,6 +174,9 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         elif ganze_immobilie and gk["rest"] > 0:
             punkt(f"{name}: {de_num(gk['rest'])} € sind keinem Mietobjekt zugeordnet. "
                   "Fehlen Mietobjekte oder deren MEA bzw. Wohnfläche?", link, "hinweis")
+    for b in erg.get("hausgeld_offen", []) if ganze_immobilie else []:
+        punkt(f"Hausgeld „{b['text']}“ ({de_num(b['betrag'])} €): Der Eigentümer hat hier keine Wohnung mehr, der Betrag "
+              "wird keiner Wohnung zugerechnet.", url_for("immobilie", iid=immo["id"], reiter="buchungen", buchung=b["id"]))
     if ganze_immobilie:
         rl = ruecklage(immo["id"], jahr())
         if rl["vorhanden"] and rl["anfang"] is None:
@@ -268,7 +348,7 @@ def immobilie(iid):
                      "LEFT JOIN kostenart ka ON ka.id = b.kostenart_id WHERE b.immobilie_id = ? AND b.jahr = ? "
                      "ORDER BY b.datum IS NULL, b.datum DESC, b.id DESC", (iid, j))
     # Buchungen mit Belegdatum in diesem Jahr, die (meist versehentlich) in einem anderen Jahr stehen
-    fremde = rows("SELECT b.*, ka.name AS kostenart, (b.kostenart_id IS NULL OR ka.ruecklage = 1) AS rl_eintrag "
+    fremde = rows("SELECT b.*, ka.name AS kostenart, (b.hausgeld_eigentuemer_id IS NULL AND (b.kostenart_id IS NULL OR ka.ruecklage = 1)) AS rl_eintrag "
                   "FROM buchung b LEFT JOIN kostenart ka ON ka.id = b.kostenart_id "
                   "WHERE b.immobilie_id = ? AND b.jahr <> ? AND substr(b.datum, 1, 4) = ? ORDER BY b.datum, b.id",
                   (iid, j, str(j)))
@@ -276,6 +356,25 @@ def immobilie(iid):
     for b in buchungen:
         if b["kosten_id"]:
             belege[b["kosten_id"]] = belege.get(b["kosten_id"], 0) + 1
+    hg_opt = hausgeld_optionen(iid)
+    eig_namen = {e["id"]: e["name"] for e in hg_opt}
+    wohnung_bez = {w["id"]: w["bezeichnung"] for w in rows("SELECT id, bezeichnung FROM wohnung WHERE immobilie_id = ?", (iid,))}
+    for b in buchungen:
+        b["ziel"] = ziel_wert(b)
+        if b["hausgeld_eigentuemer_id"]:
+            b["wohnungen"] = hausgeld_wohnungen(iid, b)
+            name = eig_namen.get(b["hausgeld_eigentuemer_id"]) or person_name(
+                one("SELECT * FROM benutzer WHERE id = ?", (b["hausgeld_eigentuemer_id"],)) or {})
+            b["ziel_text"] = f"Hausgeld {name}"
+            b["ziel_zusatz"] = ", ".join(wohnung_bez.get(w, "?") for w in b["wohnungen"]) or "keine Wohnung"
+        else:
+            b["wohnungen"], b["ziel_zusatz"] = [], ""
+            b["ziel_text"] = b["kostenart"] if b["kostenart_id"] else "Erhaltungsrücklage"
+    if not ist_admin():  # Eigentümer sehen nur das Hausgeld ihrer eigenen Wohnungen
+        buchungen = [b for b in buchungen if not b["hausgeld_eigentuemer_id"] or set(b["wohnungen"]) & eigene]
+        hg_opt = [e for e in hg_opt if e["id"] == g.user["id"]]
+    filter_ = {k: request.args.get(k, "").strip() for k in ("q", "ziel", "art", "monat", "wohnung", "eigentuemer", "ohne")}
+    alle_buchungen, buchungen = buchungen, buchungen_filtern(buchungen, filter_)
     vorlage = dict(session.get("buchung_vorlage") or {})
     rl_vorlage = dict(session.get("ruecklage_vorlage") or {})
     for v in (vorlage, rl_vorlage):
@@ -296,10 +395,14 @@ def immobilie(iid):
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
                            reiter=reiter, aktiv=reiter_waehlen(reiter),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
-                           pruefung=pruefung, buchungen=buchungen, belege=belege, vorlage=vorlage,
+                           pruefung=pruefung, buchungen=buchungen, alle_buchungen=alle_buchungen, filter_=filter_,
+                           hg_opt=hg_opt if immo["weg"] else [], belege=belege, vorlage=vorlage,
                            rl_vorlage=rl_vorlage, BEZAHLT=BEZAHLT, RL_ARTEN=RL_ARTEN, fremde=fremde,
                            kt=konten(iid, j), kontostand_vorlage=session.get("kontostand_vorlage") or {},
-                           offen_bar=[b for b in buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
+                           dauer=dauerauftraege(iid, j), RHYTHMEN=RHYTHMEN,
+                           dauer_vorjahr=one("SELECT COUNT(*) AS n FROM dauerauftrag WHERE immobilie_id = ? AND jahr = ?",
+                                             (iid, j - 1))["n"],
+                           offen_bar=[b for b in alle_buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
                            rl=ruecklage(iid, j),
                            vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
@@ -455,7 +558,36 @@ def ruecklage_kostenart(gewuenscht=None):
     return ka["id"]
 
 
-def buchung_werte():
+def ziel_aufloesen(ziel, iid):
+    """„Kostenart / Ziel“ aus dem Formular: Kostenart-ID, „ruecklage“ oder Hausgeld („e<id>“ = von diesem Eigentümer für
+    alle seine Wohnungen der Immobilie, „w<id>“ = für diese Wohnung). Ergebnis: (kostenart_id, eigentümer, wohnung)."""
+    if not ziel:
+        raise ValueError("Bitte eine Kostenart, die Rücklage oder Hausgeld wählen.")
+    if ziel == "ruecklage":
+        return None, None, None
+    if ziel[0] == "w":
+        w = one("SELECT * FROM wohnung WHERE id = ? AND immobilie_id = ?", (int(ziel[1:]), iid))
+        if not w or not w["eigentuemer_id"]:
+            raise ValueError("Für diese Wohnung ist kein Eigentümer hinterlegt.")
+        return None, w["eigentuemer_id"], w["id"]
+    if ziel[0] == "e":
+        eig = int(ziel[1:])
+        if not one("SELECT 1 FROM wohnung WHERE immobilie_id = ? AND eigentuemer_id = ?", (iid, eig)):
+            raise ValueError("Dieser Eigentümer hat in dieser Immobilie keine Wohnung.")
+        return None, eig, None
+    return _kostenart_id({"kostenart_id": ziel}), None, None
+
+
+def ziel_wert(b):
+    """Gegenstück zu ziel_aufloesen(): der Formularwert für eine gespeicherte Buchung bzw. einen Dauerauftrag."""
+    if b.get("hausgeld_wohnung_id"):
+        return f"w{b['hausgeld_wohnung_id']}"
+    if b.get("hausgeld_eigentuemer_id"):
+        return f"e{b['hausgeld_eigentuemer_id']}"
+    return str(b["kostenart_id"]) if b.get("kostenart_id") else "ruecklage"
+
+
+def buchung_werte(iid):
     f = request.form
     art, ziel = f.get("art"), f.get("ziel", "")
     rl_art = f.get("rl_art")
@@ -475,9 +607,9 @@ def buchung_werte():
         raise ValueError("Bitte einen Betrag angeben.")
     if vals["bezahlt"] not in BEZAHLT:
         raise ValueError("Bitte angeben, wie bezahlt wurde.")
-    if not ziel:
-        raise ValueError("Bitte eine Kostenart oder die Erhaltungsrücklage wählen.")
-    vals["kostenart_id"] = None if ziel == "ruecklage" else _kostenart_id({"kostenart_id": ziel})
+    vals["kostenart_id"], vals["hausgeld_eigentuemer_id"], vals["hausgeld_wohnung_id"] = ziel_aufloesen(ziel, iid)
+    if vals["hausgeld_eigentuemer_id"]:
+        vals["art"] = "einnahme"  # Hausgeld ist immer eine Einnahme; Korrekturen mit negativem Betrag
     vals["erstattet"] = (f.get("erstattet") or None) if vals["bezahlt"] == "bar" and vals["art"] == "ausgabe" else None
     return vals
 
@@ -514,7 +646,7 @@ def _beleg_speichern(immo, j, vals):
 def buchung_neu(iid):
     immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
     j = _buchungsjahr(jahr())
-    vals = buchung_werte()
+    vals = buchung_werte(iid)
     if not vals["datum"]:
         raise ValueError("Bitte das Datum des Belegs angeben.")
     vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"]) if vals["kostenart_id"] else None
@@ -524,8 +656,7 @@ def buchung_neu(iid):
     if vals["kosten_id"]:
         kosten_aus_buchungen(vals["kosten_id"])
     # Für die nächste Zeile vorbelegen, damit mehrere Belege schnell hintereinander gehen
-    vorlage = {"datum": vals["datum"], "art": vals["art"], "bezahlt": vals["bezahlt"],
-               "ziel": str(vals["kostenart_id"] or "ruecklage")}
+    vorlage = {"datum": vals["datum"], "art": vals["art"], "bezahlt": vals["bezahlt"], "ziel": ziel_wert(vals)}
     if _buchung_reiter() == "ruecklage":
         session["ruecklage_vorlage"] = {**vorlage, "rl_art": request.form.get("rl_art")}
     else:
@@ -539,7 +670,7 @@ def buchung_neu(iid):
 def buchung_speichern(bid):
     b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
     immo = row("SELECT * FROM immobilie WHERE id = ?", (b["immobilie_id"],))
-    vals = buchung_werte()
+    vals = buchung_werte(immo["id"])
     vals["jahr"] = j = _buchungsjahr(b["jahr"])
     vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"]) if vals["kostenart_id"] else None
     dok = _beleg_speichern(immo, j, vals)
@@ -591,6 +722,194 @@ def buchung_loeschen(bid):
     return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter=_buchung_reiter()))
 
 
+# ---------- Daueraufträge ----------
+
+RHYTHMEN = {"monat": ("monatlich", 1), "quartal": ("vierteljährlich", 3), "halbjahr": ("halbjährlich", 6),
+            "jahr": ("jährlich", 12)}
+
+
+def plus_monate(d, n):
+    m = d.month - 1 + n
+    j, m = d.year + m // 12, m % 12 + 1
+    tage = [31, 29 if j % 4 == 0 and (j % 100 or j % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+    return date(j, m, min(d.day, tage))
+
+
+def faelligkeiten(da, j):
+    """Fälligkeiten eines Dauerauftrags im Jahr j: ab „von“ im Rhythmus, höchstens bis „bis“."""
+    von, bis = parse_date(da["von"]), parse_date(da["bis"]) if da["bis"] else None
+    schritt, erg, k = RHYTHMEN[da["rhythmus"]][1], [], 0
+    while True:
+        d = plus_monate(von, k * schritt)
+        if d.year > j or (bis and d > bis):
+            return erg
+        if d.year == j:
+            erg.append(d)
+        k += 1
+
+
+def dauerauftraege(iid, j):
+    """Daueraufträge des Jahres mit Rechenweg und dem, was davon schon gebucht ist."""
+    erg = rows("SELECT d.*, ka.name AS kostenart FROM dauerauftrag d LEFT JOIN kostenart ka ON ka.id = d.kostenart_id "
+               "WHERE d.immobilie_id = ? AND d.jahr = ? ORDER BY d.text COLLATE NATUERLICH, d.von", (iid, j))
+    for da in erg:
+        da["ziel"] = ziel_wert(da)
+        if da["hausgeld_eigentuemer_id"]:
+            name = person_name(one("SELECT * FROM benutzer WHERE id = ?", (da["hausgeld_eigentuemer_id"],)) or {})
+            wids = hausgeld_wohnungen(iid, da)
+            fuer = ", ".join(row("SELECT bezeichnung FROM wohnung WHERE id = ?", (w,))["bezeichnung"] for w in wids)
+            da["ziel_text"] = f"Hausgeld {name} · {fuer or 'keine Wohnung'}"
+        else:
+            da["ziel_text"] = da["kostenart"] or "→ Rücklage"
+        da["termine"] = faelligkeiten(da, j)
+        da["soll"] = rund(len(da["termine"]) * da["betrag"])
+        da["rechenweg"] = f"{len(da['termine'])} × {de_num(da['betrag'])} € = {de_num(da['soll'])} €"
+        da["gebucht"] = rows("SELECT * FROM buchung WHERE dauerauftrag_id = ? AND jahr = ? ORDER BY datum", (da["id"], j))
+        da["gebucht_summe"] = rund(sum(b["betrag"] for b in da["gebucht"]))
+        if da["einzeln"]:
+            daten = {b["datum"] for b in da["gebucht"]}
+            da["offen"] = [d for d in da["termine"] if d.isoformat() not in daten]
+            da["buchung"] = None
+        else:
+            da["offen"] = [] if da["gebucht"] else da["termine"]
+            da["buchung"] = da["gebucht"][0] if da["gebucht"] else None
+    return erg
+
+
+def _dauerauftrag_werte(iid, j):
+    f = request.form
+    vals = {"text": f.get("text", "").strip(), "art": f.get("art"), "betrag": parse_num(f.get("betrag")),
+            "rhythmus": f.get("rhythmus"), "einzeln": 1 if f.get("einzeln") else 0,
+            "von": f.get("von") or f"{j}-01-01", "bis": f.get("bis") or f"{j}-12-31", "notiz": f.get("notiz", "").strip()}
+    if not vals["text"]:
+        raise ValueError("Bitte eine Beschreibung angeben, z. B. „Hausmeister“.")
+    if vals["art"] not in ("ausgabe", "einnahme") or vals["rhythmus"] not in RHYTHMEN:
+        raise ValueError("Bitte Art und Rhythmus wählen.")
+    if not vals["betrag"]:
+        raise ValueError("Bitte einen Betrag angeben.")
+    if not (vals["von"].startswith(str(j)) and vals["bis"].startswith(str(j))):
+        raise ValueError(f"Ein Dauerauftrag gilt nur für ein Jahr: „ab“ und „bis“ müssen in {j} liegen. "
+                         "Fürs nächste Jahr übernimmst du ihn dort aus dem Vorjahr.")
+    if vals["bis"] < vals["von"]:
+        raise ValueError("„bis“ liegt vor „ab“.")
+    vals["kostenart_id"], vals["hausgeld_eigentuemer_id"], vals["hausgeld_wohnung_id"] = \
+        ziel_aufloesen(f.get("ziel", ""), iid)
+    if vals["hausgeld_eigentuemer_id"]:
+        vals["art"] = "einnahme"
+    return vals
+
+
+def _zu_dauerauftraegen(iid):
+    return redirect(url_for("immobilie", iid=iid, reiter="buchungen") + "#dauerauftraege")
+
+
+@app.post("/immobilien/<int:iid>/dauerauftraege")
+@admin_noetig
+def dauerauftrag_neu(iid):
+    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
+    j = jahr()
+    vals = _dauerauftrag_werte(iid, j)
+    exe(f"INSERT INTO dauerauftrag (immobilie_id, jahr, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
+        [iid, j, *vals.values()])
+    return _zu_dauerauftraegen(iid)
+
+
+@app.post("/dauerauftraege/<int:did>")
+@admin_noetig
+def dauerauftrag_speichern(did):
+    da = row("SELECT * FROM dauerauftrag WHERE id = ?", (did,))
+    vals = _dauerauftrag_werte(da["immobilie_id"], da["jahr"])
+    exe(f"UPDATE dauerauftrag SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), did])
+    return _zu_dauerauftraegen(da["immobilie_id"])
+
+
+@app.post("/dauerauftraege/<int:did>/loeschen")
+@admin_noetig
+def dauerauftrag_loeschen(did):
+    da = row("SELECT * FROM dauerauftrag WHERE id = ?", (did,))
+    exe("DELETE FROM dauerauftrag WHERE id = ?", (did,))
+    flash(f"Dauerauftrag „{da['text']}“ gelöscht. Bereits gebuchte Buchungen bleiben erhalten.")
+    return _zu_dauerauftraegen(da["immobilie_id"])
+
+
+def _dauerauftrag_buchung(immo, j, da, datum, text, betrag, notiz, buchung=None):
+    """Buchung aus einem Dauerauftrag anlegen bzw. (buchung) überschreiben; Gebäudekosten werden nachgezogen."""
+    vals = {"datum": datum.isoformat(), "text": text, "art": da["art"], "betrag": betrag, "bezahlt": "konto",
+            "notiz": notiz, "kostenart_id": da["kostenart_id"], "hausgeld_eigentuemer_id": da["hausgeld_eigentuemer_id"],
+            "hausgeld_wohnung_id": da["hausgeld_wohnung_id"],
+            "kosten_id": kostenposition(immo, j, da["kostenart_id"]) if da["kostenart_id"] else None}
+    if buchung:
+        exe(f"UPDATE buchung SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), buchung["id"]])
+        if buchung["kosten_id"] and buchung["kosten_id"] != vals["kosten_id"]:
+            kosten_aus_buchungen(buchung["kosten_id"])
+    else:
+        exe(f"INSERT INTO buchung (immobilie_id, jahr, dauerauftrag_id, {', '.join(vals)}) "
+            f"VALUES (?, ?, ?, {', '.join('?' * len(vals))})", [immo["id"], j, da["id"], *vals.values()])
+    if vals["kosten_id"]:
+        kosten_aus_buchungen(vals["kosten_id"])
+
+
+def _dauerauftrag_buchen(immo, j, da):
+    """Offene Termine buchen: je Termin eine Buchung (einzeln) oder eine Jahresbuchung mit Rechenweg."""
+    if da["einzeln"]:
+        for d in da["offen"]:
+            _dauerauftrag_buchung(immo, j, da, d, f"{da['text']} {d:%m/%Y}", da["betrag"],
+                                  f"Dauerauftrag ({RHYTHMEN[da['rhythmus']][0]})")
+    else:
+        _dauerauftrag_buchung(immo, j, da, da["termine"][-1], f"{da['text']} {j}", da["soll"],
+                              f"{da['rechenweg']} ({RHYTHMEN[da['rhythmus']][0]}, Dauerauftrag)", da["buchung"])
+
+
+@app.post("/immobilien/<int:iid>/dauerauftraege/buchen")
+@admin_noetig
+def dauerauftraege_buchen(iid):
+    """Offene Termine aller Daueraufträge des Jahres buchen; vorhandene (evtl. von Hand geänderte) bleiben unberührt."""
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    j = jahr()
+    offen = [da for da in dauerauftraege(iid, j) if da["offen"]]
+    for da in offen:
+        _dauerauftrag_buchen(immo, j, da)
+    flash(f"{len(offen)} Dauerauftrag/-aufträge für {j} gebucht." if offen else f"Für {j} ist schon alles gebucht.")
+    return _zu_dauerauftraegen(iid)
+
+
+@app.post("/dauerauftraege/<int:did>/angleichen")
+@admin_noetig
+def dauerauftrag_angleichen(did):
+    """Jahresbuchung wieder auf den Rechenweg setzen (z. B. nach Änderung des Betrags)."""
+    da = row("SELECT * FROM dauerauftrag WHERE id = ?", (did,))
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (da["immobilie_id"],))
+    da = next(x for x in dauerauftraege(immo["id"], da["jahr"]) if x["id"] == did)
+    if da["termine"] and not da["einzeln"]:
+        _dauerauftrag_buchung(immo, da["jahr"], da, da["termine"][-1], f"{da['text']} {da['jahr']}", da["soll"],
+                              f"{da['rechenweg']} ({RHYTHMEN[da['rhythmus']][0]}, Dauerauftrag)", da["buchung"])
+    return _zu_dauerauftraegen(immo["id"])
+
+
+def _ins_jahr(datum, j):
+    """Datum ins Jahr j verschieben (29.02. wird in Nicht-Schaltjahren zum 28.02.)."""
+    d = parse_date(datum)
+    return plus_monate(d, (j - d.year) * 12).isoformat()
+
+
+@app.post("/immobilien/<int:iid>/dauerauftraege/vorjahr")
+@admin_noetig
+def dauerauftraege_vorjahr(iid):
+    """Daueraufträge des Vorjahres ins angezeigte Jahr kopieren – zum Prüfen und Anpassen an den neuen Wirtschaftsplan."""
+    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
+    j = jahr()
+    if one("SELECT 1 FROM dauerauftrag WHERE immobilie_id = ? AND jahr = ?", (iid, j)):
+        raise ValueError(f"Für {j} gibt es schon Daueraufträge.")
+    alte = rows("SELECT * FROM dauerauftrag WHERE immobilie_id = ? AND jahr = ?", (iid, j - 1))
+    for da in alte:
+        exe("INSERT INTO dauerauftrag (immobilie_id, jahr, text, art, kostenart_id, hausgeld_eigentuemer_id, "
+            "hausgeld_wohnung_id, betrag, rhythmus, einzeln, von, bis, notiz) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (iid, j, da["text"], da["art"], da["kostenart_id"], da["hausgeld_eigentuemer_id"], da["hausgeld_wohnung_id"],
+             da["betrag"], da["rhythmus"], da["einzeln"], _ins_jahr(da["von"], j), _ins_jahr(da["bis"], j), da["notiz"]))
+    flash(f"{len(alte)} Dauerauftrag/-aufträge aus {j - 1} übernommen. Bitte Beträge prüfen, dann buchen.")
+    return _zu_dauerauftraegen(iid)
+
+
 # ---------- Erhaltungsrücklage ----------
 
 def ruecklage(iid, j):
@@ -601,6 +920,7 @@ def ruecklage(iid, j):
                          "WHERE k.immobilie_id = ? AND k.jahr = ? AND k.wohnung_id IS NULL AND ka.ruecklage = 1",
                          (iid, jj))["s"]
         buchungen = rows("SELECT * FROM buchung WHERE immobilie_id = ? AND jahr = ? AND kostenart_id IS NULL "
+                         "AND hausgeld_eigentuemer_id IS NULL "
                          "ORDER BY datum IS NULL, datum, id", (iid, jj))
         return zufuehrung, buchungen
 
@@ -619,7 +939,8 @@ def ruecklage(iid, j):
     entnahmen = [b for b in buchungen if b["art"] == "ausgabe"]
     # Kontoblatt: alle Bewegungen des Jahres (Zuführungen sind Buchungen auf eine Rücklage-Kostenart) mit laufendem Stand
     eintraege = rows("SELECT b.*, ka.name AS kostenart FROM buchung b LEFT JOIN kostenart ka ON ka.id = b.kostenart_id "
-                     "WHERE b.immobilie_id = ? AND b.jahr = ? AND (b.kostenart_id IS NULL OR ka.ruecklage = 1)",
+                     "WHERE b.immobilie_id = ? AND b.jahr = ? AND b.hausgeld_eigentuemer_id IS NULL "
+                     "AND (b.kostenart_id IS NULL OR ka.ruecklage = 1)",
                      (iid, j))
     eintraege.sort(key=lambda b: (b["datum"] or f"{j}-12-31", b["id"]))
     stand = anfang or 0
@@ -942,9 +1263,11 @@ def vorauszahlungen_speichern(wid):
     wohnung_laden(wid, bearbeiten=True)
     j = jahr()
     mv_ids = {m["id"] for m in rows("SELECT id FROM mietverhaeltnis WHERE wohnung_id = ?", (wid,))}
+    w = row("SELECT * FROM wohnung WHERE id = ?", (wid,))
+    hausgeld_gebucht = w["immobilie_id"] and wid in hausgeld_aus_buchungen(w["immobilie_id"], j)[0]
     con = db.get_db()
     for k, v in request.form.items():
-        if not k.startswith("vz_"):
+        if not k.startswith("vz_") or (k == "vz_eigentuemer" and hausgeld_gebucht):
             continue
         mid = None if k == "vz_eigentuemer" else int(k[3:])
         if mid is not None and mid not in mv_ids:
@@ -963,7 +1286,8 @@ def vorauszahlungen_speichern(wid):
 def hausgeld_speichern(iid):
     """Hausgeld aller Mietobjekte einer WEG auf einmal (gleiche Daten wie „Eigentümer-Abrechnung“ beim Mietobjekt)."""
     j = jahr()
-    wohnungen = {w["id"] for w in rows("SELECT id FROM wohnung WHERE immobilie_id = ?", (iid,))}
+    aus_buchungen = hausgeld_aus_buchungen(iid, j)[0]
+    wohnungen = {w["id"] for w in rows("SELECT id FROM wohnung WHERE immobilie_id = ?", (iid,))} - set(aus_buchungen)
     con = db.get_db()
     for k, v in request.form.items():
         if not k.startswith("hg_") or int(k[3:]) not in wohnungen:

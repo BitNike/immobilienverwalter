@@ -266,3 +266,30 @@ table.ueber tr:last-child th, table.ueber tr:last-child td { border-bottom: none
 .jahr-spalte { width: 56px; }
 .verwalten { border-top: 1px solid var(--linie); padding-top: 18px; }
 .verwalten .knopfleiste form { display: inline-flex; }
+
+/* Info-Symbol mit kurzer Erklärung beim Darüberfahren, Antippen oder per Tab-Taste */
+.info { position: relative; display: inline-flex; vertical-align: middle; color: var(--leise); cursor: help; margin-left: 4px; }
+.info:hover, .info:focus { color: var(--primaer); outline: none; }
+.info::after { content: attr(data-tipp); position: absolute; z-index: 20; left: -10px; top: calc(100% + 8px);
+  width: max-content; max-width: 340px; padding: 9px 12px; border-radius: 3px; background: var(--text); color: #fff;
+  font: 13px/1.45 var(--schrift); font-weight: normal; text-transform: none; letter-spacing: normal; white-space: pre-line; text-align: left;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18); opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; }
+.info:hover::after, .info:focus::after { opacity: 1; visibility: visible; }
+th .info::after { left: auto; right: -10px; }
+th:first-child .info::after, th:nth-child(2) .info::after, th:nth-child(3) .info::after, th:nth-child(4) .info::after { left: -10px; right: auto; }
+table.dauer td.zeitraum-felder label { flex-direction: row; align-items: center; gap: 6px; font-size: 11.5px; }
+table.dauer td.zeitraum-felder label + label { margin-top: 4px; }
+table.dauer td.zeitraum-felder input { width: 124px; height: 32px !important; }
+table.dauer select[name=rhythmus] { width: 125px; }
+table.dauer input[name=text] { min-width: 120px; }
+table.dauer th:nth-child(2) { width: 1%; }
+table.dauer th:first-child { width: auto; }
+table.dauer td:nth-child(2) { min-width: 0; }
+table.dauer td.betrag-art select { display: block; width: 100px; height: 30px !important; margin: 0 0 4px auto; font-size: 12.5px; }
+table.dauer select[name=ziel] { width: 160px; }
+/* Filterzeile über den Buchungen */
+.filterzeile { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.filterzeile input[type=search] { width: 200px; }
+.filterzeile select { max-width: 190px; }
+.filterzeile label.haken { margin: 0; font-size: 13px; }
+label.haken.klein { margin: 4px 0 0; font-size: 12px; color: var(--leise); }

@@ -1,6 +1,40 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, reiter_leiste, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, zaehler_karte, ablage_bereich, saldo %}
+{% from "_ui.html" import icon, info, reiter_leiste, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, zaehler_karte, ablage_bereich, saldo %}
 {% block title %}{{ immo.name }}{% endblock %}
+
+{% macro ziel_auswahl(form, b, kostenarten) -%}
+<select name="ziel" form="{{ form }}" required>
+  <option value="">– wählen –</option>
+  <optgroup label="Rücklage (wird nicht umgelegt)">
+  <option value="ruecklage" {{ 'selected' if b.ziel == 'ruecklage' }}>→ Rücklage (Einnahme / Entnahme)</option>
+  </optgroup>
+  {% if hg_opt %}
+  <optgroup label="Hausgeld (Einnahme vom Eigentümer)">
+  {% for e in hg_opt %}
+    {% if e.wohnungen|length > 1 %}<option value="e{{ e.id }}" {{ 'selected' if b.ziel == 'e%d' % e.id }}>Hausgeld {{ e.name }} – alle ({{ e.wohnungen|map(attribute='bezeichnung')|join(', ') }})</option>{% endif %}
+    {% for w in e.wohnungen %}<option value="w{{ w.id }}" {{ 'selected' if b.ziel == 'w%d' % w.id }}>Hausgeld {{ e.name }} – {{ w.bezeichnung }}</option>{% endfor %}
+  {% endfor %}
+  </optgroup>
+  {% endif %}
+  <optgroup label="Kostenart (wird umgelegt)">
+  {% if b.ziel and b.ziel[0] not in 'rew' and b.ziel not in kostenarten|map(attribute='id')|map('string')|list %}<option value="{{ b.ziel }}" selected>{{ b.kostenart }}</option>{% endif %}
+  {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if k.id|string == b.ziel }}>{{ k.name }}{% if k.ruecklage %} (Zuführung){% elif not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
+  </optgroup></select>
+{%- endmacro %}
+
+{% macro dauer_felder(form, d, kostenarten) -%}
+<td><input name="text" form="{{ form }}" value="{{ d.text or '' }}" placeholder="z. B. Hausmeister" required>
+  <input name="notiz" class="kommentar" form="{{ form }}" value="{{ d.notiz or '' }}" placeholder="Kommentar (optional)"></td>
+<td>{{ ziel_auswahl(form, d, kostenarten) }}</td>
+<td class="zahl betrag-art"><select name="art" form="{{ form }}"><option value="ausgabe" {{ 'selected' if d.art != 'einnahme' }}>Ausgabe</option>
+  <option value="einnahme" {{ 'selected' if d.art == 'einnahme' }}>Einnahme</option></select>
+  <input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ d.betrag|num if d.betrag else '' }}" required></td>
+<td><select name="rhythmus" form="{{ form }}">{% for r, (t, _) in RHYTHMEN.items() %}<option value="{{ r }}" {{ 'selected' if d.rhythmus == r }}>{{ t }}</option>{% endfor %}</select>
+  <label class="haken klein" title="Je Termin eine eigene Buchung (z. B. monatliches Hausgeld) statt einer Jahresbuchung mit Rechenweg"><input type="checkbox" name="einzeln" form="{{ form }}" {{ 'checked' if d.einzeln }}> einzeln buchen</label></td>
+{% set dj = (d.jahr or jahr)|string %}
+<td class="zeitraum-felder"><label>ab<input type="date" name="von" form="{{ form }}" value="{{ d.von or '' }}" min="{{ dj }}-01-01" max="{{ dj }}-12-31" required></label>
+  <label>bis<input type="date" name="bis" form="{{ form }}" value="{{ d.bis or '' }}" min="{{ dj }}-01-01" max="{{ dj }}-12-31" required></label></td>
+{%- endmacro %}
 
 {% macro buchung_felder(form, b, kostenarten, BEZAHLT) -%}
 <td><input type="date" name="datum" form="{{ form }}" value="{{ b.datum or '' }}" {{ 'required' if form == 'bneu' }} {{ 'autofocus' if form == 'bneu' and request.args.get('neu') }}>
@@ -10,15 +44,7 @@
 <td><select name="art" form="{{ form }}">
   <option value="ausgabe" {{ 'selected' if b.art != 'einnahme' }}>Ausgabe</option>
   <option value="einnahme" {{ 'selected' if b.art == 'einnahme' }}>Einnahme</option></select></td>
-<td><select name="ziel" form="{{ form }}" required>
-  <option value="">– wählen –</option>
-  <optgroup label="Rücklage (wird nicht umgelegt)">
-  <option value="ruecklage" {{ 'selected' if b.ziel == 'ruecklage' }}>→ Rücklage (Einnahme / Entnahme)</option>
-  </optgroup>
-  <optgroup label="Kostenart (wird umgelegt)">
-  {% if b.ziel and b.ziel != 'ruecklage' and b.ziel not in kostenarten|map(attribute='id')|map('string')|list %}<option value="{{ b.ziel }}" selected>{{ b.kostenart }}</option>{% endif %}
-  {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if k.id|string == b.ziel }}>{{ k.name }}{% if k.ruecklage %} (Zuführung){% elif not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
-  </optgroup></select></td>
+<td>{{ ziel_auswahl(form, b, kostenarten) }}</td>
 <td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
 <td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
 
@@ -89,18 +115,42 @@
 <section class="block" id="buchungen">
   <h2>Belege und Buchungen {{ jahr }}</h2>
   {{ fremde_buchungen(fremde, jahr) }}
-  <p class="leise">Eine Zeile je Rechnung, Kassenbon oder Einnahme. Mit einer <strong>Kostenart</strong> zählt der Betrag zu den
-    Gebäudekosten und wird umgelegt, eine Einnahme mindert sie (z. B. eine Erstattung der Stadtwerke). Mit
-    <strong>Erhaltungsrücklage</strong> wird nichts umgelegt: Einnahmen (z. B. PV-Anlage) fließen in die Rücklage, Ausgaben werden ihr
-    entnommen. Kosten nur einer Wohnung (z. B. Heizkostenabrechnung) trägst du beim Mietobjekt ein.</p>
+  <p class="leise">Erfasse hier nur, was in die Abrechnung gehört – eine Zeile je Rechnung, Kassenbon oder Einnahme.
+    {{ info("Der Immobilienverwalter ist keine Buchhaltung. Alle Bewegungen stehen auf den Kontoauszügen; hier gehört nur hin, was verteilt oder abgerechnet wird.\n\nGehört hinein: Versicherungen, Grundbesitzabgaben, Hausmeister, Wasser/Strom laut Jahresrechnung (nicht die Abschläge), Schornsteinfeger, Belege für Haus und Garten, Zuführung zur Rücklage.\n\nGehört nicht hinein: Umbuchungen zwischen eigenen Konten, Hausgeld-Eingänge der Eigentümer (→ Übersicht, Hausgeld), Nachzahlungen/Erstattungen der Vorjahresabrechnung.") }}</p>
   {% if ist_admin %}
   <form id="bneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data"
     onsubmit="return jahrPruefen(this, {{ jahr }})"><input type="hidden" name="buchungsjahr"></form>
   {% endif %}
+  {% if alle_buchungen|length > 5 or filter_.values()|select|list %}
+  <form method="get" class="filterzeile" action="{{ url_for('immobilie', iid=immo.id) }}">
+    <input type="hidden" name="reiter" value="buchungen">
+    <input type="search" name="q" value="{{ filter_.q }}" placeholder="Suchen: Text oder Betrag" aria-label="Suchen">
+    <select name="ziel" aria-label="Kostenart / Ziel"><option value="">alle Kostenarten</option>
+      {% if hg_opt %}<option value="hausgeld" {{ 'selected' if filter_.ziel == 'hausgeld' }}>Hausgeld</option>{% endif %}
+      <option value="ruecklage" {{ 'selected' if filter_.ziel == 'ruecklage' }}>→ Rücklage</option>
+      {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if filter_.ziel == k.id|string }}>{{ k.name }}</option>{% endfor %}</select>
+    <select name="art" aria-label="Art"><option value="">Ausgaben und Einnahmen</option>
+      <option value="ausgabe" {{ 'selected' if filter_.art == 'ausgabe' }}>nur Ausgaben</option>
+      <option value="einnahme" {{ 'selected' if filter_.art == 'einnahme' }}>nur Einnahmen</option></select>
+    <select name="monat" aria-label="Monat"><option value="">alle Monate</option>
+      {% for m in ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'] %}
+      <option value="{{ loop.index }}" {{ 'selected' if filter_.monat == loop.index|string }}>{{ m }}</option>{% endfor %}</select>
+    {% if hg_opt %}
+    <select name="eigentuemer" aria-label="Eigentümer"><option value="">alle Eigentümer</option>
+      {% for e in hg_opt %}<option value="{{ e.id }}" {{ 'selected' if filter_.eigentuemer == e.id|string }}>{{ e.name }}</option>{% endfor %}</select>
+    <select name="wohnung" aria-label="Mietobjekt"><option value="">alle Mietobjekte</option>
+      {% for e in hg_opt %}{% for w in e.wohnungen %}<option value="{{ w.id }}" {{ 'selected' if filter_.wohnung == w.id|string }}>{{ w.bezeichnung }}</option>{% endfor %}{% endfor %}</select>
+    {% endif %}
+    <label class="haken"><input type="checkbox" name="ohne" value="1" {{ 'checked' if filter_.ohne }}> nur ohne Beleg</label>
+    <button class="btn hell">Filtern</button>
+    {% if filter_.values()|select|list %}<a href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}">zurücksetzen</a>{% endif %}
+    {{ info("Eigentümer und Mietobjekt filtern die Hausgeld-Buchungen. Ein Betrag im Suchfeld (z. B. 450 oder 450,00) findet Buchungen mit genau diesem Betrag.") }}
+  </form>
+  {% endif %}
   <div class="tabelle">
   <table class="buchungen">
-    <thead><tr><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Kostenart / Ziel</th><th class="zahl">Betrag</th>
-      <th>Bezahlt</th><th class="aktionen">Beleg</th></tr></thead>
+    <thead><tr><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Kostenart / Ziel {{ info("Mit einer Kostenart zählt der Betrag zu den Gebäudekosten und wird nach deren Schlüssel auf die Wohnungen verteilt; eine Einnahme mindert sie (z. B. Erstattung der Stadtwerke).\n\n„→ Rücklage“ wird nicht umgelegt: Einnahmen (PV-Anlage, Zinsen) fließen hinein, Ausgaben werden entnommen.\n\nKosten nur einer Wohnung (z. B. Heizkostenabrechnung) trägst du beim Mietobjekt ein.") }}</th><th class="zahl">Betrag</th>
+      <th>Bezahlt {{ info("Konto: von einem Konto der Immobilie bezahlt.\nBar: privat ausgelegt – bleibt als „offen“ markiert, bis du die Erstattung einträgst.") }}</th><th class="aktionen">Beleg</th></tr></thead>
     <tbody>
     {% if ist_admin and not bb %}
     <tr class="in-bearbeitung">
@@ -111,7 +161,7 @@
     {% for b in buchungen %}
     {% if ist_admin and bb == b.id %}
     <tr class="in-bearbeitung">
-      {{ buchung_felder('b%d' % b.id, dict(b, ziel=(b.kostenart_id|string if b.kostenart_id else 'ruecklage')), kostenarten, BEZAHLT) }}
+      {{ buchung_felder('b%d' % b.id, b, kostenarten, BEZAHLT) }}
       <td class="aktionen">{{ beleg_knopf('b%d' % b.id, b) }}
         <form id="b{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline"
           onsubmit="return jahrPruefen(this, {{ b.jahr }})"><input type="hidden" name="buchungsjahr">
@@ -126,7 +176,7 @@
           <button class="link-knopf" title="Buchung ins Jahr {{ b.datum[:4] }} verschieben">→ {{ b.datum[:4] }}</button></form>{% endif %}{% endif %}</td>
       <td>{{ b.text }}{% if b.notiz %}<br><small class="leise notiz">{{ b.notiz }}</small>{% endif %}</td>
       <td>{{ 'Einnahme' if b.art == 'einnahme' else 'Ausgabe' }}</td>
-      <td>{{ b.kostenart if b.kostenart_id else 'Erhaltungsrücklage' }}</td>
+      <td>{{ b.ziel_text }}{% if b.ziel_zusatz %}<br><small class="leise">{{ b.ziel_zusatz }}</small>{% endif %}</td>
       <td class="zahl {{ 'gutschrift' if b.art == 'einnahme' }}">{{ '+ ' if b.art == 'einnahme' }}{{ b.betrag|eur }}</td>
       <td>{{ BEZAHLT[b.bezahlt] }}
         {% if b.art == 'ausgabe' and b.bezahlt == 'bar' %}<br>
@@ -136,7 +186,7 @@
             <button class="link-knopf" title="Heute von der WEG erstattet">erstattet</button></form>{% endif %}
         {% endif %}{% endif %}</td>
       <td class="aktionen">{% if b.dokument_id %}{% if ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('klammer', 16) }}</a>{% else %}<span class="leise" title="Beleg vorhanden">{{ icon('klammer', 16) }}</span>{% endif %}
-        {% else %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>{% endif %}
+        {% elif not b.hausgeld_eigentuemer_id %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>{% endif %}
         {% if ist_admin %}
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', buchung=b.id) }}" title="Bearbeiten">{{ icon('edit', 16) }}</a>
         {{ loeschen(url_for('buchung_loeschen', bid=b.id), 'Buchung „%s“ löschen? Ein angehängter Beleg bleibt unter Dokumente erhalten.' % b.text) }}
@@ -145,13 +195,14 @@
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="7" class="leise">Für {{ jahr }} sind noch keine Buchungen erfasst.</td></tr>
+    <tr><td colspan="7" class="leise">{{ 'Keine Buchung passt zum Filter.' if alle_buchungen else 'Für %d sind noch keine Buchungen erfasst.' % jahr }}</td></tr>
     {% endfor %}
     </tbody>
     {% if buchungen %}
     {% set ausgaben = buchungen|selectattr('art', 'equalto', 'ausgabe')|sum(attribute='betrag') %}
     {% set einnahmen = buchungen|selectattr('art', 'equalto', 'einnahme')|sum(attribute='betrag') %}
     <tfoot>
+      {% if buchungen|length != alle_buchungen|length %}<tr class="unter"><td colspan="7" class="leise">Gefiltert: {{ buchungen|length }} von {{ alle_buchungen|length }} Buchungen – die Summen gelten für die gefilterten.</td></tr>{% endif %}
       <tr><th colspan="4">Summe Ausgaben <small class="leise">({{ buchungen|selectattr('art', 'equalto', 'ausgabe')|list|length }})</small></th>
         <th class="zahl">{{ ausgaben|eur }}</th><th colspan="2"></th></tr>
       {% if einnahmen %}
@@ -163,14 +214,73 @@
     {% endif %}
   </table>
   </div>
-  {% set ohne_beleg = buchungen|rejectattr('dokument_id')|list %}
-  {% if ohne_beleg and buchungen %}
-  <p class="warnung">{{ ohne_beleg|length }} von {{ buchungen|length }} Buchung{{ 'en' if buchungen|length != 1 }} ohne Beleg.
+  {% set mit_beleg = buchungen|rejectattr('hausgeld_eigentuemer_id')|list %}
+  {% set ohne_beleg = mit_beleg|rejectattr('dokument_id')|list %}
+  {% if ohne_beleg %}
+  <p class="warnung">{{ ohne_beleg|length }} von {{ mit_beleg|length }} Buchung{{ 'en' if mit_beleg|length != 1 }} ohne Beleg.
     {% if ist_admin %}<span class="leise">Nachträglich über den Stift anhängen.</span>{% endif %}</p>
   {% endif %}
   {% if offen_bar %}
   <p class="warnung">Bar ausgelegt und noch nicht {{ 'von der WEG ' if immo.weg }}erstattet: {{ offen_bar|length }} Beleg{{ 'e' if offen_bar|length != 1 }},
     zusammen {{ offen_bar|sum(attribute='betrag')|eur }}.</p>
+  {% endif %}
+
+  {% set dbb = request.args.get('da')|int %}
+  <h3 id="dauerauftraege">Daueraufträge {{ info("Für Zahlungen, die regelmäßig gleich anfallen (z. B. Hausmeister monatlich, Zuführung zur Rücklage). Die App rechnet daraus je Jahr eine Buchung mit Rechenweg, z. B. „12 × 170,00 € = 2.040,00 €“. Du vergleichst nur noch die Summe mit dem Kontoauszug.\n\nEin Dauerauftrag gilt immer nur für ein Jahr (z. B. laut Wirtschaftsplan); im neuen Jahr übernimmst du ihn aus dem Vorjahr und prüfst die Beträge. Ändert sich der Betrag im Jahr, beende den alten („bis“) und lege einen neuen an.\n\n„einzeln buchen“: je Termin eine eigene Buchung, z. B. für das monatliche Hausgeld. Alle Buchungen lassen sich wie jede andere bearbeiten.") }}</h3>
+  {% if dauer or ist_admin %}
+  {% if ist_admin %}<form id="dneu" method="post" action="{{ url_for('dauerauftrag_neu', iid=immo.id) }}"></form>{% endif %}
+  <div class="tabelle">
+  <table class="buchungen dauer">
+    <thead><tr><th>Beschreibung</th><th>Kostenart / Ziel</th><th class="zahl">Betrag</th><th>Rhythmus</th><th>gültig</th>
+      <th class="zahl">{{ jahr }}</th><th class="aktionen"></th></tr></thead>
+    <tbody>
+    {% for da in dauer %}
+    {% if ist_admin and dbb == da.id %}
+    <tr class="in-bearbeitung">{{ dauer_felder('d%d' % da.id, da, kostenarten) }}
+      <td></td>
+      <td class="aktionen"><form id="d{{ da.id }}" method="post" action="{{ url_for('dauerauftrag_speichern', did=da.id) }}" class="inline">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}#dauerauftraege" title="Abbrechen">{{ icon('x', 16) }}</a></td>
+    </tr>
+    {% else %}
+    <tr class="{{ 'leise' if not da.termine }}">
+      <td>{{ da.text }}{% if da.notiz %}<br><small class="leise notiz">{{ da.notiz }}</small>{% endif %}</td>
+      <td>{{ da.ziel_text }}</td>
+      <td class="zahl {{ 'gutschrift' if da.art == 'einnahme' }}">{{ '+ ' if da.art == 'einnahme' }}{{ da.betrag|eur }}{% if da.art == 'einnahme' %}<br><small>Einnahme</small>{% endif %}</td>
+      <td>{{ RHYTHMEN[da.rhythmus][0] }}{% if da.einzeln %}<br><small class="leise">einzeln gebucht</small>{% endif %}</td>
+      <td>{{ da.von|datum(True) }}<br>bis {{ da.bis|datum(True) }}</td>
+      <td class="zahl">{% if da.termine %}{{ da.termine|length }} × {{ da.betrag|eur }}<br><strong>= {{ da.soll|eur }}</strong><br>
+        {% if da.einzeln and da.gebucht and da.offen %}<small class="warnung">{{ da.gebucht|length }} von {{ da.termine|length }} gebucht</small>
+        {% elif da.offen %}<small class="warnung">noch nicht gebucht</small>
+        {% elif (da.gebucht_summe - da.soll)|abs < 0.005 %}<small class="gutschrift">gebucht ✓</small>
+        {% else %}<small class="warnung" title="Gebuchte Beträge wurden von Hand geändert oder der Dauerauftrag danach angepasst">gebucht {{ da.gebucht_summe|eur }}</small>
+          {% if ist_admin and not da.einzeln %}<form method="post" action="{{ url_for('dauerauftrag_angleichen', did=da.id) }}" class="inline">
+            <button class="link-knopf" title="Jahresbuchung auf den Rechenweg setzen">angleichen</button></form>{% endif %}{% endif %}
+        {% else %}<small>in {{ jahr }} nicht fällig</small>{% endif %}</td>
+      <td class="aktionen">{% if ist_admin %}
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', da=da.id) }}#dauerauftraege" title="Bearbeiten">{{ icon('edit', 16) }}</a>
+        {{ loeschen(url_for('dauerauftrag_loeschen', did=da.id), 'Dauerauftrag „%s“ löschen? Bereits gebuchte Buchungen bleiben erhalten.' % da.text) }}{% endif %}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    {% if ist_admin and not dbb %}
+    <tr class="in-bearbeitung">{{ dauer_felder('dneu', {'art': 'ausgabe', 'rhythmus': 'monat', 'von': '%d-01-01' % jahr, 'bis': '%d-12-31' % jahr}, kostenarten) }}
+      <td></td>
+      <td class="aktionen"><button class="btn-icon" form="dneu" title="Dauerauftrag anlegen">{{ icon('plus', 16) }}</button></td>
+    </tr>
+    {% endif %}
+    </tbody>
+  </table>
+  </div>
+  {% set offen_da = dauer|selectattr('offen')|list %}
+  {% if ist_admin and not dauer and dauer_vorjahr %}
+  <form method="post" action="{{ url_for('dauerauftraege_vorjahr', iid=immo.id) }}">
+    <button class="btn hell">{{ icon('list') }}<span>{{ dauer_vorjahr }} Dauerauftrag/-aufträge aus {{ jahr - 1 }} übernehmen</span></button></form>
+  {% endif %}
+  {% if ist_admin and offen_da %}
+  <form method="post" action="{{ url_for('dauerauftraege_buchen', iid=immo.id) }}">
+    <button class="btn">{{ icon('list') }}<span>{{ offen_da|length }} Dauerauftrag{{ '/-aufträge' if offen_da|length != 1 }} für {{ jahr }} buchen</span></button></form>
+  {% endif %}
   {% endif %}
 </section>
 {% endif %}
@@ -178,8 +288,8 @@
 {% if aktiv == 'uebersicht' %}
 <section class="block" id="kosten">
   <h2>Gebäudekosten {{ jahr }}</h2>
-  <p class="leise">Summe der <a href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}">Buchungen</a> je Kostenart. Sie wird nach dem Umlageschlüssel auf die Mietobjekte verteilt; den Schlüssel
-    änderst du über den Stift.</p>
+  <p class="leise">Summe der <a href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}">Buchungen</a> je Kostenart.
+    {{ info("Jede Kostenart wird nach ihrem Umlageschlüssel (MEA, Wohnfläche, Einheiten oder Wasserzähler) auf die Mietobjekte verteilt. Den Schlüssel änderst du über den Stift, den Betrag über die Buchungen.") }}</p>
   {% if erg.gebaeude %}
   <div class="tabelle">
   <table>
@@ -236,7 +346,7 @@
 {% if aktiv == 'ruecklage' %}
 {% set rbb = request.args.get('buchung')|int %}
 <section class="block" id="ruecklage">
-  <h2>Rücklage {{ jahr }}</h2>
+  <h2>Rücklage {{ jahr }} {{ info("Zuführung: regelmäßige Einzahlung (z. B. Hausgeld-Anteil oder Bausparrate). Läuft über die Kostenart mit Haken „Rücklage“ und erscheint deshalb auch in den Gebäudekosten und der Eigentümer-Abrechnung.\n\nEinnahme (z. B. PV-Vergütung, Zinsen) und Entnahme (z. B. Reparatur aus der Rücklage) werden nicht umgelegt.\n\nUmbuchungen zwischen eigenen Konten trägst du nicht ein. Den Anfangsbestand brauchst du nur im ersten Jahr, danach wird fortgeschrieben.") }}</h2>
   {{ fremde_buchungen(fremde|selectattr('rl_eintrag')|list, jahr) }}
   <div class="kennzahlen">
     <div><span>Anfangsbestand 01.01.</span><strong>{{ rl.anfang|eur if rl.anfang is not none else '–' }}</strong>
@@ -324,14 +434,10 @@
     <tfoot><tr><th colspan="4">Endbestand 31.12.{{ jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th><th></th></tr></tfoot>
   </table>
   </div>
-  <p class="leise"><small><strong>Zuführung</strong>: regelmäßige Einzahlung (z. B. Hausgeld-Anteil oder Bausparrate). Sie läuft über die
-    Kostenart mit Haken „Rücklage“ und erscheint deshalb auch in den Gebäudekosten und der Eigentümer-Abrechnung.
-    <strong>Einnahme</strong> (z. B. PV-Vergütung, Zinsen) und <strong>Entnahme</strong> (z. B. Reparatur aus der Rücklage) werden nicht umgelegt.
-    Den Anfangsbestand brauchst du nur im ersten Jahr; danach wird der Endbestand des Vorjahres übernommen.</small></p>
 
-  <h3 id="konten">Konten</h3>
-  <p class="leise"><small>Kontostände laut Kontoauszug, meist einmal im Jahr zum 31.12. Das Jahr ergibt sich aus dem Datum;
-    der Stand zu Jahresbeginn ist der letzte Stand des Vorjahres.</small></p>
+
+  <h3 id="konten">Konten {{ info("Kontostände laut Kontoauszug, am einfachsten einmal im Jahr zum 31.12. Einzelne Bewegungen stehen auf den Kontoauszügen und gehören nicht hierher.\n\nDas Jahr ergibt sich aus dem Datum; der Stand zu Jahresbeginn ist der letzte Stand des Vorjahres. Konten mit Haken „Rücklage“ werden mit dem Rücklagenstand abgeglichen.") }}</h3>
+
   {% set kbb = request.args.get('konto')|int %}{% set sbb = request.args.get('stand')|int %}
   {% if kt.liste %}
   <div class="tabelle">
@@ -444,9 +550,8 @@
 {% if aktiv == 'uebersicht' %}
 {% if ist_admin and immo.weg and verteilung %}
 <section class="block" id="hausgeld">
-  <h2>Hausgeld der Eigentümer {{ jahr }}</h2>
-  <p class="leise">Eigentümer-Abrechnungen gegenüber der WEG: Kosten der Wohnung gegen das gezahlte Hausgeld. Trag die Zahlungen
-    vom WEG-Konto hier für alle Wohnungen ein; es sind dieselben Werte wie in der Zeile „Eigentümer-Abrechnung“ beim Mietobjekt.</p>
+  <h2>Hausgeld der Eigentümer {{ jahr }} {{ info("Gezahltes Hausgeld je Wohnung. Erfasst du die Überweisungen der Eigentümer als Buchungen (Kostenart / Ziel „Hausgeld …“, gern per Dauerauftrag „einzeln buchen“), wird die Summe hier automatisch übernommen. Zahlt ein Eigentümer für mehrere Wohnungen zusammen, wird der Betrag gleichmäßig verteilt. Ohne solche Buchungen trägst du die Jahressumme von Hand ein.") }}</h2>
+  <p class="leise">Kosten jeder Wohnung gegen das gezahlte Hausgeld – die Grundlage der Eigentümer-Abrechnung.</p>
   <form method="post" action="{{ url_for('hausgeld_speichern', iid=immo.id) }}" id="hg"></form>
   <div class="tabelle">
   <table class="abrechnung">
@@ -458,8 +563,10 @@
       <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a></td>
       <td>{{ person_name(r.eigentuemer) if r.eigentuemer else '–' }}</td>
       <td class="zahl">{{ r.summe|eur }}</td>
-      <td class="zahl"><input class="betrag" form="hg" name="hg_{{ w.id }}" inputmode="decimal" placeholder="Hausgeld"
-          value="{{ r.vorauszahlung|num if (w.id, None) in erg.vz_gespeichert else '' }}"></td>
+      <td class="zahl">{% set hgn = erg.hausgeld_buchungen.get(w.id) %}{% if hgn %}{{ r.vorauszahlung|eur }}<br>
+          <a class="leise" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', ziel='hausgeld', wohnung=w.id) }}"><small>aus {{ hgn }} Buchung{{ 'en' if hgn != 1 }}</small></a>
+        {% else %}<input class="betrag" form="hg" name="hg_{{ w.id }}" inputmode="decimal" placeholder="Hausgeld"
+          value="{{ r.vorauszahlung|num if (w.id, None) in erg.vz_gespeichert else '' }}">{% endif %}</td>
       <td class="zahl">{% if (w.id, None) in erg.vz_gespeichert %}{{ saldo(r.saldo) }}{% else %}<span class="leise">noch offen</span>{% endif %}</td>
       <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}" title="Abrechnung des Eigentümers gegenüber der WEG">{{ icon('download', 16) }}<span>Eigentümer</span></a></td>
     </tr>

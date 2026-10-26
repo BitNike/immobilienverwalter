@@ -253,6 +253,29 @@ MIGRATIONEN = [
         notiz TEXT NOT NULL DEFAULT ''
     );
     """,
+    # 15: Daueraufträge, jeweils für genau ein Jahr (je Jahr eine Buchung mit Rechenweg oder Einzelbuchungen je Termin);
+    #     Hausgeld als Buchung: Einnahme von einem Eigentümer, für eine Wohnung oder gleichmäßig für alle seine Wohnungen
+    """
+    CREATE TABLE dauerauftrag (
+        id INTEGER PRIMARY KEY,
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        jahr INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        art TEXT NOT NULL DEFAULT 'ausgabe',
+        kostenart_id INTEGER REFERENCES kostenart(id),
+        hausgeld_eigentuemer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL,
+        hausgeld_wohnung_id INTEGER REFERENCES wohnung(id) ON DELETE SET NULL,
+        betrag REAL NOT NULL,
+        rhythmus TEXT NOT NULL DEFAULT 'monat',
+        einzeln INTEGER NOT NULL DEFAULT 0,
+        von TEXT NOT NULL,
+        bis TEXT NOT NULL,
+        notiz TEXT NOT NULL DEFAULT ''
+    );
+    ALTER TABLE buchung ADD COLUMN dauerauftrag_id INTEGER REFERENCES dauerauftrag(id) ON DELETE SET NULL;
+    ALTER TABLE buchung ADD COLUMN hausgeld_eigentuemer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL;
+    ALTER TABLE buchung ADD COLUMN hausgeld_wohnung_id INTEGER REFERENCES wohnung(id) ON DELETE SET NULL;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

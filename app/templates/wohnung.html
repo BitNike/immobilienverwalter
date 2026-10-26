@@ -74,7 +74,8 @@
       <th>Eigentümer-Abrechnung (WEG)<br><small class="leise">gesamte Wohnung gegenüber der WEG</small></th>
       <td>{{ erg.monate|monate }} Monate</td><td></td>
       <th class="zahl">{{ r.summe|eur }}</th>
-      <td class="zahl">{% if darf %}<input class="betrag" form="vz" name="vz_eigentuemer" inputmode="decimal"
+      <td class="zahl">{% if erg.hausgeld_buchungen.get(w.id) %}{{ r.vorauszahlung|eur }}<br><small class="leise">aus {{ erg.hausgeld_buchungen[w.id] }} Buchung{{ 'en' if erg.hausgeld_buchungen[w.id] != 1 }}</small>
+          {% elif darf %}<input class="betrag" form="vz" name="vz_eigentuemer" inputmode="decimal"
           value="{{ vz_gespeichert[None]|num if None in vz_gespeichert else '' }}" placeholder="Hausgeld" title="An die WEG gezahltes Hausgeld">{% else %}{{ r.vorauszahlung|eur }}{% endif %}</td>
       <td class="zahl">{{ saldo(r.saldo) }}</td>
       <td class="aktionen"><a class="btn klein" href="{{ url_for('export', wid=w.id, partei='eigentuemer') }}" title="Abrechnung des Eigentümers gegenüber der WEG">{{ icon('download', 16) }}<span>Eigentümer</span></a></td>
