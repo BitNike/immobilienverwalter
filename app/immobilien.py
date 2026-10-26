@@ -298,6 +298,7 @@ def immobilie(iid):
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefung, buchungen=buchungen, belege=belege, vorlage=vorlage,
                            rl_vorlage=rl_vorlage, BEZAHLT=BEZAHLT, RL_ARTEN=RL_ARTEN, fremde=fremde,
+                           kt=konten(iid, j), kontostand_vorlage=session.get("kontostand_vorlage") or {},
                            offen_bar=[b for b in buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
                            rl=ruecklage(iid, j),
@@ -653,6 +654,119 @@ def ruecklage_speichern(iid):
     flash("Anfangsbestand der Rücklage gespeichert." if wert else
           "Eingetragener Anfangsbestand entfernt; er wird, falls möglich, aus dem Vorjahr fortgeschrieben.")
     return redirect(url_for("immobilie", iid=iid, reiter="ruecklage"))
+
+
+# ---------- Konten (Stände zum Stichtag laut Kontoauszug) ----------
+
+def konten(iid, j):
+    """Konten mit Stand zu Jahresbeginn (letzter Stand bis 31.12. des Vorjahres) und Jahresende (letzter Stand bis
+    31.12. des Jahres) sowie den Ständen, die im Jahr eingetragen sind."""
+    erg = rows("SELECT * FROM konto WHERE immobilie_id = ? ORDER BY ruecklage, name COLLATE NATUERLICH", (iid,))
+    for k in erg:
+        def letzter(bis):
+            return one("SELECT * FROM kontostand WHERE konto_id = ? AND datum <= ? ORDER BY datum DESC, id DESC LIMIT 1",
+                       (k["id"], bis))
+        k["anfang"], k["ende"] = letzter(f"{j - 1}-12-31"), letzter(f"{j}-12-31")
+        k["staende"] = rows("SELECT * FROM kontostand WHERE konto_id = ? AND substr(datum, 1, 4) = ? ORDER BY datum, id",
+                            (k["id"], str(j)))
+        if k["ende"] and not k["ende"]["datum"].startswith(str(j)):  # kein Stand in diesem Jahr
+            k["zuletzt"], k["ende"] = k["ende"], None
+    rl = [k for k in erg if k["ruecklage"]]
+    return {"liste": erg,
+            "anfang": rund(sum(k["anfang"]["betrag"] for k in erg if k["anfang"])),
+            "ende": rund(sum(k["ende"]["betrag"] for k in erg if k["ende"])),
+            "rl_konten": len(rl), "rl_ende": rund(sum(k["ende"]["betrag"] for k in rl if k["ende"])),
+            "rl_vollstaendig": all(k["ende"] for k in rl),
+            "staende": sorted(({**st, "konto": k["name"]} for k in erg for st in k["staende"]),
+                              key=lambda st: (st["datum"], st["id"]))}
+
+
+def _konto_laden(kid):
+    k = row("SELECT * FROM konto WHERE id = ?", (kid,))
+    return k, row("SELECT * FROM immobilie WHERE id = ?", (k["immobilie_id"],))
+
+
+def _konto_werte():
+    f = request.form
+    name = f.get("name", "").strip()
+    if not name:
+        raise ValueError("Bitte einen Namen für das Konto angeben, z. B. „Tagesgeld“.")
+    return {"name": name, "ruecklage": 1 if f.get("ruecklage") else 0, "iban": f.get("iban", "").strip().upper(),
+            "bank": f.get("bank", "").strip()}
+
+
+@app.post("/immobilien/<int:iid>/konten")
+@admin_noetig
+def konto_neu(iid):
+    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
+    vals = _konto_werte()
+    exe(f"INSERT INTO konto (immobilie_id, {', '.join(vals)}) VALUES (?, {', '.join('?' * len(vals))})", [iid, *vals.values()])
+    return redirect(url_for("immobilie", iid=iid, reiter="ruecklage") + "#konten")
+
+
+@app.post("/konten/<int:kid>")
+@admin_noetig
+def konto_speichern(kid):
+    k, immo = _konto_laden(kid)
+    vals = _konto_werte()
+    exe(f"UPDATE konto SET {', '.join(x + ' = ?' for x in vals)} WHERE id = ?", [*vals.values(), kid])
+    return redirect(url_for("immobilie", iid=immo["id"], reiter="ruecklage") + "#konten")
+
+
+@app.post("/konten/<int:kid>/loeschen")
+@admin_noetig
+def konto_loeschen(kid):
+    k, immo = _konto_laden(kid)
+    exe("DELETE FROM konto WHERE id = ?", (kid,))
+    flash(f"Konto „{k['name']}“ mit allen Kontoständen gelöscht.")
+    return redirect(url_for("immobilie", iid=immo["id"], reiter="ruecklage") + "#konten")
+
+
+def _kontostand_werte():
+    f = request.form
+    datum = f.get("datum") or ""
+    if not datum or not f.get("betrag", "").strip():
+        raise ValueError("Bitte Datum und Kontostand angeben.")
+    return {"datum": datum, "betrag": parse_num(f.get("betrag")), "notiz": f.get("notiz", "").strip()}
+
+
+def _zum_stand(iid, datum):
+    """Zurück zur Rücklage – im Jahr des Kontostands, damit er gleich zu sehen ist."""
+    j = int(datum[:4])
+    if j != jahr():
+        flash(f"Der Kontostand vom {parse_date(datum):%d.%m.%Y} gehört ins Jahr {j}; die Ansicht wurde umgestellt.")
+    return redirect(url_for("immobilie", iid=iid, reiter="ruecklage", jahr=j if j != jahr() else None) + "#konten")
+
+
+@app.post("/immobilien/<int:iid>/kontostaende")
+@admin_noetig
+def kontostand_neu(iid):
+    k, immo = _konto_laden(int(request.form.get("konto_id") or 0))
+    if immo["id"] != iid:
+        abort(400)
+    vals = _kontostand_werte()
+    exe("INSERT INTO kontostand (konto_id, datum, betrag, notiz) VALUES (?, ?, ?, ?)", (k["id"], *vals.values()))
+    session["kontostand_vorlage"] = {"konto_id": k["id"], "datum": vals["datum"]}
+    return _zum_stand(iid, vals["datum"])
+
+
+@app.post("/kontostaende/<int:sid>")
+@admin_noetig
+def kontostand_speichern(sid):
+    st = row("SELECT * FROM kontostand WHERE id = ?", (sid,))
+    k, immo = _konto_laden(st["konto_id"])
+    vals = _kontostand_werte()
+    exe("UPDATE kontostand SET datum = ?, betrag = ?, notiz = ? WHERE id = ?", (*vals.values(), sid))
+    return _zum_stand(immo["id"], vals["datum"])
+
+
+@app.post("/kontostaende/<int:sid>/loeschen")
+@admin_noetig
+def kontostand_loeschen(sid):
+    st = row("SELECT * FROM kontostand WHERE id = ?", (sid,))
+    k, immo = _konto_laden(st["konto_id"])
+    exe("DELETE FROM kontostand WHERE id = ?", (sid,))
+    return redirect(url_for("immobilie", iid=immo["id"], reiter="ruecklage") + "#konten")
 
 
 # ---------- Mietobjekte ----------

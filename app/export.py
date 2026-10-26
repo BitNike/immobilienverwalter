@@ -8,7 +8,7 @@ from flask import abort, g, render_template, request, send_file
 import dateien
 from calc import de_num, parse_num, rund
 from core import NAME, URL, app, einstellung, ist_admin, jahr, one, person_name, row, rows, wohnung_laden
-from immobilien import adresse, berechnung, dokumente_sichtbar, mv_name, pruefungen, ruecklage
+from immobilien import adresse, berechnung, dokumente_sichtbar, konten, mv_name, pruefungen, ruecklage
 
 HINWEIS_NACHZAHLUNG = ("Bitte überweisen Sie die Nachzahlung innerhalb von 30 Tagen nach Erhalt dieser Abrechnung "
                        "auf folgendes Konto:")
@@ -72,6 +72,9 @@ def brief_daten(wid, partei):
         if rl["vorhanden"]:
             d["ruecklage"] = rl
             d["ruecklage_anteil"] = rund(rl["ende"] * w["mea"] / w["mea_basis"]) if w["mea"] and w["mea_basis"] else None
+        kt = konten(immo["id"], j)
+        if any(k["ende"] for k in kt["liste"]):
+            d["konten"] = kt
     else:
         p = next((x for x in r["parteien"] if str(x["mv"]["id"]) == str(partei)), None)
         if p is None:

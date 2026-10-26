@@ -12,7 +12,9 @@
   <option value="einnahme" {{ 'selected' if b.art == 'einnahme' }}>Einnahme</option></select></td>
 <td><select name="ziel" form="{{ form }}" required>
   <option value="">– wählen –</option>
-  <option value="ruecklage" {{ 'selected' if b.ziel == 'ruecklage' }}>Erhaltungsrücklage</option>
+  <optgroup label="Rücklage (wird nicht umgelegt)">
+  <option value="ruecklage" {{ 'selected' if b.ziel == 'ruecklage' }}>→ Rücklage (Einnahme / Entnahme)</option>
+  </optgroup>
   <optgroup label="Kostenart (wird umgelegt)">
   {% if b.ziel and b.ziel != 'ruecklage' and b.ziel not in kostenarten|map(attribute='id')|map('string')|list %}<option value="{{ b.ziel }}" selected>{{ b.kostenart }}</option>{% endif %}
   {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if k.id|string == b.ziel }}>{{ k.name }}{% if k.ruecklage %} (Zuführung){% elif not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
@@ -29,7 +31,6 @@
   <input type="hidden" name="ziel" form="{{ form }}" value="{{ b.ziel or '' }}"></td>
 <td><select name="rl_art" form="{{ form }}">{% for s, t in RL_ARTEN.items() %}<option value="{{ s }}" {{ 'selected' if b.rl_art == s }}>{{ t }}</option>{% endfor %}</select></td>
 <td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
-<td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
 {%- endmacro %}
 
 {% macro fremde_buchungen(fremde, jahr) -%}
@@ -253,7 +254,7 @@
   {% endif %}
   <div class="tabelle">
   <table class="buchungen rl-blatt">
-    <thead><tr><th>Datum</th><th>Beschreibung / Kommentar</th><th>Art</th><th class="zahl">Betrag</th><th>Bezahlt</th>
+    <thead><tr><th>Datum</th><th>Beschreibung / Kommentar</th><th>Art</th><th class="zahl">Betrag</th>
       <th class="zahl">Stand</th><th class="aktionen">Beleg</th></tr></thead>
     <tbody>
     {% if ist_admin and not rbb %}
@@ -270,7 +271,7 @@
       <td></td>
       <td class="zahl"><input class="betrag" name="anfang" form="ranfang" inputmode="decimal" value="{{ rl.anfang|num if rl.eingetragen else '' }}"
         placeholder="{{ rl.anfang|num if rl.anfang is not none else '' }}" {{ 'autofocus' }}></td>
-      <td colspan="2" class="leise"><small>Leer = aus dem Vorjahr fortschreiben</small></td>
+      <td class="leise"><small>Leer = aus dem Vorjahr fortschreiben</small></td>
       <td class="aktionen"><button class="btn-icon" form="ranfang" title="Speichern">{{ icon('save', 16) }}</button>
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage') }}" title="Abbrechen">{{ icon('x', 16) }}</a></td>
     </tr>
@@ -281,7 +282,6 @@
         {% if not rl.eingetragen and rl.anfang is not none %}<br><small class="leise">aus {{ jahr - 1 }} fortgeschrieben</small>{% endif %}</td>
       <td></td>
       <td class="zahl">{% if rl.anfang is not none %}{{ rl.anfang|eur }}{% else %}<span class="warnung">fehlt</span>{% endif %}</td>
-      <td></td>
       <td class="zahl">{{ (rl.anfang or 0)|eur }}</td>
       <td class="aktionen">{% if ist_admin %}
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage', anfang=1) }}" title="Anfangsbestand bearbeiten">{{ icon('edit', 16) }}</a>
@@ -309,7 +309,6 @@
         {% if b.rl_art == 'zufuehrung' %}<br><small class="leise">über „{{ b.kostenart }}“ umgelegt</small>{% endif %}</td>
       <td>{{ RL_ARTEN[b.rl_art] }}</td>
       <td class="zahl {{ 'gutschrift' if b.wert > 0 else 'nachzahlung' }}">{{ '+' if b.wert > 0 else '−' }} {{ b.betrag|eur }}</td>
-      <td>{{ BEZAHLT[b.bezahlt] }}</td>
       <td class="zahl">{{ b.stand|eur }}</td>
       <td class="aktionen">{% if b.dokument_id %}{% if ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('klammer', 16) }}</a>{% else %}<span class="leise" title="Beleg vorhanden">{{ icon('klammer', 16) }}</span>{% endif %}
         {% else %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>{% endif %}
@@ -322,13 +321,113 @@
     {% endif %}
     {% endfor %}
     </tbody>
-    <tfoot><tr><th colspan="5">Endbestand 31.12.{{ jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th><th></th></tr></tfoot>
+    <tfoot><tr><th colspan="4">Endbestand 31.12.{{ jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th><th></th></tr></tfoot>
   </table>
   </div>
   <p class="leise"><small><strong>Zuführung</strong>: regelmäßige Einzahlung (z. B. Hausgeld-Anteil oder Bausparrate). Sie läuft über die
     Kostenart mit Haken „Rücklage“ und erscheint deshalb auch in den Gebäudekosten und der Eigentümer-Abrechnung.
     <strong>Einnahme</strong> (z. B. PV-Vergütung, Zinsen) und <strong>Entnahme</strong> (z. B. Reparatur aus der Rücklage) werden nicht umgelegt.
     Den Anfangsbestand brauchst du nur im ersten Jahr; danach wird der Endbestand des Vorjahres übernommen.</small></p>
+
+  <h3 id="konten">Konten</h3>
+  <p class="leise"><small>Kontostände laut Kontoauszug, meist einmal im Jahr zum 31.12. Das Jahr ergibt sich aus dem Datum;
+    der Stand zu Jahresbeginn ist der letzte Stand des Vorjahres.</small></p>
+  {% set kbb = request.args.get('konto')|int %}{% set sbb = request.args.get('stand')|int %}
+  {% if kt.liste %}
+  <div class="tabelle">
+  <table class="konten">
+    <thead><tr><th>Konto</th><th class="zahl">Stand 01.01.{{ jahr }}</th><th class="zahl">Stand 31.12.{{ jahr }}</th>
+      <th class="zahl">Veränderung</th><th></th></tr></thead>
+    <tbody>
+    {% for k in kt.liste %}
+    {% if ist_admin and kbb == k.id %}
+    <tr class="in-bearbeitung"><td colspan="4">
+      <form id="kto{{ k.id }}" method="post" action="{{ url_for('konto_speichern', kid=k.id) }}" class="zeile">
+        <label>Name<input name="name" value="{{ k.name }}" required></label>
+        <label>IBAN<input name="iban" value="{{ k.iban }}"></label>
+        <label>Bank<input name="bank" value="{{ k.bank }}"></label>
+        <label class="haken"><input type="checkbox" name="ruecklage" {{ 'checked' if k.ruecklage }}> gehört zur Rücklage</label>
+      </form></td>
+      <td class="aktionen"><button class="btn-icon" form="kto{{ k.id }}" title="Speichern">{{ icon('save', 16) }}</button>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage') }}#konten" title="Abbrechen">{{ icon('x', 16) }}</a></td>
+    </tr>
+    {% else %}
+    <tr>
+      <td><strong>{{ k.name }}</strong>{% if k.ruecklage %} <span class="marke">Rücklage</span>{% endif %}
+        {% if k.iban or k.bank %}<br><small class="leise">{{ [k.iban, k.bank]|select|join(' · ') }}</small>{% endif %}</td>
+      <td class="zahl">{% if k.anfang %}{{ k.anfang.betrag|eur }}<br><small class="leise">vom {{ k.anfang.datum|datum(True) }}</small>{% else %}<span class="leise">–</span>{% endif %}</td>
+      <td class="zahl">{% if k.ende %}{{ k.ende.betrag|eur }}<br><small class="leise">vom {{ k.ende.datum|datum(True) }}</small>
+        {% else %}<span class="warnung">noch kein Stand</span>{% endif %}</td>
+      <td class="zahl">{% if k.anfang and k.ende %}{% set d = k.ende.betrag - k.anfang.betrag %}<span class="{{ 'gutschrift' if d > 0 else 'nachzahlung' if d < 0 }}">{{ '+ ' if d > 0 else '− ' if d < 0 }}{{ d|abs|eur }}</span>{% endif %}</td>
+      <td class="aktionen">{% if ist_admin %}
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage', konto=k.id) }}#konten" title="Konto bearbeiten">{{ icon('edit', 16) }}</a>
+        {{ loeschen(url_for('konto_loeschen', kid=k.id), 'Konto „%s“ mit allen Kontoständen löschen?' % k.name) }}{% endif %}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th>Summe</th><th class="zahl">{{ kt.anfang|eur }}</th><th class="zahl">{{ kt.ende|eur }}</th>
+      <th class="zahl">{{ '+ ' if kt.ende > kt.anfang else '− ' if kt.ende < kt.anfang }}{{ (kt.ende - kt.anfang)|abs|eur }}</th><th></th></tr></tfoot>
+  </table>
+  </div>
+  {% if kt.rl_konten %}
+  {% set diff = kt.rl_ende - rl.ende %}
+  <p class="{{ 'warnung' if kt.rl_vollstaendig and diff|abs >= 0.005 else 'leise' }}">
+    Rücklage-Konten am 31.12.{{ jahr }}: <strong>{{ kt.rl_ende|eur }}</strong> · Rücklage laut Kontoblatt: <strong>{{ rl.ende|eur }}</strong>
+    {% if not kt.rl_vollstaendig %}· noch nicht für alle Rücklage-Konten ein Stand eingetragen
+    {% elif diff|abs >= 0.005 %}· Differenz {{ diff|eur }} – bitte Buchungen und Kontostände prüfen
+    {% else %}· stimmt überein{% endif %}</p>
+  {% endif %}
+  {% else %}
+  <p class="leise">Noch kein Konto angelegt.</p>
+  {% endif %}
+
+  {% if ist_admin %}
+  {% if kt.liste %}
+  <form method="post" action="{{ url_for('kontostand_neu', iid=immo.id) }}" class="zeile">
+    <label>Konto<select name="konto_id">{% for k in kt.liste %}<option value="{{ k.id }}" {{ 'selected' if k.id == kontostand_vorlage.konto_id }}>{{ k.name }}</option>{% endfor %}</select></label>
+    <label>Datum<input type="date" name="datum" value="{{ kontostand_vorlage.datum if (kontostand_vorlage.datum or '').startswith(jahr|string) else '%d-12-31' % jahr }}" required></label>
+    <label>Kontostand (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
+    <label class="notizfeld">Kommentar<input name="notiz" placeholder="optional, z. B. Auszug Nr. 12"></label>
+    <button class="btn">{{ icon('plus') }}<span>Stand eintragen</span></button>
+  </form>
+  {% endif %}
+  <details {{ 'open' if not kt.liste }}>
+    <summary>{{ icon('plus') }} Konto hinzufügen</summary>
+    <form method="post" action="{{ url_for('konto_neu', iid=immo.id) }}" class="zeile">
+      <label>Name *<input name="name" placeholder="z. B. Tagesgeld" required></label>
+      <label class="haken"><input type="checkbox" name="ruecklage" checked> gehört zur Rücklage</label>
+      <label>IBAN<input name="iban" placeholder="optional"></label>
+      <label>Bank<input name="bank" placeholder="optional"></label>
+      <button class="btn">{{ icon('plus') }}<span>Anlegen</span></button>
+    </form>
+  </details>
+  {% endif %}
+
+  {% if kt.staende %}
+  <details {{ 'open' if sbb }}>
+    <summary>Eingetragene Kontostände {{ jahr }} ({{ kt.staende|length }})</summary>
+    <table class="kompakt">
+      {% for st in kt.staende %}
+      {% if ist_admin and sbb == st.id %}
+      <tr class="in-bearbeitung">
+        <td colspan="4"><form id="st{{ st.id }}" method="post" action="{{ url_for('kontostand_speichern', sid=st.id) }}" class="zeile">
+          <label>Datum<input type="date" name="datum" value="{{ st.datum }}" required></label>
+          <label>Kontostand (€)<input class="betrag" name="betrag" inputmode="decimal" value="{{ st.betrag|num }}" required></label>
+          <label class="notizfeld">Kommentar<input name="notiz" value="{{ st.notiz }}"></label></form></td>
+        <td class="aktionen"><button class="btn-icon" form="st{{ st.id }}" title="Speichern">{{ icon('save', 16) }}</button>
+          <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage') }}#konten" title="Abbrechen">{{ icon('x', 16) }}</a></td>
+      </tr>
+      {% else %}
+      <tr><td>{{ st.datum|datum(True) }}</td><td>{{ st.konto }}</td><td class="zahl">{{ st.betrag|eur }}</td><td class="leise">{{ st.notiz }}</td>
+        <td class="aktionen">{% if ist_admin %}
+          <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage', stand=st.id) }}#konten" title="Bearbeiten">{{ icon('edit', 16) }}</a>
+          {{ loeschen(url_for('kontostand_loeschen', sid=st.id), 'Kontostand löschen?') }}{% endif %}</td></tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+  </details>
+  {% endif %}
 </section>
 {% endif %}
 

@@ -235,6 +235,24 @@ MIGRATIONEN = [
     ALTER TABLE buchung ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
     ALTER TABLE ruecklage_bestand ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
     """,
+    # 14: Konten einer Immobilie (Girokonto, Tagesgeld …) mit Kontoständen zum Stichtag laut Kontoauszug
+    """
+    CREATE TABLE konto (
+        id INTEGER PRIMARY KEY,
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        ruecklage INTEGER NOT NULL DEFAULT 1,
+        iban TEXT NOT NULL DEFAULT '',
+        bank TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE kontostand (
+        id INTEGER PRIMARY KEY,
+        konto_id INTEGER NOT NULL REFERENCES konto(id) ON DELETE CASCADE,
+        datum TEXT NOT NULL,
+        betrag REAL NOT NULL,
+        notiz TEXT NOT NULL DEFAULT ''
+    );
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

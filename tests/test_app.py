@@ -324,6 +324,28 @@ def test_gesamter_ablauf():
     post(c, "/immobilien/1/ruecklage", data={"anfang": ""})  # eingetragenen Anfangsbestand wieder entfernen
     assert "11.875,00 €" in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
     post(c, f"/buchungen/{bid}/loeschen", data={"reiter": "ruecklage"})
+    # Konten: Stände zum Stichtag, Jahr aus dem Datum, Abgleich mit der Rücklage, bearbeiten und löschen
+    post(c, "/immobilien/1/konten", data={"name": "Tagesgeld", "ruecklage": "on"})
+    post(c, "/immobilien/1/konten", data={"name": "Girokonto", "iban": "de00 9999"})
+    tg, giro = [x[0] for x in dbcon.execute("SELECT id FROM konto ORDER BY id")]
+    post(c, "/immobilien/1/kontostaende", data={"konto_id": tg, "datum": "2025-12-31", "betrag": "11.000"})
+    r = post(c, "/immobilien/1/kontostaende", data={"konto_id": tg, "datum": "2026-12-31", "betrag": "11.755",
+                                                    "notiz": "Auszug 12"})
+    assert "jahr=2026" not in r.headers["Location"]  # Ansicht steht schon auf 2026
+    post(c, "/immobilien/1/kontostaende", data={"konto_id": giro, "datum": "2026-12-31", "betrag": "2.000"})
+    html = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "Auszug 12" in html and "13.755,00 €" in html and "+ 755,00 €" in html and "stimmt überein" in html  # Rücklage 11.755
+    sid = dbcon.execute("SELECT id FROM kontostand WHERE notiz = 'Auszug 12'").fetchone()[0]
+    post(c, f"/kontostaende/{sid}", data={"datum": "2026-12-31", "betrag": "11.780", "notiz": "korrigiert"})
+    assert "Differenz 25,00 €" in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    r = post(c, f"/kontostaende/{sid}", data={"datum": "2025-06-30", "betrag": "11.780", "notiz": "korrigiert"})
+    assert "jahr=2025" in r.headers["Location"]  # falsches Jahr erkannt, Ansicht springt mit
+    c.get("/immobilien/1?jahr=2026")
+    post(c, f"/kontostaende/{sid}/loeschen")
+    post(c, f"/konten/{giro}", data={"name": "Girokonto WEG"})
+    post(c, f"/konten/{giro}/loeschen")
+    assert dbcon.execute("SELECT name FROM konto").fetchall() == [("Tagesgeld",)]
+    assert not dbcon.execute("SELECT 1 FROM kontostand WHERE konto_id = ?", (giro,)).fetchone()
     assert "geändert" not in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
     # Reiter: jeder Bereich hat eine eigene Adresse, der Jahr-Umschalter behält den Reiter
     assert "/immobilien/1?jahr=2025&amp;reiter=ruecklage" in html

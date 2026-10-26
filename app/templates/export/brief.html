@@ -67,6 +67,7 @@
   .ruecklage { margin-top: 10mm; }
   .rl { width: 125mm; font-size: 9.5pt; }
   .rl td, .rl th { padding: 0.6mm 0; }
+  .konten-titel { margin-top: 5mm; }
   .rl tr.summe th { border-top: 1px solid #111; font-weight: bold; padding-top: 1.2mm; }
   .belege { font-size: 9.5pt; }
   .belege tbody { break-inside: avoid; }
@@ -163,6 +164,13 @@
       <tr class="summe"><th>Endbestand 31.12.{{ d.jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th></tr>
       {% if d.ruecklage_anteil is not none %}<tr><td>davon rechnerisch Ihr Anteil ({{ d.w.mea|num }}/{{ d.w.mea_basis|num(0) }} MEA)</td><td class="zahl">{{ d.ruecklage_anteil|eur }}</td></tr>{% endif %}
     </table>
+    {% if d.konten %}
+    <h2 class="konten-titel">Kontostände der Gemeinschaft am 31.12.{{ d.jahr }}</h2>
+    <table class="rl">
+      {% for k in d.konten.liste if k.ende %}<tr><td>{{ k.name }}{% if k.ruecklage %} (Rücklage){% endif %}</td><td class="zahl">{{ k.ende.betrag|eur }}</td></tr>{% endfor %}
+      <tr class="summe"><th>Summe</th><th class="zahl">{{ d.konten.ende|eur }}</th></tr>
+    </table>
+    {% endif %}
   </div>
   {% endif %}
 
