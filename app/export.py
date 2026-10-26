@@ -135,6 +135,19 @@ def export_dokumente(d):
             continue
         doc["vorauswahl"] = doc["bereich"] != "vermieter"
         erg.append(doc)
+    if ist_admin():
+        # Belege der Buchungen: in der Eigentümer-Abrechnung alle vorausgewählt, Mietern nur umlagefähige zur Auswahl
+        eigentuemer = d["partei"] == "eigentuemer"
+        vorhanden = {doc["id"] for doc in erg}
+        for doc in rows("SELECT d.*, ka.name AS kostenart, b.kostenart_id AS b_kostenart, ka.umlagefaehig FROM buchung b "
+                        "JOIN dokument d ON d.id = b.dokument_id LEFT JOIN kostenart ka ON ka.id = b.kostenart_id "
+                        "WHERE b.immobilie_id = ? AND b.jahr = ? ORDER BY b.datum IS NULL, b.datum, b.id",
+                        (d["immo"]["id"], d["jahr"])):
+            if doc["id"] in vorhanden or not (eigentuemer or (doc["b_kostenart"] and doc["umlagefaehig"])):
+                continue
+            doc.update(vorauswahl=eigentuemer, buchung=True)
+            vorhanden.add(doc["id"])
+            erg.append(doc)
     return erg
 
 

@@ -3,7 +3,8 @@
 {% block title %}{{ immo.name }}{% endblock %}
 
 {% macro buchung_felder(form, b, kostenarten, BEZAHLT) -%}
-<td><input type="date" name="datum" form="{{ form }}" value="{{ b.datum or '' }}" {{ 'required' if form == 'bneu' }} {{ 'autofocus' if form == 'bneu' and request.args.get('neu') }}></td>
+<td><input type="date" name="datum" form="{{ form }}" value="{{ b.datum or '' }}" {{ 'required' if form == 'bneu' }} {{ 'autofocus' if form == 'bneu' and request.args.get('neu') }}>
+  {% if form != 'bneu' %}<label class="erstattet" title="Nur bei „Bar ausgelegt“: wann die Auslage erstattet wurde">bar erstattet am<input type="date" name="erstattet" form="{{ form }}" value="{{ b.erstattet or '' }}"></label>{% endif %}</td>
 <td><input name="text" form="{{ form }}" value="{{ b.text or '' }}" placeholder="z. B. Lampe Flur Haus 2" required></td>
 <td><select name="art" form="{{ form }}">
   <option value="ausgabe" {{ 'selected' if b.art != 'einnahme' }}>Ausgabe</option>
@@ -16,10 +17,13 @@
   {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if k.id|string == b.ziel }}>{{ k.name }}{% if k.ruecklage %} (Zuführung){% elif not k.umlagefaehig %} (nicht umlagefähig){% endif %}</option>{% endfor %}
   </optgroup></select></td>
 <td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
-<td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }}>{{ t }}</option>{% endfor %}</select>
-  {% if form != 'bneu' %}<label class="erstattet">erstattet am<input type="date" name="erstattet" form="{{ form }}" value="{{ b.erstattet or '' }}"></label>{% endif %}</td>
-<td><label class="btn-icon beleg-wahl" title="Beleg anhängen (Foto oder PDF)">{{ icon('file', 16) }}<input type="file" name="beleg" form="{{ form }}" accept=".pdf,image/*" hidden
-  onchange="this.parentNode.classList.toggle('gewaehlt', this.files.length > 0); this.parentNode.title = this.files.length ? this.files[0].name : 'Beleg anhängen (Foto oder PDF)'"></label></td>
+<td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
+
+{%- endmacro %}
+
+{% macro beleg_knopf(form, b) -%}
+<label class="btn hell klein beleg-wahl" title="Beleg anhängen (Foto oder PDF)">{{ icon('klammer', 15) }}<span>{{ 'Ersetzen' if b.dokument_id else 'Beleg' }}</span><input type="file" name="beleg" form="{{ form }}" accept=".pdf,image/*" hidden
+  onchange="var f = this.files.length ? this.files[0].name : ''; this.parentNode.classList.toggle('gewaehlt', !!f); this.previousElementSibling.textContent = f ? '✓ ' + (f.length > 18 ? f.slice(0, 16) + '…' : f) : {{ ('Ersetzen' if b.dokument_id else 'Beleg')|tojson|forceescape }}; this.parentNode.title = f || 'Beleg anhängen (Foto oder PDF)'"></label>
 {%- endmacro %}
 
 {% block content %}
@@ -57,19 +61,19 @@
   <div class="tabelle">
   <table class="buchungen">
     <thead><tr><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Kostenart / Ziel</th><th class="zahl">Betrag</th>
-      <th>Bezahlt</th><th>Beleg</th><th></th></tr></thead>
+      <th>Bezahlt</th><th class="aktionen">Beleg</th></tr></thead>
     <tbody>
     {% if ist_admin and not bb %}
     <tr class="in-bearbeitung">
       {{ buchung_felder('bneu', vorlage, kostenarten, BEZAHLT) }}
-      <td class="aktionen"><button class="btn-icon" form="bneu" title="Speichern (Enter)">{{ icon('save', 16) }}</button></td>
+      <td class="aktionen">{{ beleg_knopf('bneu', vorlage) }}<button class="btn-icon" form="bneu" title="Speichern (Enter)">{{ icon('save', 16) }}</button></td>
     </tr>
     {% endif %}
     {% for b in buchungen %}
     {% if ist_admin and bb == b.id %}
     <tr class="in-bearbeitung">
       {{ buchung_felder('b%d' % b.id, dict(b, ziel=(b.kostenart_id|string if b.kostenart_id else 'ruecklage')), kostenarten, BEZAHLT) }}
-      <td class="aktionen">
+      <td class="aktionen">{{ beleg_knopf('b%d' % b.id, b) }}
         <form id="b{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline">
           <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}" title="Abbrechen">{{ icon('x', 16) }}</a>
@@ -89,8 +93,8 @@
           {% if ist_admin %}<form method="post" action="{{ url_for('buchung_erstattet', bid=b.id) }}" class="inline">
             <button class="link-knopf" title="Heute von der WEG erstattet">erstattet</button></form>{% endif %}
         {% endif %}{% endif %}</td>
-      <td>{% if b.dokument_id and ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('file', 16) }}</a>{% endif %}</td>
-      <td class="aktionen">
+      <td class="aktionen">{% if b.dokument_id %}{% if ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('klammer', 16) }}</a>{% else %}<span class="leise" title="Beleg vorhanden">{{ icon('klammer', 16) }}</span>{% endif %}
+        {% else %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>{% endif %}
         {% if ist_admin %}
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', buchung=b.id) }}" title="Bearbeiten">{{ icon('edit', 16) }}</a>
         {{ loeschen(url_for('buchung_loeschen', bid=b.id), 'Buchung „%s“ löschen? Ein angehängter Beleg bleibt unter Dokumente erhalten.' % b.text) }}
@@ -99,11 +103,16 @@
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="8" class="leise">Für {{ jahr }} sind noch keine Buchungen erfasst.</td></tr>
+    <tr><td colspan="7" class="leise">Für {{ jahr }} sind noch keine Buchungen erfasst.</td></tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
+  {% set ohne_beleg = buchungen|rejectattr('dokument_id')|list %}
+  {% if ohne_beleg and buchungen %}
+  <p class="warnung">{{ ohne_beleg|length }} von {{ buchungen|length }} Buchung{{ 'en' if buchungen|length != 1 }} ohne Beleg.
+    {% if ist_admin %}<span class="leise">Nachträglich über den Stift anhängen.</span>{% endif %}</p>
+  {% endif %}
   {% if offen_bar %}
   <p class="warnung">Bar ausgelegt und noch nicht {{ 'von der WEG ' if immo.weg }}erstattet: {{ offen_bar|length }} Beleg{{ 'e' if offen_bar|length != 1 }},
     zusammen {{ offen_bar|sum(attribute='betrag')|eur }}.</p>

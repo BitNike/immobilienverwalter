@@ -34,7 +34,7 @@
     {% for doc in dokumente %}
     <label class="haken">
       <input type="checkbox" name="dokumente" value="{{ doc.id }}" {{ 'checked' if doc.vorauswahl }}>
-      <span>{{ doc.titel }}<br><small class="leise">{% if doc.bereich == 'vermieter' %}Vermieter{% elif doc.bereich == 'mieterordner' %}{{ doc.mv_ordner }}{% else %}Mieter{% endif %}{% if doc.kostenart %} · {{ doc.kostenart }}{% endif %}</small></span>
+      <span>{{ doc.titel }}<br><small class="leise">{% if doc.buchung %}Beleg zur Buchung{% elif doc.bereich == 'vermieter' %}Vermieter{% elif doc.bereich == 'mieterordner' %}{{ doc.mv_ordner }}{% else %}Mieter{% endif %}{% if doc.kostenart %} · {{ doc.kostenart }}{% endif %}</small></span>
     </label>
     {% else %}
     <p class="leise">Für {{ d.jahr }} sind keine Dokumente hochgeladen.</p>

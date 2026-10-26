@@ -1,6 +1,7 @@
 """Ende-zu-Ende-Test über den Flask-Testclient: Einrichtung bis PDF-Export."""
 import io
 import os
+import re
 import sys
 import tempfile
 
@@ -246,7 +247,13 @@ def test_gesamter_ablauf():
     mieter_brief = ok(c.get("/wohnungen/1/export/brief?partei=1")).get_data(as_text=True)
     assert "Erhaltungsrücklage" not in mieter_brief and "Energieausweise" not in mieter_brief
     # Export-Auswahl: Belegliste als Zusatzseite, Rücklage abwählbar; Mieter sehen nur umlagefähige Belege
-    assert "Belegliste 2025" in ok(c.get("/wohnungen/1/export?partei=eigentuemer")).get_data(as_text=True)
+    seite = ok(c.get("/wohnungen/1/export?partei=eigentuemer")).get_data(as_text=True)
+    assert "Belegliste 2025" in seite
+    # Beleg der Buchung „Obi“ (jetzt Hausmeister, umlagefähig): Eigentümer vorausgewählt, Mieter nur zur Auswahl
+    assert re.search(r'value="3" checked>\s*<span>Obi<br><small class="leise">Beleg zur Buchung', seite)
+    assert re.search(r'value="3" >\s*<span>Obi<br>', ok(c.get("/wohnungen/1/export?partei=1")).get_data(as_text=True))
+    html = ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert "5 von 6 Buchungen ohne Beleg" in html and html.count(">fehlt<") == 5
 
     def pdf_text(daten):
         r = post(c, "/wohnungen/1/export/pdf", 200, data={**daten, "aktion": "speichern"})
@@ -380,7 +387,6 @@ def test_gesamter_ablauf():
     ok(x.get("/"))
 
     # Zwei-Faktor-Anmeldung: einrichten, Anmeldung mit Code, Notfall-Code, Zurücksetzen durch den Admin
-    import re
     import time
     import zweifaktor
     ok(x.get("/profil/passwort"))
