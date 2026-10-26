@@ -230,6 +230,11 @@ MIGRATIONEN = [
         FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id
         WHERE k.wohnung_id IS NULL AND k.betrag <> 0;
     """,
+    # 13: Kommentar zu Buchungen und zum Anfangsbestand der Rücklage
+    """
+    ALTER TABLE buchung ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
+    ALTER TABLE ruecklage_bestand ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

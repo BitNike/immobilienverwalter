@@ -272,8 +272,10 @@ def immobilie(iid):
         if b["kosten_id"]:
             belege[b["kosten_id"]] = belege.get(b["kosten_id"], 0) + 1
     vorlage = dict(session.get("buchung_vorlage") or {})
-    if not (vorlage.get("datum") or "").startswith(str(j)):
-        vorlage["datum"] = date.today().isoformat() if date.today().year == j else ""
+    rl_vorlage = dict(session.get("ruecklage_vorlage") or {})
+    for v in (vorlage, rl_vorlage):
+        if not (v.get("datum") or "").startswith(str(j)):
+            v["datum"] = date.today().isoformat() if date.today().year == j else ""
     umfang = one("SELECT (SELECT COUNT(*) FROM wohnung WHERE immobilie_id = :i) AS wohnungen, "
                  "(SELECT COUNT(*) FROM mietverhaeltnis m JOIN wohnung w ON w.id = m.wohnung_id WHERE w.immobilie_id = :i) AS mieter, "
                  "(SELECT COUNT(*) FROM kosten WHERE immobilie_id = :i) AS kosten, "
@@ -289,7 +291,8 @@ def immobilie(iid):
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
                            reiter=reiter, aktiv=reiter_waehlen(reiter),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
-                           pruefung=pruefung, buchungen=buchungen, belege=belege, vorlage=vorlage, BEZAHLT=BEZAHLT,
+                           pruefung=pruefung, buchungen=buchungen, belege=belege, vorlage=vorlage,
+                           rl_vorlage=rl_vorlage, BEZAHLT=BEZAHLT, RL_ARTEN=RL_ARTEN,
                            offen_bar=[b for b in buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
                            rl=ruecklage(iid, j),
@@ -433,10 +436,31 @@ def kosten_aus_buchungen(kid):
         exe("DELETE FROM kosten WHERE id = ?", (kid,))
 
 
+RL_ARTEN = {"zufuehrung": "Zuführung", "einnahme": "Einnahme", "entnahme": "Entnahme"}
+
+
+def ruecklage_kostenart(gewuenscht=None):
+    """Kostenart für Zuführungen zur Rücklage: die gewünschte, falls sie eine ist, sonst die erste aktive."""
+    if gewuenscht and one("SELECT 1 FROM kostenart WHERE id = ? AND ruecklage = 1", (gewuenscht,)):
+        return int(gewuenscht)
+    ka = one("SELECT id FROM kostenart WHERE ruecklage = 1 AND aktiv = 1 ORDER BY sortierung, name")
+    if not ka:
+        raise ValueError("Es gibt keine Kostenart mit Haken „Rücklage“ (Einstellungen → Kostenarten).")
+    return ka["id"]
+
+
 def buchung_werte():
     f = request.form
-    vals = {"datum": f.get("datum") or None, "text": f.get("text", "").strip(), "art": f.get("art"),
-            "betrag": parse_num(f.get("betrag")), "bezahlt": f.get("bezahlt", "konto")}
+    art, ziel = f.get("art"), f.get("ziel", "")
+    rl_art = f.get("rl_art")
+    if rl_art:  # Eingabe im Reiter „Rücklage“: Zuführung läuft über die Rücklage-Kostenart und wird umgelegt
+        if rl_art not in RL_ARTEN:
+            raise ValueError("Bitte Zuführung, Einnahme oder Entnahme wählen.")
+        art = "einnahme" if rl_art == "einnahme" else "ausgabe"
+        ziel = str(ruecklage_kostenart(ziel)) if rl_art == "zufuehrung" else "ruecklage"
+    vals = {"datum": f.get("datum") or None, "text": f.get("text", "").strip(), "art": art,
+            "betrag": parse_num(f.get("betrag")), "bezahlt": f.get("bezahlt", "konto"),
+            "notiz": f.get("notiz", "").strip()}
     if not vals["text"]:
         raise ValueError("Bitte eine Beschreibung angeben, z. B. „Lampe Flur Haus 2“.")
     if vals["art"] not in ("ausgabe", "einnahme"):
@@ -445,12 +469,16 @@ def buchung_werte():
         raise ValueError("Bitte einen Betrag angeben.")
     if vals["bezahlt"] not in BEZAHLT:
         raise ValueError("Bitte angeben, wie bezahlt wurde.")
-    ziel = f.get("ziel", "")
     if not ziel:
         raise ValueError("Bitte eine Kostenart oder die Erhaltungsrücklage wählen.")
     vals["kostenart_id"] = None if ziel == "ruecklage" else _kostenart_id({"kostenart_id": ziel})
     vals["erstattet"] = (f.get("erstattet") or None) if vals["bezahlt"] == "bar" and vals["art"] == "ausgabe" else None
     return vals
+
+
+def _buchung_reiter():
+    """Nach dem Speichern zurück auf den Reiter, von dem aus gebucht wurde."""
+    return "ruecklage" if request.form.get("reiter") == "ruecklage" else "buchungen"
 
 
 def _beleg_speichern(immo, j, vals):
@@ -479,9 +507,13 @@ def buchung_neu(iid):
     if vals["kosten_id"]:
         kosten_aus_buchungen(vals["kosten_id"])
     # Für die nächste Zeile vorbelegen, damit mehrere Belege schnell hintereinander gehen
-    session["buchung_vorlage"] = {"datum": vals["datum"], "art": vals["art"], "bezahlt": vals["bezahlt"],
-                                  "ziel": str(vals["kostenart_id"] or "ruecklage")}
-    return redirect(url_for("immobilie", iid=iid, reiter="buchungen", neu=1))
+    vorlage = {"datum": vals["datum"], "art": vals["art"], "bezahlt": vals["bezahlt"],
+               "ziel": str(vals["kostenart_id"] or "ruecklage")}
+    if _buchung_reiter() == "ruecklage":
+        session["ruecklage_vorlage"] = {**vorlage, "rl_art": request.form.get("rl_art")}
+    else:
+        session["buchung_vorlage"] = vorlage
+    return redirect(url_for("immobilie", iid=iid, reiter=_buchung_reiter(), neu=1))
 
 
 @app.post("/buchungen/<int:bid>")
@@ -499,7 +531,7 @@ def buchung_speichern(bid):
         kosten_aus_buchungen(vals["kosten_id"])
     if b["kosten_id"] and b["kosten_id"] != vals["kosten_id"]:
         kosten_aus_buchungen(b["kosten_id"])
-    return redirect(url_for("immobilie", iid=immo["id"], reiter="buchungen"))
+    return redirect(url_for("immobilie", iid=immo["id"], reiter=_buchung_reiter()))
 
 
 @app.post("/buchungen/<int:bid>/erstattet")
@@ -507,7 +539,7 @@ def buchung_speichern(bid):
 def buchung_erstattet(bid):
     b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
     exe("UPDATE buchung SET erstattet = ? WHERE id = ?", (date.today().isoformat(), bid))
-    return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter="buchungen"))
+    return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter=_buchung_reiter()))
 
 
 @app.post("/buchungen/<int:bid>/loeschen")
@@ -517,7 +549,7 @@ def buchung_loeschen(bid):
     exe("DELETE FROM buchung WHERE id = ?", (bid,))
     if b["kosten_id"]:
         kosten_aus_buchungen(b["kosten_id"])
-    return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter="buchungen"))
+    return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter=_buchung_reiter()))
 
 
 # ---------- Erhaltungsrücklage ----------
@@ -546,7 +578,23 @@ def ruecklage(iid, j):
     zufuehrung, buchungen = bewegungen(j)
     einnahmen = [b for b in buchungen if b["art"] == "einnahme"]
     entnahmen = [b for b in buchungen if b["art"] == "ausgabe"]
-    return {"anfang": None if anfang is None else rund(anfang), "eingetragen": bool(basis) and basis["jahr"] == j,
+    # Kontoblatt: alle Bewegungen des Jahres (Zuführungen sind Buchungen auf eine Rücklage-Kostenart) mit laufendem Stand
+    eintraege = rows("SELECT b.*, ka.name AS kostenart FROM buchung b LEFT JOIN kostenart ka ON ka.id = b.kostenart_id "
+                     "WHERE b.immobilie_id = ? AND b.jahr = ? AND (b.kostenart_id IS NULL OR ka.ruecklage = 1)",
+                     (iid, j))
+    eintraege.sort(key=lambda b: (b["datum"] or f"{j}-12-31", b["id"]))
+    stand = anfang or 0
+    for b in eintraege:
+        zufluss = b["art"] == "einnahme" if b["kostenart_id"] is None else b["art"] == "ausgabe"
+        b["rl_art"] = "zufuehrung" if b["kostenart_id"] else ("einnahme" if zufluss else "entnahme")
+        b["wert"] = b["betrag"] if zufluss else -b["betrag"]
+        stand += b["wert"]
+        b["stand"] = rund(stand)
+    eintrag = one("SELECT * FROM ruecklage_bestand WHERE immobilie_id = ? AND jahr = ?", (iid, j))
+    return {"anfang": None if anfang is None else rund(anfang), "eingetragen": bool(eintrag),
+            "notiz": eintrag["notiz"] if eintrag else "", "eintraege": eintraege,
+            "zufluesse": rund(sum(b["wert"] for b in eintraege if b["wert"] > 0)),
+            "abfluesse": rund(-sum(b["wert"] for b in eintraege if b["wert"] < 0)),
             "zufuehrung": rund(zufuehrung), "einnahmen": einnahmen, "entnahmen": entnahmen,
             "summe_einnahmen": rund(sum(b["betrag"] for b in einnahmen)),
             "summe_entnahmen": rund(sum(b["betrag"] for b in entnahmen)),
@@ -562,8 +610,10 @@ def ruecklage_speichern(iid):
     wert = request.form.get("anfang", "").strip()
     exe("DELETE FROM ruecklage_bestand WHERE immobilie_id = ? AND jahr = ?", (iid, j))
     if wert:
-        exe("INSERT INTO ruecklage_bestand (immobilie_id, jahr, betrag) VALUES (?, ?, ?)", (iid, j, parse_num(wert)))
-    flash("Anfangsbestand der Rücklage gespeichert." if wert else "Anfangsbestand wird aus dem Vorjahr fortgeschrieben.")
+        exe("INSERT INTO ruecklage_bestand (immobilie_id, jahr, betrag, notiz) VALUES (?, ?, ?, ?)",
+            (iid, j, parse_num(wert), request.form.get("notiz", "").strip()))
+    flash("Anfangsbestand der Rücklage gespeichert." if wert else
+          "Eingetragener Anfangsbestand entfernt; er wird, falls möglich, aus dem Vorjahr fortgeschrieben.")
     return redirect(url_for("immobilie", iid=iid, reiter="ruecklage"))
 
 

@@ -5,7 +5,8 @@
 {% macro buchung_felder(form, b, kostenarten, BEZAHLT) -%}
 <td><input type="date" name="datum" form="{{ form }}" value="{{ b.datum or '' }}" {{ 'required' if form == 'bneu' }} {{ 'autofocus' if form == 'bneu' and request.args.get('neu') }}>
   {% if form != 'bneu' %}<label class="erstattet" title="Nur bei „Bar ausgelegt“: wann die Auslage erstattet wurde">bar erstattet am<input type="date" name="erstattet" form="{{ form }}" value="{{ b.erstattet or '' }}"></label>{% endif %}</td>
-<td><input name="text" form="{{ form }}" value="{{ b.text or '' }}" placeholder="z. B. Lampe Flur Haus 2" required></td>
+<td><input name="text" form="{{ form }}" value="{{ b.text or '' }}" placeholder="z. B. Lampe Flur Haus 2" required>
+  <input name="notiz" class="kommentar" form="{{ form }}" value="{{ b.notiz or '' }}" placeholder="Kommentar (optional)"></td>
 <td><select name="art" form="{{ form }}">
   <option value="ausgabe" {{ 'selected' if b.art != 'einnahme' }}>Ausgabe</option>
   <option value="einnahme" {{ 'selected' if b.art == 'einnahme' }}>Einnahme</option></select></td>
@@ -19,6 +20,16 @@
 <td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
 <td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
 
+{%- endmacro %}
+
+{% macro rl_felder(form, b) -%}
+<td><input type="date" name="datum" form="{{ form }}" value="{{ b.datum or '' }}" required {{ 'autofocus' if form == 'rneu' and request.args.get('neu') }}></td>
+<td><input name="text" form="{{ form }}" value="{{ b.text or '' }}" placeholder="z. B. Bausparrate Januar" required>
+  <input name="notiz" class="kommentar" form="{{ form }}" value="{{ b.notiz or '' }}" placeholder="Kommentar (optional)">
+  <input type="hidden" name="ziel" form="{{ form }}" value="{{ b.ziel or '' }}"></td>
+<td><select name="rl_art" form="{{ form }}">{% for s, t in RL_ARTEN.items() %}<option value="{{ s }}" {{ 'selected' if b.rl_art == s }}>{{ t }}</option>{% endfor %}</select></td>
+<td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
+<td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
 {%- endmacro %}
 
 {% macro beleg_knopf(form, b) -%}
@@ -82,7 +93,7 @@
     {% else %}
     <tr>
       <td>{{ b.datum|datum(True) if b.datum else '–' }}</td>
-      <td>{{ b.text }}</td>
+      <td>{{ b.text }}{% if b.notiz %}<br><small class="leise notiz">{{ b.notiz }}</small>{% endif %}</td>
       <td>{{ 'Einnahme' if b.art == 'einnahme' else 'Ausgabe' }}</td>
       <td>{{ b.kostenart if b.kostenart_id else 'Erhaltungsrücklage' }}</td>
       <td class="zahl {{ 'gutschrift' if b.art == 'einnahme' }}">{{ '+ ' if b.art == 'einnahme' }}{{ b.betrag|eur }}</td>
@@ -179,32 +190,99 @@
 {% endif %}
 
 {% if aktiv == 'ruecklage' %}
+{% set rbb = request.args.get('buchung')|int %}
 <section class="block" id="ruecklage">
   <h2>Rücklage {{ jahr }}</h2>
-  <p class="leise">Bei einer WEG gehört die Erhaltungsrücklage zur Jahresabrechnung (Vermögensbericht, § 28 Abs. 4 WEG) und steht in
-    der Eigentümer-Abrechnung. Beim eigenen Haus kannst du hier z. B. einen Bausparvertrag verfolgen. Die Zuführung kommt aus den
-    Gebäudekosten (Kostenart mit Haken „Rücklage“), Einnahmen und Entnahmen aus den
-    <a href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}">Buchungen</a> mit Ziel „Erhaltungsrücklage“.</p>
-  <table class="schmal ruecklage">
-    <tbody>
-    <tr><th>Anfangsbestand 01.01.{{ jahr }}</th>
-      <td class="zahl">{% if rl.anfang is not none %}{{ rl.anfang|eur }}{% else %}<span class="warnung">fehlt</span>{% endif %}</td>
-      <td class="leise">{% if rl.eingetragen %}eingetragen{% elif rl.anfang is not none %}fortgeschrieben aus {{ jahr - 1 }}{% endif %}</td></tr>
-    <tr><th>+ Zuführung{{ ' aus dem Hausgeld' if immo.weg }}</th><td class="zahl">{{ rl.zufuehrung|eur }}</td><td></td></tr>
-    {% for b in rl.einnahmen %}<tr><th>+ {{ b.text }}{% if b.datum %} <small>({{ b.datum|datum(True) }})</small>{% endif %}</th><td class="zahl">{{ b.betrag|eur }}</td><td></td></tr>{% endfor %}
-    {% for b in rl.entnahmen %}<tr><th>− {{ b.text }}{% if b.datum %} <small>({{ b.datum|datum(True) }})</small>{% endif %}</th><td class="zahl">− {{ b.betrag|eur }}</td><td></td></tr>{% endfor %}
-    </tbody>
-    <tfoot><tr><th>Endbestand 31.12.{{ jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th><th></th></tr></tfoot>
-  </table>
+  <div class="kennzahlen">
+    <div><span>Anfangsbestand 01.01.</span><strong>{{ rl.anfang|eur if rl.anfang is not none else '–' }}</strong>
+      <small class="{{ 'warnung' if rl.anfang is none else 'leise' }}">{% if rl.eingetragen %}eingetragen{% elif rl.anfang is not none %}aus {{ jahr - 1 }} fortgeschrieben{% else %}fehlt{% endif %}</small></div>
+    <div><span>Zuflüsse</span><strong class="gutschrift">+ {{ rl.zufluesse|eur }}</strong><small class="leise">Zuführungen und Einnahmen</small></div>
+    <div><span>Entnahmen</span><strong class="nachzahlung">− {{ rl.abfluesse|eur }}</strong><small class="leise">Ausgaben aus der Rücklage</small></div>
+    <div class="betont"><span>Endbestand 31.12.</span><strong>{{ rl.ende|eur }}</strong><small class="leise">{{ rl.eintraege|length }} Bewegung{{ 'en' if rl.eintraege|length != 1 }}</small></div>
+  </div>
+
   {% if ist_admin %}
-  <form method="post" action="{{ url_for('ruecklage_speichern', iid=immo.id) }}" class="zeile">
-    <label>Anfangsbestand 01.01.{{ jahr }} (€)<input class="betrag" name="anfang" inputmode="decimal"
-      value="{{ rl.anfang|num if rl.eingetragen else '' }}" placeholder="{{ rl.anfang|num if rl.anfang is not none else '' }}"></label>
-    {{ speichern() }}
-  </form>
-  <p class="leise"><small>Den Anfangsbestand brauchst du nur im ersten Jahr, danach wird der Endbestand des Vorjahres übernommen.
-    Leer speichern = fortschreiben.</small></p>
+  <form id="rneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data">
+    <input type="hidden" name="reiter" value="ruecklage"></form>
+  <form id="ranfang" method="post" action="{{ url_for('ruecklage_speichern', iid=immo.id) }}"></form>
   {% endif %}
+  <div class="tabelle">
+  <table class="buchungen rl-blatt">
+    <thead><tr><th>Datum</th><th>Beschreibung / Kommentar</th><th>Art</th><th class="zahl">Betrag</th><th>Bezahlt</th>
+      <th class="zahl">Stand</th><th class="aktionen">Beleg</th></tr></thead>
+    <tbody>
+    {% if ist_admin and not rbb %}
+    <tr class="in-bearbeitung">{{ rl_felder('rneu', rl_vorlage) }}
+      <td></td>
+      <td class="aktionen">{{ beleg_knopf('rneu', rl_vorlage) }}<button class="btn-icon" form="rneu" title="Speichern (Enter)">{{ icon('save', 16) }}</button></td>
+    </tr>
+    {% endif %}
+    {% if ist_admin and request.args.get('anfang') %}
+    <tr class="in-bearbeitung">
+      <td>01.01.{{ jahr }}</td>
+      <td><strong>Anfangsbestand</strong>
+        <input name="notiz" class="kommentar" form="ranfang" value="{{ rl.notiz }}" placeholder="Kommentar, z. B. Kontoauszug vom 31.12."></td>
+      <td></td>
+      <td class="zahl"><input class="betrag" name="anfang" form="ranfang" inputmode="decimal" value="{{ rl.anfang|num if rl.eingetragen else '' }}"
+        placeholder="{{ rl.anfang|num if rl.anfang is not none else '' }}" {{ 'autofocus' }}></td>
+      <td colspan="2" class="leise"><small>Leer = aus dem Vorjahr fortschreiben</small></td>
+      <td class="aktionen"><button class="btn-icon" form="ranfang" title="Speichern">{{ icon('save', 16) }}</button>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage') }}" title="Abbrechen">{{ icon('x', 16) }}</a></td>
+    </tr>
+    {% else %}
+    <tr class="anfang">
+      <td>01.01.{{ jahr }}</td>
+      <td><strong>Anfangsbestand</strong>{% if rl.notiz %}<br><small class="leise notiz">{{ rl.notiz }}</small>{% endif %}
+        {% if not rl.eingetragen and rl.anfang is not none %}<br><small class="leise">aus {{ jahr - 1 }} fortgeschrieben</small>{% endif %}</td>
+      <td></td>
+      <td class="zahl">{% if rl.anfang is not none %}{{ rl.anfang|eur }}{% else %}<span class="warnung">fehlt</span>{% endif %}</td>
+      <td></td>
+      <td class="zahl">{{ (rl.anfang or 0)|eur }}</td>
+      <td class="aktionen">{% if ist_admin %}
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage', anfang=1) }}" title="Anfangsbestand bearbeiten">{{ icon('edit', 16) }}</a>
+        {% if rl.eingetragen %}<form method="post" action="{{ url_for('ruecklage_speichern', iid=immo.id) }}" class="inline"
+          onsubmit="return confirm('Eingetragenen Anfangsbestand löschen? Er wird dann, falls möglich, aus dem Vorjahr fortgeschrieben.')">
+          <input type="hidden" name="anfang" value=""><button class="btn-icon gefahr" title="Löschen">{{ icon('trash', 16) }}</button></form>{% endif %}
+        {% endif %}</td>
+    </tr>
+    {% endif %}
+    {% for b in rl.eintraege %}
+    {% if ist_admin and rbb == b.id %}
+    <tr class="in-bearbeitung">{{ rl_felder('r%d' % b.id, dict(b, ziel=b.kostenart_id|string if b.kostenart_id else '')) }}
+      <td></td>
+      <td class="aktionen">{{ beleg_knopf('r%d' % b.id, b) }}
+        <form id="r{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline">
+          <input type="hidden" name="reiter" value="ruecklage">
+          <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage') }}" title="Abbrechen">{{ icon('x', 16) }}</a></td>
+    </tr>
+    {% else %}
+    <tr>
+      <td>{{ b.datum|datum(True) if b.datum else '–' }}</td>
+      <td>{{ b.text }}{% if b.notiz %}<br><small class="leise notiz">{{ b.notiz }}</small>{% endif %}
+        {% if b.rl_art == 'zufuehrung' %}<br><small class="leise">über „{{ b.kostenart }}“ umgelegt</small>{% endif %}</td>
+      <td>{{ RL_ARTEN[b.rl_art] }}</td>
+      <td class="zahl {{ 'gutschrift' if b.wert > 0 else 'nachzahlung' }}">{{ '+' if b.wert > 0 else '−' }} {{ b.betrag|eur }}</td>
+      <td>{{ BEZAHLT[b.bezahlt] }}</td>
+      <td class="zahl">{{ b.stand|eur }}</td>
+      <td class="aktionen">{% if b.dokument_id %}{% if ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('klammer', 16) }}</a>{% else %}<span class="leise" title="Beleg vorhanden">{{ icon('klammer', 16) }}</span>{% endif %}
+        {% else %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>{% endif %}
+        {% if ist_admin %}
+        <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage', buchung=b.id) }}" title="Bearbeiten">{{ icon('edit', 16) }}</a>
+        <form method="post" action="{{ url_for('buchung_loeschen', bid=b.id) }}" class="inline" onsubmit="return confirm({{ ('Eintrag „%s“ löschen?' % b.text)|tojson|forceescape }})">
+          <input type="hidden" name="reiter" value="ruecklage"><button class="btn-icon gefahr" title="Löschen">{{ icon('trash', 16) }}</button></form>
+        {% endif %}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th colspan="5">Endbestand 31.12.{{ jahr }}</th><th class="zahl">{{ rl.ende|eur }}</th><th></th></tr></tfoot>
+  </table>
+  </div>
+  <p class="leise"><small><strong>Zuführung</strong>: regelmäßige Einzahlung (z. B. Hausgeld-Anteil oder Bausparrate). Sie läuft über die
+    Kostenart mit Haken „Rücklage“ und erscheint deshalb auch in den Gebäudekosten und der Eigentümer-Abrechnung.
+    <strong>Einnahme</strong> (z. B. PV-Vergütung, Zinsen) und <strong>Entnahme</strong> (z. B. Reparatur aus der Rücklage) werden nicht umgelegt.
+    Den Anfangsbestand brauchst du nur im ersten Jahr; danach wird der Endbestand des Vorjahres übernommen.</small></p>
 </section>
 {% endif %}
 

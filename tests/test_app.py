@@ -273,7 +273,36 @@ def test_gesamter_ablauf():
     html = ok(c.get("/immobilien/1")).get_data(as_text=True)
     assert "Gebäudeversicherung" in html
     html = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
-    assert "11.800,00 €" in html and "fortgeschrieben aus 2025" in html
+    assert "11.800,00 €" in html and "aus 2025 fortgeschrieben" in html
+    # Rücklage als Kontoblatt: Einträge direkt im Reiter, mit Kommentar, bearbeitbar und löschbar
+    r = post(c, "/immobilien/1/buchungen", data={"reiter": "ruecklage", "rl_art": "zufuehrung", "datum": "2026-01-31",
+                                                 "text": "Bausparrate Januar", "notiz": "Vertrag 4711", "betrag": "100",
+                                                 "bezahlt": "konto"})
+    assert r.headers["Location"].endswith("reiter=ruecklage&neu=1")
+    post(c, "/immobilien/1/buchungen", data={"reiter": "ruecklage", "rl_art": "einnahme", "datum": "2026-03-01",
+                                               "text": "Zinsen", "betrag": "5", "bezahlt": "konto"})
+    post(c, "/immobilien/1/buchungen", data={"reiter": "ruecklage", "rl_art": "entnahme", "datum": "2026-04-01",
+                                               "text": "Dachrinne", "betrag": "50", "bezahlt": "bar"})
+    html = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "Vertrag 4711" in html and "11.855,00 €" in html  # 11.800 + 100 + 5 − 50
+    assert "11.900,00 €" in html and "11.905,00 €" in html  # laufender Stand
+    zufuehrung_2026 = dbcon.execute("SELECT id, kostenart_id, kosten_id FROM buchung WHERE text = 'Bausparrate Januar'").fetchone()
+    assert zufuehrung_2026[1] == zufuehrung and zufuehrung_2026[2]  # läuft über die Rücklage-Kostenart, wird umgelegt
+    bid = zufuehrung_2026[0]
+    assert 'name="rl_art"' in ok(c.get(f"/immobilien/1?reiter=ruecklage&buchung={bid}")).get_data(as_text=True)
+    r = post(c, f"/buchungen/{bid}", data={"reiter": "ruecklage", "rl_art": "zufuehrung", "ziel": str(zufuehrung),
+                                           "datum": "2026-01-31", "text": "Bausparrate Januar", "notiz": "geändert",
+                                           "betrag": "120", "bezahlt": "konto"})
+    assert r.headers["Location"].endswith("reiter=ruecklage")
+    html = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "geändert" in html and "11.875,00 €" in html
+    post(c, "/immobilien/1/ruecklage", data={"anfang": "100", "notiz": "Testeintrag"})
+    html = ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    assert "Testeintrag" in html and "175,00 €" in html  # 100 + 120 + 5 − 50
+    post(c, "/immobilien/1/ruecklage", data={"anfang": ""})  # eingetragenen Anfangsbestand wieder entfernen
+    assert "11.875,00 €" in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
+    post(c, f"/buchungen/{bid}/loeschen", data={"reiter": "ruecklage"})
+    assert "geändert" not in ok(c.get("/immobilien/1?reiter=ruecklage")).get_data(as_text=True)
     # Reiter: jeder Bereich hat eine eigene Adresse, der Jahr-Umschalter behält den Reiter
     assert "/immobilien/1?jahr=2025&amp;reiter=ruecklage" in html
     for reiter, text in (("buchungen", "Belege und Buchungen"), ("zaehler", "Hauptzähler"), ("dokumente", "Ablage"),
