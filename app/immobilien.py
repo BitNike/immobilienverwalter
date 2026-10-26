@@ -267,6 +267,11 @@ def immobilie(iid):
     buchungen = rows("SELECT b.*, ka.name AS kostenart, ka.ruecklage AS zufuehrung FROM buchung b "
                      "LEFT JOIN kostenart ka ON ka.id = b.kostenart_id WHERE b.immobilie_id = ? AND b.jahr = ? "
                      "ORDER BY b.datum IS NULL, b.datum DESC, b.id DESC", (iid, j))
+    # Buchungen mit Belegdatum in diesem Jahr, die (meist versehentlich) in einem anderen Jahr stehen
+    fremde = rows("SELECT b.*, ka.name AS kostenart, (b.kostenart_id IS NULL OR ka.ruecklage = 1) AS rl_eintrag "
+                  "FROM buchung b LEFT JOIN kostenart ka ON ka.id = b.kostenart_id "
+                  "WHERE b.immobilie_id = ? AND b.jahr <> ? AND substr(b.datum, 1, 4) = ? ORDER BY b.datum, b.id",
+                  (iid, j, str(j)))
     belege = {}
     for b in buchungen:
         if b["kosten_id"]:
@@ -292,7 +297,7 @@ def immobilie(iid):
                            reiter=reiter, aktiv=reiter_waehlen(reiter),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefung, buchungen=buchungen, belege=belege, vorlage=vorlage,
-                           rl_vorlage=rl_vorlage, BEZAHLT=BEZAHLT, RL_ARTEN=RL_ARTEN,
+                           rl_vorlage=rl_vorlage, BEZAHLT=BEZAHLT, RL_ARTEN=RL_ARTEN, fremde=fremde,
                            offen_bar=[b for b in buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
                            rl=ruecklage(iid, j),
@@ -546,6 +551,25 @@ def buchung_speichern(bid):
         kosten_aus_buchungen(b["kosten_id"])
     _jahr_hinweis(j)
     return redirect(url_for("immobilie", iid=immo["id"], reiter=_buchung_reiter(), jahr=j if j != jahr() else None))
+
+
+@app.post("/buchungen/<int:bid>/jahr")
+@admin_noetig
+def buchung_ins_datumsjahr(bid):
+    """Buchung in das Jahr ihres Belegdatums verschieben (z. B. versehentlich im falschen Jahr erfasst)."""
+    b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (b["immobilie_id"],))
+    if not b["datum"]:
+        raise ValueError("Die Buchung hat kein Datum.")
+    j = int(b["datum"][:4])
+    kid = kostenposition(immo, j, b["kostenart_id"]) if b["kostenart_id"] else None
+    exe("UPDATE buchung SET jahr = ?, kosten_id = ? WHERE id = ?", (j, kid, bid))
+    if kid:
+        kosten_aus_buchungen(kid)
+    if b["kosten_id"] and b["kosten_id"] != kid:
+        kosten_aus_buchungen(b["kosten_id"])
+    flash(f"„{b['text']}“ steht jetzt im Jahr {j}.")
+    return zurueck()
 
 
 @app.post("/buchungen/<int:bid>/erstattet")

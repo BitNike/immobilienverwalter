@@ -32,6 +32,22 @@
 <td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
 {%- endmacro %}
 
+{% macro fremde_buchungen(fremde, jahr) -%}
+{% if fremde %}
+<div class="meldung">
+  <strong>{{ fremde|length }} Buchung{{ 'en' if fremde|length != 1 }} mit Datum in {{ jahr }} {{ 'stehen' if fremde|length != 1 else 'steht' }} in einem anderen Jahr</strong>
+  <ul class="kompakt-liste">
+  {% for b in fremde %}
+    <li>{{ b.datum|datum(True) }} · {{ b.text }} · {{ b.betrag|eur }} <span class="leise">(im Jahr {{ b.jahr }}, {{ b.kostenart or 'Rücklage' }})</span>
+      {% if ist_admin %}<form method="post" action="{{ url_for('buchung_ins_datumsjahr', bid=b.id) }}" class="inline">
+        <button class="link-knopf">nach {{ jahr }} holen</button></form>{% endif %}</li>
+  {% endfor %}
+  </ul>
+  <small class="leise">Gehört eine davon bewusst ins andere Jahr (z. B. eine Vorjahresrechnung), einfach so lassen.</small>
+</div>
+{% endif %}
+{%- endmacro %}
+
 {% macro beleg_knopf(form, b) -%}
 <label class="btn hell klein beleg-wahl" title="Beleg anhängen (Foto oder PDF)">{{ icon('klammer', 15) }}<span>{{ 'Ersetzen' if b.dokument_id else 'Beleg' }}</span><input type="file" name="beleg" form="{{ form }}" accept=".pdf,image/*" hidden
   onchange="var f = this.files.length ? this.files[0].name : ''; this.parentNode.classList.toggle('gewaehlt', !!f); this.previousElementSibling.textContent = f ? '✓ ' + (f.length > 18 ? f.slice(0, 16) + '…' : f) : {{ ('Ersetzen' if b.dokument_id else 'Beleg')|tojson|forceescape }}; this.parentNode.title = f || 'Beleg anhängen (Foto oder PDF)'"></label>
@@ -71,6 +87,7 @@
 {% if aktiv == 'buchungen' %}
 <section class="block" id="buchungen">
   <h2>Belege und Buchungen {{ jahr }}</h2>
+  {{ fremde_buchungen(fremde, jahr) }}
   <p class="leise">Eine Zeile je Rechnung, Kassenbon oder Einnahme. Mit einer <strong>Kostenart</strong> zählt der Betrag zu den
     Gebäudekosten und wird umgelegt, eine Einnahme mindert sie (z. B. eine Erstattung der Stadtwerke). Mit
     <strong>Erhaltungsrücklage</strong> wird nichts umgelegt: Einnahmen (z. B. PV-Anlage) fließen in die Rücklage, Ausgaben werden ihr
@@ -104,7 +121,8 @@
     {% else %}
     <tr>
       <td>{{ b.datum|datum(True) if b.datum else '–' }}{% if b.datum and b.datum[:4] != b.jahr|string %}<br>
-        <small class="warnung" title="Belegdatum außerhalb des Abrechnungsjahres. Zum Verschieben bearbeiten und speichern.">nicht {{ b.jahr }}</small>{% endif %}</td>
+        <small class="warnung" title="Belegdatum außerhalb des Abrechnungsjahres">nicht {{ b.jahr }}</small>{% if ist_admin %}<form method="post" action="{{ url_for('buchung_ins_datumsjahr', bid=b.id) }}" class="inline">
+          <button class="link-knopf" title="Buchung ins Jahr {{ b.datum[:4] }} verschieben">→ {{ b.datum[:4] }}</button></form>{% endif %}{% endif %}</td>
       <td>{{ b.text }}{% if b.notiz %}<br><small class="leise notiz">{{ b.notiz }}</small>{% endif %}</td>
       <td>{{ 'Einnahme' if b.art == 'einnahme' else 'Ausgabe' }}</td>
       <td>{{ b.kostenart if b.kostenart_id else 'Erhaltungsrücklage' }}</td>
@@ -218,6 +236,7 @@
 {% set rbb = request.args.get('buchung')|int %}
 <section class="block" id="ruecklage">
   <h2>Rücklage {{ jahr }}</h2>
+  {{ fremde_buchungen(fremde|selectattr('rl_eintrag')|list, jahr) }}
   <div class="kennzahlen">
     <div><span>Anfangsbestand 01.01.</span><strong>{{ rl.anfang|eur if rl.anfang is not none else '–' }}</strong>
       <small class="{{ 'warnung' if rl.anfang is none else 'leise' }}">{% if rl.eingetragen %}eingetragen{% elif rl.anfang is not none %}aus {{ jahr - 1 }} fortgeschrieben{% else %}fehlt{% endif %}</small></div>

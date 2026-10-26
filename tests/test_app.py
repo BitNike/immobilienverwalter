@@ -238,6 +238,14 @@ def test_gesamter_ablauf():
     assert kosten(garten) == [23.75]  # bewusst im Jahr 2025 gelassen (z. B. Rechnung fürs Vorjahr)
     html = ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
     assert "nicht 2025" in html and "Summe Ausgaben" in html
+    # im Jahr 2026 erscheint ein Hinweis mit „nach 2026 holen“; ein Klick verschiebt die Buchung samt Gebäudekosten
+    assert "→ 2026</button>" in html
+    html = ok(c.get("/immobilien/1?jahr=2026&reiter=buchungen")).get_data(as_text=True)
+    assert "1 Buchung mit Datum in 2026 steht in einem anderen Jahr" in html and "nach 2026 holen" in html
+    post(c, f"/buchungen/{tanken[0]}/jahr")
+    assert kosten(garten) == [] and dbcon.execute("SELECT jahr FROM buchung WHERE id = ?", (tanken[0],)).fetchone()[0] == 2026
+    assert "nach 2026 holen" not in ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    c.get("/immobilien/1?jahr=2025")
     post(c, f"/buchungen/{tanken[0]}/loeschen")
     assert kosten(garten) == []
     # Erhaltungsrücklage: Zuführung über die Kostenart, PV-Einnahme hinein, Energieausweise heraus
