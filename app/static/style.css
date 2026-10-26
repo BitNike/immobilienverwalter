@@ -142,6 +142,12 @@ table.abrechnung td, table.abrechnung th { vertical-align: middle; }
 /* Buchungen: Eingabezeile direkt in der Tabelle, Enter speichert */
 table.buchungen th, table.buchungen td { vertical-align: middle; padding-left: 4px; padding-right: 4px; }
 table.buchungen input, table.buchungen select { padding-left: 7px; }
+/* Auf breiten Bildschirmen bekommt nur die Beschreibung den freien Platz, die übrigen Spalten bleiben so schmal wie ihr Inhalt */
+table.buchungen th { width: 1%; white-space: nowrap; }
+table.buchungen th:nth-child(2) { width: auto; }
+table.buchungen td:nth-child(2) { min-width: 140px; }
+table.buchungen td:nth-child(6) { white-space: nowrap; }
+table.buchungen tfoot tr.unter th { border-top: none; padding-top: 2px; font-weight: normal; }
 table.buchungen .aktionen > * { margin-left: 2px; }
 table.buchungen input[name=text] { min-width: 100px; }
 table.buchungen input[type=date] { width: 124px; }

@@ -212,7 +212,7 @@ def test_gesamter_ablauf():
     assert os.path.exists(os.path.join(TMP, "dokumente", "Lindenhof 7", "2025", "Vermieter", "Obi.pdf"))
     assert kosten(garten) == [35.98]
     html = ok(c.get("/immobilien/1?reiter=buchungen&neu=1")).get_data(as_text=True)
-    assert "noch nicht erstattet" in html and "zusammen 35,98 €" in html
+    assert "offen</small>" in html and "zusammen 35,98 €" in html
     assert "aus 2 Buchungen" in ok(c.get("/immobilien/1")).get_data(as_text=True)  # Übersicht: Gebäudekosten
     assert 'value="2025-11-24" required autofocus' in html and f'<option value="{garten}" selected>' in html
     post(c, "/immobilien/1/buchungen", data={"datum": "2025-12-10", "text": "Gutschrift", "art": "einnahme",
@@ -222,10 +222,24 @@ def test_gesamter_ablauf():
     post(c, "/buchungen/4", data={"datum": "2025-11-24", "text": "Obi", "art": "ausgabe", "ziel": hausmeister,
                                   "betrag": "17,97", "bezahlt": "bar", "erstattet": "2025-12-01"})
     assert kosten(garten) == [12.03] and kosten(hausmeister) == [17.97]
-    assert "noch nicht erstattet" not in ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert "offen</small>" not in ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
     post(c, "/buchungen/3/loeschen")
     post(c, "/buchungen/5/loeschen")
     assert kosten(garten) == []  # ohne Buchungen fällt die Kostenposition weg
+    # Belegdatum aus einem anderen Jahr: nach Rückfrage (Feld buchungsjahr) landet die Buchung dort, die Ansicht wechselt mit
+    r = post(c, "/immobilien/1/buchungen", data={"datum": "2026-07-06", "text": "Tanken", "art": "ausgabe", "ziel": garten,
+                                                 "betrag": "23,75", "bezahlt": "konto", "buchungsjahr": "2026"})
+    assert "jahr=2026" in r.headers["Location"]
+    tanken = dbcon.execute("SELECT id, jahr FROM buchung WHERE text = 'Tanken'").fetchone()
+    assert tanken[1] == 2026 and kosten(garten) == []
+    c.get("/immobilien/1?jahr=2025")
+    post(c, f"/buchungen/{tanken[0]}", data={"datum": "2026-07-06", "text": "Tanken", "art": "ausgabe", "ziel": garten,
+                                             "betrag": "23,75", "bezahlt": "konto", "buchungsjahr": "2025"})
+    assert kosten(garten) == [23.75]  # bewusst im Jahr 2025 gelassen (z. B. Rechnung fürs Vorjahr)
+    html = ok(c.get("/immobilien/1?reiter=buchungen")).get_data(as_text=True)
+    assert "nicht 2025" in html and "Summe Ausgaben" in html
+    post(c, f"/buchungen/{tanken[0]}/loeschen")
+    assert kosten(garten) == []
     # Erhaltungsrücklage: Zuführung über die Kostenart, PV-Einnahme hinein, Energieausweise heraus
     post(c, "/immobilien/1/buchungen", data={"datum": "2025-12-31", "text": "Zuführung", "art": "ausgabe",
                                                "ziel": zufuehrung, "betrag": "1.900,00", "bezahlt": "konto"})

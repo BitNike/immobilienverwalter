@@ -38,6 +38,15 @@
 {%- endmacro %}
 
 {% block content %}
+<script>
+  // Liegt das Belegdatum in einem anderen Jahr, nachfragen, in welches Abrechnungsjahr die Buchung gehört.
+  function jahrPruefen(f, j) {
+    var d = f.elements.datum && f.elements.datum.value, y = d ? +d.slice(0, 4) : j;
+    f.elements.buchungsjahr.value = y === j || !confirm('Das Belegdatum liegt im Jahr ' + y + ', angezeigt wird ' + j + '.\n\n'
+      + 'OK: Buchung ins Jahr ' + y + ' übernehmen\nAbbrechen: im Jahr ' + j + ' lassen (z. B. Rechnung für ' + j + ', die später kam)') ? j : y;
+    return true;
+  }
+</script>
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
 {% set bb = request.args.get('buchung')|int %}
 <div class="kopf">
@@ -67,7 +76,8 @@
     <strong>Erhaltungsrücklage</strong> wird nichts umgelegt: Einnahmen (z. B. PV-Anlage) fließen in die Rücklage, Ausgaben werden ihr
     entnommen. Kosten nur einer Wohnung (z. B. Heizkostenabrechnung) trägst du beim Mietobjekt ein.</p>
   {% if ist_admin %}
-  <form id="bneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data"></form>
+  <form id="bneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data"
+    onsubmit="return jahrPruefen(this, {{ jahr }})"><input type="hidden" name="buchungsjahr"></form>
   {% endif %}
   <div class="tabelle">
   <table class="buchungen">
@@ -85,14 +95,16 @@
     <tr class="in-bearbeitung">
       {{ buchung_felder('b%d' % b.id, dict(b, ziel=(b.kostenart_id|string if b.kostenart_id else 'ruecklage')), kostenarten, BEZAHLT) }}
       <td class="aktionen">{{ beleg_knopf('b%d' % b.id, b) }}
-        <form id="b{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline">
+        <form id="b{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline"
+          onsubmit="return jahrPruefen(this, {{ b.jahr }})"><input type="hidden" name="buchungsjahr">
           <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}" title="Abbrechen">{{ icon('x', 16) }}</a>
       </td>
     </tr>
     {% else %}
     <tr>
-      <td>{{ b.datum|datum(True) if b.datum else '–' }}</td>
+      <td>{{ b.datum|datum(True) if b.datum else '–' }}{% if b.datum and b.datum[:4] != b.jahr|string %}<br>
+        <small class="warnung" title="Belegdatum außerhalb des Abrechnungsjahres. Zum Verschieben bearbeiten und speichern.">nicht {{ b.jahr }}</small>{% endif %}</td>
       <td>{{ b.text }}{% if b.notiz %}<br><small class="leise notiz">{{ b.notiz }}</small>{% endif %}</td>
       <td>{{ 'Einnahme' if b.art == 'einnahme' else 'Ausgabe' }}</td>
       <td>{{ b.kostenart if b.kostenart_id else 'Erhaltungsrücklage' }}</td>
@@ -100,7 +112,7 @@
       <td>{{ BEZAHLT[b.bezahlt] }}
         {% if b.art == 'ausgabe' and b.bezahlt == 'bar' %}<br>
         {% if b.erstattet %}<small class="leise">erstattet {{ b.erstattet|datum(True) }}</small>
-        {% else %}<small class="warnung">noch nicht erstattet</small>
+        {% else %}<small class="warnung" title="Bar ausgelegt, noch nicht erstattet">offen</small>
           {% if ist_admin %}<form method="post" action="{{ url_for('buchung_erstattet', bid=b.id) }}" class="inline">
             <button class="link-knopf" title="Heute von der WEG erstattet">erstattet</button></form>{% endif %}
         {% endif %}{% endif %}</td>
@@ -117,6 +129,19 @@
     <tr><td colspan="7" class="leise">Für {{ jahr }} sind noch keine Buchungen erfasst.</td></tr>
     {% endfor %}
     </tbody>
+    {% if buchungen %}
+    {% set ausgaben = buchungen|selectattr('art', 'equalto', 'ausgabe')|sum(attribute='betrag') %}
+    {% set einnahmen = buchungen|selectattr('art', 'equalto', 'einnahme')|sum(attribute='betrag') %}
+    <tfoot>
+      <tr><th colspan="4">Summe Ausgaben <small class="leise">({{ buchungen|selectattr('art', 'equalto', 'ausgabe')|list|length }})</small></th>
+        <th class="zahl">{{ ausgaben|eur }}</th><th colspan="2"></th></tr>
+      {% if einnahmen %}
+      <tr class="unter"><th colspan="4">Summe Einnahmen <small class="leise">({{ buchungen|selectattr('art', 'equalto', 'einnahme')|list|length }})</small></th>
+        <th class="zahl gutschrift">+ {{ einnahmen|eur }}</th><th colspan="2"></th></tr>
+      <tr class="unter"><th colspan="4">Saldo</th><th class="zahl">{{ (ausgaben - einnahmen)|eur }}</th><th colspan="2"></th></tr>
+      {% endif %}
+    </tfoot>
+    {% endif %}
   </table>
   </div>
   {% set ohne_beleg = buchungen|rejectattr('dokument_id')|list %}
@@ -202,7 +227,8 @@
   </div>
 
   {% if ist_admin %}
-  <form id="rneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data">
+  <form id="rneu" method="post" action="{{ url_for('buchung_neu', iid=immo.id) }}" enctype="multipart/form-data"
+    onsubmit="return jahrPruefen(this, {{ jahr }})"><input type="hidden" name="buchungsjahr">
     <input type="hidden" name="reiter" value="ruecklage"></form>
   <form id="ranfang" method="post" action="{{ url_for('ruecklage_speichern', iid=immo.id) }}"></form>
   {% endif %}
@@ -251,7 +277,8 @@
     <tr class="in-bearbeitung">{{ rl_felder('r%d' % b.id, dict(b, ziel=b.kostenart_id|string if b.kostenart_id else '')) }}
       <td></td>
       <td class="aktionen">{{ beleg_knopf('r%d' % b.id, b) }}
-        <form id="r{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline">
+        <form id="r{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline"
+          onsubmit="return jahrPruefen(this, {{ b.jahr }})"><input type="hidden" name="buchungsjahr">
           <input type="hidden" name="reiter" value="ruecklage">
           <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='ruecklage') }}" title="Abbrechen">{{ icon('x', 16) }}</a></td>

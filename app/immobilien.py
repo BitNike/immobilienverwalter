@@ -476,6 +476,17 @@ def buchung_werte():
     return vals
 
 
+def _buchungsjahr(standard):
+    """Abrechnungsjahr der Buchung: vom Formular (Rückfrage, wenn das Belegdatum in einem anderen Jahr liegt), sonst standard."""
+    j = request.form.get("buchungsjahr", type=int)
+    return j if j and 1990 <= j <= 2200 else standard
+
+
+def _jahr_hinweis(j):
+    if j != jahr():
+        flash(f"Die Buchung steht im Jahr {j}; die Ansicht wurde auf {j} umgestellt.")
+
+
 def _buchung_reiter():
     """Nach dem Speichern zurück auf den Reiter, von dem aus gebucht wurde."""
     return "ruecklage" if request.form.get("reiter") == "ruecklage" else "buchungen"
@@ -496,7 +507,7 @@ def _beleg_speichern(immo, j, vals):
 @admin_noetig
 def buchung_neu(iid):
     immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
-    j = jahr()
+    j = _buchungsjahr(jahr())
     vals = buchung_werte()
     if not vals["datum"]:
         raise ValueError("Bitte das Datum des Belegs angeben.")
@@ -513,7 +524,8 @@ def buchung_neu(iid):
         session["ruecklage_vorlage"] = {**vorlage, "rl_art": request.form.get("rl_art")}
     else:
         session["buchung_vorlage"] = vorlage
-    return redirect(url_for("immobilie", iid=iid, reiter=_buchung_reiter(), neu=1))
+    _jahr_hinweis(j)
+    return redirect(url_for("immobilie", iid=iid, reiter=_buchung_reiter(), neu=1, jahr=j if j != jahr() else None))
 
 
 @app.post("/buchungen/<int:bid>")
@@ -522,8 +534,9 @@ def buchung_speichern(bid):
     b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
     immo = row("SELECT * FROM immobilie WHERE id = ?", (b["immobilie_id"],))
     vals = buchung_werte()
-    vals["kosten_id"] = kostenposition(immo, b["jahr"], vals["kostenart_id"]) if vals["kostenart_id"] else None
-    dok = _beleg_speichern(immo, b["jahr"], vals)
+    vals["jahr"] = j = _buchungsjahr(b["jahr"])
+    vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"]) if vals["kostenart_id"] else None
+    dok = _beleg_speichern(immo, j, vals)
     if dok:
         vals["dokument_id"] = dok
     exe(f"UPDATE buchung SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), bid])
@@ -531,7 +544,8 @@ def buchung_speichern(bid):
         kosten_aus_buchungen(vals["kosten_id"])
     if b["kosten_id"] and b["kosten_id"] != vals["kosten_id"]:
         kosten_aus_buchungen(b["kosten_id"])
-    return redirect(url_for("immobilie", iid=immo["id"], reiter=_buchung_reiter()))
+    _jahr_hinweis(j)
+    return redirect(url_for("immobilie", iid=immo["id"], reiter=_buchung_reiter(), jahr=j if j != jahr() else None))
 
 
 @app.post("/buchungen/<int:bid>/erstattet")
