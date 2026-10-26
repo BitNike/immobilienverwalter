@@ -483,7 +483,7 @@ def test_gesamter_ablauf():
     for reiter, text in (("buchungen", "Belege und Buchungen"), ("zaehler", "Hauptzähler"), ("dokumente", "Ablage"),
                          ("stammdaten", "Dokumentenordner"), ("unbekannt", "Gebäudekosten")):
         assert text in ok(c.get(f"/immobilien/1?reiter={reiter}")).get_data(as_text=True), reiter
-    for reiter, text in (("mieter", "Neues Mietverhältnis"), ("zaehler", "Zähler &amp; Ablesungen"),
+    for reiter, text in (("mieter", "Neues Mietverhältnis"), ("zaehler", "Wasserverbrauch"),
                          ("dokumente", "Dokumente hochladen"), ("stammdaten", "Aus der Immobilie lösen")):
         assert text in ok(c.get(f"/wohnungen/1?reiter={reiter}")).get_data(as_text=True), reiter
 
@@ -502,7 +502,21 @@ def test_gesamter_ablauf():
     html = ok(c.get("/immobilien/1?jahr=2025&reiter=zaehler")).get_data(as_text=True)
     assert "Flurstrom Haus 2" in html and "Hauptwasser Keller" in html and "Jahresablesung" in html
     assert "550,0 kWh" in html                                    # 400 + 150
-    assert "Wohnungsuhren zusammen 50,0 m³, Differenz 10,0 m³" in html  # 60 Haupt − (30 EG + 20 OG)
+    assert "Wohnungsuhren 50,0 m³ · Differenz 10,0 m³" in html
+    # Zählertabelle wie die Rücklage: Stand 01.01./31.12., Verbrauch je Zähler; Ablesung über die Auswahl eintragen
+    assert "Stand 01.01.2025" in html and "1.000,00 kWh" in html and "<strong>400,0 kWh</strong>" in html
+    r = post(c, "/zaehlerstaende", data={"zaehler_id": "4", "datum": "2026-06-30", "stand": "1.500",
+                                         "next": "/immobilien/1?reiter=zaehler"})
+    assert r.headers["Location"] == "/immobilien/1?reiter=zaehler&jahr=2026"  # Ablesung aus 2026 → Ansicht springt mit
+    html = ok(c.get(r.headers["Location"])).get_data(as_text=True)
+    assert "1.400,00 kWh" in html and "1.500,00 kWh" in html and "100,0 kWh<br>" in html and "bisher, bis 30.06.26" in html
+    sid = dbcon.execute("SELECT id FROM zaehlerstand WHERE stand = 1500").fetchone()[0]
+    post(c, f"/zaehlerstaende/{sid}", data={"datum": "2026-06-30", "stand": "1.550", "notiz": "korrigiert",
+                                            "next": "/immobilien/1?reiter=zaehler"})
+    html = ok(c.get("/immobilien/1?reiter=zaehler")).get_data(as_text=True)
+    assert "korrigiert" in html and "150,0 kWh<br>" in html
+    post(c, f"/zaehlerstaende/{sid}/loeschen")
+    c.get("/immobilien/1?jahr=2025")  # 60 Haupt − (30 EG + 20 OG)
 
     # Logo, Kostenart
     post(c, "/einstellungen/admin/logo", data={"logo_typ": "text", "logo_text": "Vermietung",

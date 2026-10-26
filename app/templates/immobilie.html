@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_ui.html" import icon, info, reiter_leiste, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, zaehler_karte, ablage_bereich, saldo %}
+{% from "_ui.html" import icon, info, reiter_leiste, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, ablage_bereich, saldo %}
+{% from "_ui.html" import zaehler_bereich with context %}
 {% block title %}{{ immo.name }}{% endblock %}
 
 {% macro ziel_auswahl(form, b, kostenarten) -%}
@@ -129,7 +130,7 @@
       {% if hg_opt %}<option value="hausgeld" {{ 'selected' if filter_.ziel == 'hausgeld' }}>Hausgeld</option>{% endif %}
       <option value="ruecklage" {{ 'selected' if filter_.ziel == 'ruecklage' }}>→ Rücklage</option>
       {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if filter_.ziel == k.id|string }}>{{ k.name }}</option>{% endfor %}</select>
-    <select name="art" aria-label="Art"><option value="">Ausgaben und Einnahmen</option>
+    <select name="art" aria-label="Art"><option value="">alle Arten</option>
       <option value="ausgabe" {{ 'selected' if filter_.art == 'ausgabe' }}>nur Ausgaben</option>
       <option value="einnahme" {{ 'selected' if filter_.art == 'einnahme' }}>nur Einnahmen</option></select>
     <select name="monat" aria-label="Monat"><option value="">alle Monate</option>
@@ -142,9 +143,9 @@
       {% for e in hg_opt %}{% for w in e.wohnungen %}<option value="{{ w.id }}" {{ 'selected' if filter_.wohnung == w.id|string }}>{{ w.bezeichnung }}</option>{% endfor %}{% endfor %}</select>
     {% endif %}
     <label class="haken"><input type="checkbox" name="ohne" value="1" {{ 'checked' if filter_.ohne }}> nur ohne Beleg</label>
-    <button class="btn hell">Filtern</button>
+    <span class="filter-knoepfe"><button class="btn hell">Filtern</button>
     {% if filter_.values()|select|list %}<a href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen') }}">zurücksetzen</a>{% endif %}
-    {{ info("Eigentümer und Mietobjekt filtern die Hausgeld-Buchungen. Ein Betrag im Suchfeld (z. B. 450 oder 450,00) findet Buchungen mit genau diesem Betrag.") }}
+    {{ info("Eigentümer und Mietobjekt filtern die Hausgeld-Buchungen. Ein Betrag im Suchfeld (z. B. 450 oder 450,00) findet Buchungen mit genau diesem Betrag.") }}</span>
   </form>
   {% endif %}
   <div class="tabelle">
@@ -640,48 +641,18 @@
 
 {% if aktiv == 'zaehler' %}
 <section class="block" id="hauptzaehler">
-  <h2>Hauptzähler</h2>
-  <p class="leise">Zähler für das ganze Haus, z. B. Wasser-Hauptuhren oder Flurstrom. Mehrere Zähler derselben Art werden
-    zusammengezählt. Für den Jahresverbrauch den Stand am 31.12. eintragen.</p>
+  <h2>Hauptzähler {{ jahr }} {{ info("Zähler für das ganze Haus, z. B. Wasser-Hauptuhren oder Flurstrom. Für den Jahresverbrauch den Stand zum 31.12. eintragen; der Stand zum 01.01. ist die letzte Ablesung des Vorjahres. Das Jahr ergibt sich aus dem Datum.\n\nMehrere Zähler derselben Art werden zusammengezählt. Der Verbrauch dient zur Kontrolle – die Kosten kommen aus den Rechnungen (Buchungen). Beim Wasser wird mit der Summe der Wohnungsuhren verglichen.") }}</h2>
   {% if hauptverbrauch %}
-  <table class="schmal verbrauch">
-    <thead><tr><th>Verbrauch {{ jahr }}</th><th class="zahl">Summe</th><th></th></tr></thead>
-    <tbody>
+  <div class="kennzahlen">
     {% for v in hauptverbrauch %}
-    <tr>
-      <td>{{ ZAEHLERARTEN[v.art] }} <span class="leise">({{ v.anzahl }} Zähler)</span></td>
-      <td class="zahl"><strong>{{ (v.verbrauch|num(1) ~ ' ' ~ EINHEITEN[v.art]) if v.verbrauch is not none else 'nicht ermittelbar' }}</strong></td>
-      <td class="leise">
-        {% if v.verbrauch is none %}Ablesungen zum Jahresende fehlen{% elif v.ab %}<span class="warnung">gemessen erst ab {{ v.ab|datum }}</span>{% endif %}
-        {% if v.art == 'wasser' and v.verbrauch is not none and wohnungen_wasser is not none %}
-          Wohnungsuhren zusammen {{ wohnungen_wasser|num(1) }} m³, Differenz {{ (v.verbrauch - wohnungen_wasser)|num(1) }} m³
-          {% if v.verbrauch %}({{ ((v.verbrauch - wohnungen_wasser) / v.verbrauch * 100)|num(1) }} %){% endif %}
-        {% endif %}
-      </td>
-    </tr>
+    <div><span>{{ ZAEHLERARTEN[v.art] }} · {{ v.anzahl }} Zähler</span>
+      <strong>{{ (v.verbrauch|num(1) ~ ' ' ~ EINHEITEN[v.art]) if v.verbrauch is not none else '–' }}</strong>
+      <small class="{{ 'warnung' if v.verbrauch is none or v.ab else 'leise' }}">{% if v.verbrauch is none %}Stand zum 31.12. fehlt{% elif v.ab %}gemessen erst ab {{ v.ab|datum(True) }}{% else %}Verbrauch {{ jahr }}{% endif %}
+        {% if v.art == 'wasser' and v.verbrauch is not none and wohnungen_wasser is not none %}<br><span class="leise">Wohnungsuhren {{ wohnungen_wasser|num(1) }} m³ · Differenz {{ (v.verbrauch - wohnungen_wasser)|num(1) }} m³{% if v.verbrauch %} ({{ ((v.verbrauch - wohnungen_wasser) / v.verbrauch * 100)|num(1) }} %){% endif %}</span>{% endif %}</small></div>
     {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  <div class="zaehler-raster">
-  {% for z in hauptzaehler %}
-  {{ zaehler_karte(z, ist_admin, jahr) }}
-  {% else %}<p class="leise">Kein Hauptzähler erfasst.</p>{% endfor %}
   </div>
-  {% if ist_admin %}
-  <details>
-    <summary>{{ icon('plus') }} Hauptzähler hinzufügen</summary>
-    <form method="post" action="{{ url_for('zaehler_neu') }}" class="zeile">
-      <input type="hidden" name="immobilie_id" value="{{ immo.id }}">
-      <label>Art<select name="art">{% for a, t in ZAEHLERARTEN.items() %}<option value="{{ a }}">{{ t }}</option>{% endfor %}</select></label>
-      <label>Bezeichnung / Standort<input name="bezeichnung" placeholder="z. B. Flurstrom Haus 1"></label>
-      <label>Nummer<input name="nummer"></label>
-      <label>Eingebaut am<input type="date" name="eingebaut"></label>
-      <label>Anfangsstand<input class="betrag" name="stand" inputmode="decimal"></label>
-      <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
-    </form>
-  </details>
   {% endif %}
+  {{ zaehler_bereich(hauptzaehler, ist_admin, jahr, url_for('immobilie', iid=immo.id, reiter='zaehler'), {'immobilie_id': immo.id}) }}
 </section>
 {% endif %}
 

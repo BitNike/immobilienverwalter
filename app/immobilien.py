@@ -220,11 +220,31 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
     return punkte
 
 
-def zaehler_mit_staenden(sql, args):
+def zaehler_mit_staenden(sql, args, j=None):
+    """Zähler mit Ablesungen (neueste zuerst). Mit Jahr j zusätzlich wie bei den Konten: Stand zu Jahresbeginn
+    (letzte Ablesung bis 31.12. des Vorjahres), Stand zum Jahresende (letzte Ablesung im Jahr), Verbrauch im Jahr."""
     zs = rows(sql, args)
     for z in zs:
-        z["staende"] = rows("SELECT * FROM zaehlerstand WHERE zaehler_id = ? ORDER BY datum DESC", (z["id"],))
+        z["staende"] = rows("SELECT * FROM zaehlerstand WHERE zaehler_id = ? ORDER BY datum DESC, id DESC", (z["id"],))
+        if j is None:
+            continue
+        z["anfang"] = next((s for s in z["staende"] if s["datum"] <= f"{j - 1}-12-31"), None)
+        z["staende_jahr"] = [s for s in z["staende"] if s["datum"][:4] == str(j)]
+        z["ende"] = z["staende_jahr"][0] if z["staende_jahr"] else None
+        z["verbrauch"] = verbrauch_zeitraum([{**z, "staende": [(s["datum"], s["stand"]) for s in z["staende"]]}],
+                                            date(j, 1, 1), date(j, 12, 31))
+        z["im_jahr"] = not (z["ausgebaut"] and z["ausgebaut"] < f"{j}-01-01") and \
+            not (z["eingebaut"] and z["eingebaut"] > f"{j}-12-31")
+        # Zwischenstand, solange der Stand zum Jahresende fehlt (z. B. mitten im Jahr)
+        z["bisher"] = rund(z["ende"]["stand"] - z["anfang"]["stand"]) \
+            if z["verbrauch"] is None and z["anfang"] and z["ende"] else None
     return zs
+
+
+def ablesungen_im_jahr(zs):
+    """Alle Ablesungen der Zähler im Jahr, nach Datum – für die eingeklappte Liste."""
+    return sorted(({**s, "zaehler": z} for z in zs for s in z.get("staende_jahr", [])),
+                  key=lambda s: (s["datum"], s["id"]))
 
 
 def dokumente_sichtbar(immo_id, j, wohnung_id=None):
@@ -326,7 +346,7 @@ def immobilie(iid):
     vorjahr_vorhanden = not erg["gebaeude"] and one(
         "SELECT 1 FROM kosten WHERE immobilie_id = ? AND jahr = ?", (iid, j - 1))
     hauptzaehler = zaehler_mit_staenden("SELECT * FROM zaehler WHERE immobilie_id = ? "
-                                        "ORDER BY art, ausgebaut IS NULL, bezeichnung COLLATE NATUERLICH, id", (iid,))
+                                        "ORDER BY art, ausgebaut IS NOT NULL, bezeichnung COLLATE NATUERLICH, id", (iid,), j)
     hauptverbrauch = []
     for art in ZAEHLERARTEN:
         uhren = [{**z, "staende": [(s["datum"], s["stand"]) for s in z["staende"]]}
@@ -1169,8 +1189,8 @@ def wohnung(wid):
         pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
         darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
-        zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? ORDER BY art, ausgebaut IS NULL, id",
-                                     (wid,)),
+        zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? "
+                                     "ORDER BY art, ausgebaut IS NOT NULL, bezeichnung COLLATE NATUERLICH, id", (wid,), j),
         dokumente=dokumente_sichtbar(immo["id"], j, wid), ablage=ablage_sichtbar(immo["id"], wid),
         vz_gespeichert={x["mv_id"]: x["betrag"] for x in
                         rows("SELECT * FROM vorauszahlung WHERE wohnung_id = ? AND jahr = ?", (wid, j))})
@@ -1377,6 +1397,36 @@ def zaehlerstand_neu(zid):
     exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, ?)",
         (zid, f["datum"], parse_num(f["stand"]), f.get("notiz", "").strip()))
     return zurueck()
+
+
+def _zur_ablesung(datum):
+    """Zurück zur Seite – im Jahr der Ablesung, damit sie gleich zu sehen ist."""
+    ziel = request.form.get("next") or request.referrer or "/"
+    j = int(datum[:4])
+    if j != jahr():
+        flash(f"Die Ablesung vom {parse_date(datum):%d.%m.%Y} gehört ins Jahr {j}; die Ansicht wurde umgestellt.")
+        ziel = ziel.split("#")[0] + ("&" if "?" in ziel else "?") + f"jahr={j}"
+    return redirect(ziel)
+
+
+@app.post("/zaehlerstaende")
+def zaehlerstand_eintragen():
+    """Ablesung über die Auswahl „Zähler“ in der Eingabezeile."""
+    zid = int(request.form.get("zaehler_id") or 0)
+    zaehlerstand_neu(zid)
+    return _zur_ablesung(request.form["datum"])
+
+
+@app.post("/zaehlerstaende/<int:sid>")
+def zaehlerstand_speichern(sid):
+    s = row("SELECT * FROM zaehlerstand WHERE id = ?", (sid,))
+    _zaehler_recht(row("SELECT * FROM zaehler WHERE id = ?", (s["zaehler_id"],)))
+    f = request.form
+    if not f.get("datum") or not f.get("stand", "").strip():
+        raise ValueError("Datum und Zählerstand sind Pflichtfelder.")
+    exe("UPDATE zaehlerstand SET datum = ?, stand = ?, notiz = ? WHERE id = ?",
+        (f["datum"], parse_num(f["stand"]), f.get("notiz", "").strip(), sid))
+    return _zur_ablesung(f["datum"])
 
 
 @app.post("/zaehlerstaende/<int:sid>/loeschen")
