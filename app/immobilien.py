@@ -56,6 +56,12 @@ def berechnung(immo, j):
     return erg
 
 
+def reiter_waehlen(reiter):
+    """Gewählter Reiter aus ?reiter=, sonst der erste. reiter: [(schluessel, titel)]."""
+    gewaehlt = request.args.get("reiter")
+    return gewaehlt if gewaehlt in dict(reiter) else reiter[0][0]
+
+
 def standard_schluessel(immo, anzahl_wohnungen):
     """Vorauswahl für neue Gebäudekosten; None = Standard der Kostenart."""
     return immo["schluessel"] or ("flaeche" if anzahl_wohnungen == 1 else None)
@@ -91,15 +97,15 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         elif ganze_immobilie and gk["rest"] > 0:
             punkt(f"{name}: {de_num(gk['rest'])} € sind keinem Mietobjekt zugeordnet. "
                   "Fehlen Mietobjekte oder deren MEA bzw. Wohnfläche?", link, "hinweis")
-    if ganze_immobilie and immo["weg"]:
+    if ganze_immobilie:
         rl = ruecklage(immo["id"], jahr())
         if rl["vorhanden"] and rl["anfang"] is None:
             punkt("Erhaltungsrücklage: Der Anfangsbestand fehlt, der Endbestand stimmt deshalb nicht.",
-                  url_for("immobilie", iid=immo["id"]) + "#ruecklage", "hinweis")
+                  url_for("immobilie", iid=immo["id"], reiter="ruecklage"), "hinweis")
     schluessel = {gk["kosten"]["schluessel"] for gk in erg["gebaeude"] if not gk["warnung"]}
     if not immo["iban"] and any(not erg["wohnungen"][i]["wohnung"]["iban"] for i in wids if i in erg["wohnungen"]):
         punkt("Bei der Immobilie ist keine IBAN hinterlegt; im Brief fehlt dann die Bankverbindung.",
-              url_for("immobilie", iid=immo["id"], stammdaten=1) + "#stammdaten", "hinweis")
+              url_for("immobilie", iid=immo["id"], reiter="stammdaten"), "hinweis")
 
     for wid, r in erg["wohnungen"].items():
         if wid not in wids:
@@ -113,7 +119,7 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         if "wasser" in schluessel and r["wasser"] is not None and r["wasser_ab"]:
             punkt(f"{w['bezeichnung']}: Wasserverbrauch erst ab {r['wasser_ab']:%d.%m.%Y} gemessen, der Zählerstand "
                   "zum Jahresanfang fehlt (z. B. aus der Ablesung zum 31.12. des Vorjahres nachtragen).",
-                  url_for("wohnung", wid=wid) + "#zaehler", "hinweis")
+                  url_for("wohnung", wid=wid, reiter="zaehler"), "hinweis")
         if "flaeche" in schluessel and not w["wohnflaeche"]:
             punkt(f"{w['bezeichnung']}: Keine Wohnfläche hinterlegt. Kosten nach Wohnfläche entfallen auf dieses "
                   "Mietobjekt mit 0 €.", stamm)
@@ -273,10 +279,17 @@ def immobilie(iid):
                  "(SELECT COUNT(*) FROM kosten WHERE immobilie_id = :i) AS kosten, "
                  "(SELECT COUNT(*) FROM dokument WHERE immobilie_id = :i) + "
                  "(SELECT COUNT(*) FROM ablage WHERE immobilie_id = :i) AS dokumente", {"i": iid})
+    reiter = [("uebersicht", "Übersicht"), ("buchungen", "Buchungen"), ("ruecklage", "Rücklage")]
+    if ist_admin() or hauptzaehler:
+        reiter.append(("zaehler", "Zähler"))
+    reiter.append(("dokumente", "Dokumente"))
+    if ist_admin():
+        reiter.append(("stammdaten", "Stammdaten"))
+    pruefung = pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin())
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
+                           reiter=reiter, aktiv=reiter_waehlen(reiter),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
-                           pruefung=pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()),
-                           buchungen=buchungen, belege=belege, vorlage=vorlage, BEZAHLT=BEZAHLT,
+                           pruefung=pruefung, buchungen=buchungen, belege=belege, vorlage=vorlage, BEZAHLT=BEZAHLT,
                            offen_bar=[b for b in buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
                            rl=ruecklage(iid, j),
@@ -292,7 +305,7 @@ def immobilie_speichern(iid):
     vals = immobilie_werte()
     exe(f"UPDATE immobilie SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), iid])
     flash("Immobilie gespeichert.")
-    return redirect(url_for("immobilie", iid=iid))
+    return redirect(url_for("immobilie", iid=iid, reiter="stammdaten"))
 
 
 @app.post("/immobilien/<int:iid>/loeschen")
@@ -314,7 +327,7 @@ def immobilie_archivieren(iid):
     archiviert = 1 if request.form.get("archiviert") == "1" else 0
     exe("UPDATE immobilie SET archiviert = ? WHERE id = ?", (archiviert, iid))
     flash("Immobilie archiviert. Du findest sie links unter „Archiv“." if archiviert else "Immobilie wiederhergestellt.")
-    return redirect(url_for("immobilie", iid=iid))
+    return redirect(url_for("immobilie", iid=iid, reiter="stammdaten"))
 
 
 # ---------- Kosten ----------
@@ -468,7 +481,7 @@ def buchung_neu(iid):
     # Für die nächste Zeile vorbelegen, damit mehrere Belege schnell hintereinander gehen
     session["buchung_vorlage"] = {"datum": vals["datum"], "art": vals["art"], "bezahlt": vals["bezahlt"],
                                   "ziel": str(vals["kostenart_id"] or "ruecklage")}
-    return redirect(url_for("immobilie", iid=iid, neu=1) + "#buchungen")
+    return redirect(url_for("immobilie", iid=iid, reiter="buchungen", neu=1))
 
 
 @app.post("/buchungen/<int:bid>")
@@ -486,7 +499,7 @@ def buchung_speichern(bid):
         kosten_aus_buchungen(vals["kosten_id"])
     if b["kosten_id"] and b["kosten_id"] != vals["kosten_id"]:
         kosten_aus_buchungen(b["kosten_id"])
-    return redirect(url_for("immobilie", iid=immo["id"]) + "#buchungen")
+    return redirect(url_for("immobilie", iid=immo["id"], reiter="buchungen"))
 
 
 @app.post("/buchungen/<int:bid>/erstattet")
@@ -494,7 +507,7 @@ def buchung_speichern(bid):
 def buchung_erstattet(bid):
     b = row("SELECT * FROM buchung WHERE id = ?", (bid,))
     exe("UPDATE buchung SET erstattet = ? WHERE id = ?", (date.today().isoformat(), bid))
-    return redirect(url_for("immobilie", iid=b["immobilie_id"]) + "#buchungen")
+    return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter="buchungen"))
 
 
 @app.post("/buchungen/<int:bid>/loeschen")
@@ -504,7 +517,7 @@ def buchung_loeschen(bid):
     exe("DELETE FROM buchung WHERE id = ?", (bid,))
     if b["kosten_id"]:
         kosten_aus_buchungen(b["kosten_id"])
-    return redirect(url_for("immobilie", iid=b["immobilie_id"]) + "#buchungen")
+    return redirect(url_for("immobilie", iid=b["immobilie_id"], reiter="buchungen"))
 
 
 # ---------- Erhaltungsrücklage ----------
@@ -551,7 +564,7 @@ def ruecklage_speichern(iid):
     if wert:
         exe("INSERT INTO ruecklage_bestand (immobilie_id, jahr, betrag) VALUES (?, ?, ?)", (iid, j, parse_num(wert)))
     flash("Anfangsbestand der Rücklage gespeichert." if wert else "Anfangsbestand wird aus dem Vorjahr fortgeschrieben.")
-    return redirect(url_for("immobilie", iid=iid) + "#ruecklage")
+    return redirect(url_for("immobilie", iid=iid, reiter="ruecklage"))
 
 
 # ---------- Mietobjekte ----------
@@ -622,8 +635,12 @@ def wohnung(wid):
         a, b = parse_date(mv["von"]), parse_date(mv["bis"])
         mv["im_jahr"] = a <= date(j, 12, 31) and (b is None or b >= date(j, 1, 1))
     direkt = {k["id"]: k for k in rows("SELECT * FROM kosten WHERE wohnung_id = ? AND jahr = ?", (wid, j))}
+    reiter = [("abrechnung", "Abrechnung"), ("mieter", "Mieter"), ("zaehler", "Zähler"), ("dokumente", "Dokumente"),
+              ("stammdaten", "Stammdaten")]
     return render_template(
         "wohnung.html", **spalte(immo, wid), w=w, r=r, erg=erg, mvs=mvs, direkt=direkt,
+        reiter=reiter, aktiv=reiter_waehlen(reiter),
+        benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname") if ist_admin() else [],
         pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
         darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
@@ -670,7 +687,7 @@ def mv_neu(wid):
               list(vals.values()))
     exe("INSERT INTO mieter_person (mv_id, vorname, name) VALUES (?, ?, ?)",
         (mid, request.form.get("vorname", "").strip(), name))
-    return redirect(url_for("wohnung", wid=wid) + "#mieter")
+    return redirect(url_for("wohnung", wid=wid, reiter="mieter"))
 
 
 def _mv_laden(mid):
@@ -685,14 +702,14 @@ def mv_speichern(mid):
     vals = mv_werte()
     exe(f"UPDATE mietverhaeltnis SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), mid])
     flash("Mietverhältnis gespeichert.")
-    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"], reiter="mieter"))
 
 
 @app.post("/mieter/<int:mid>/loeschen")
 def mv_loeschen(mid):
     mv = _mv_laden(mid)
     exe("DELETE FROM mietverhaeltnis WHERE id = ?", (mid,))
-    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"], reiter="mieter"))
 
 
 @app.post("/mieter/<int:mid>/personen")
@@ -703,7 +720,7 @@ def person_neu(mid):
         raise ValueError("Bitte einen Namen angeben.")
     exe("INSERT INTO mieter_person (mv_id, vorname, name) VALUES (?, ?, ?)",
         (mid, request.form.get("vorname", "").strip(), name))
-    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"], reiter="mieter"))
 
 
 @app.post("/personen/<int:pid>/loeschen")
@@ -711,7 +728,7 @@ def person_loeschen(pid):
     p = row("SELECT * FROM mieter_person WHERE id = ?", (pid,))
     mv = _mv_laden(p["mv_id"])
     exe("DELETE FROM mieter_person WHERE id = ?", (pid,))
-    return redirect(url_for("wohnung", wid=mv["wohnung_id"]) + "#mieter")
+    return redirect(url_for("wohnung", wid=mv["wohnung_id"], reiter="mieter"))
 
 
 # ---------- Vorauszahlungen ----------

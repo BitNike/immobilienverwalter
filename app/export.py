@@ -68,8 +68,8 @@ def brief_daten(wid, partei):
             nutzung_von=d["abrechnung_von"], nutzung_bis=d["abrechnung_bis"], monate=erg["monate"], prozent=100.0,
             posten=r["posten"], summe=r["summe"], vorauszahlung=r["vorauszahlung"], saldo=r["saldo"],
             spalte_gesamt="Gesamtkosten Immobilie", mv=None)
-        rl = ruecklage(immo["id"], j) if immo["weg"] else None
-        if rl and rl["vorhanden"]:
+        rl = ruecklage(immo["id"], j)
+        if rl["vorhanden"]:
             d["ruecklage"] = rl
             d["ruecklage_anteil"] = rund(rl["ende"] * w["mea"] / w["mea_basis"]) if w["mea"] and w["mea_basis"] else None
     else:

@@ -206,7 +206,8 @@ def wohnung_stamm(wid=None):
                       list(vals.values()))
         zaehler_aus_formular(wid)
         flash("Mietobjekt gespeichert.")
-        return redirect(url_for("wohnung_stamm", wid=wid))
+        ziel = request.form.get("next", "")  # Reiter „Stammdaten“ beim Mietobjekt
+        return redirect(ziel if ziel.startswith("/") and not ziel.startswith("//") else url_for("wohnung_stamm", wid=wid))
     zaehler = rows("SELECT * FROM zaehler WHERE wohnung_id = ? ORDER BY art, ausgebaut IS NULL, id", (wid,)) if wid else []
     return render_template("einstellungen/wohnung_form.html", bereich="admin_wohnungen", w=w, zaehler=zaehler,
                            immobilien=rows("SELECT * FROM immobilie ORDER BY name COLLATE NATUERLICH"),

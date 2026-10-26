@@ -82,11 +82,21 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
 {%- endmacro %}
 
 {% macro jahr_umschalter(j) -%}
+{% set reiter = request.args.get('reiter') %}
 <div class="jahr" aria-label="Abrechnungsjahr">
-  <a href="?jahr={{ j - 1 }}" title="Vorjahr">{{ icon('left') }}</a>
+  <a href="{{ url_for(request.endpoint, jahr=j - 1, reiter=reiter, **request.view_args) }}" title="Vorjahr">{{ icon('left') }}</a>
   <strong>{{ j }}</strong>
-  <a href="?jahr={{ j + 1 }}" title="Folgejahr">{{ icon('right') }}</a>
+  <a href="{{ url_for(request.endpoint, jahr=j + 1, reiter=reiter, **request.view_args) }}" title="Folgejahr">{{ icon('right') }}</a>
 </div>
+{%- endmacro %}
+
+{% macro reiter_leiste(reiter, aktiv, marke={}) -%}
+<nav class="reiter" aria-label="Bereiche">
+  {% for r, titel in reiter %}
+  <a href="{{ url_for(request.endpoint, reiter=None if loop.first else r, **request.view_args) }}" class="{{ 'aktiv' if r == aktiv }}"
+     {% if r == aktiv %}aria-current="page"{% endif %}>{{ titel }}{% if marke.get(r) %} <span class="zahl-marke">{{ marke[r] }}</span>{% endif %}</a>
+  {% endfor %}
+</nav>
 {%- endmacro %}
 
 {% macro feld(name, label, wert="", typ="text", pflicht=False, hinweis="", attrs="", breit=False) -%}

@@ -63,6 +63,13 @@ small { font-size: 12px; }
 .jahr a:hover { background: var(--primaer-hell); }
 .jahr strong { padding: 0 12px; font-size: 1.1rem; font-family: var(--schrift-titel); font-weight: normal; }
 .brotkrumen { margin: 0 0 8px; font-size: 14px; }
+/* Reiter unter dem Seitenkopf (Immobilie, Mietobjekt): je Bereich eine eigene Adresse */
+.reiter { display: flex; flex-wrap: wrap; gap: 2px 4px; border-bottom: 1px solid var(--text); margin: -4px 0 22px; }
+.reiter a { padding: 8px 14px; color: var(--leise); border-bottom: 3px solid transparent; margin-bottom: -1px; font-size: 14px; }
+.reiter a:hover { color: var(--primaer); text-decoration: none; }
+.reiter a.aktiv { color: var(--primaer); border-bottom-color: var(--primaer); font-weight: 600; }
+.zahl-marke { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--warnung); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 600; }
+.reiter + .block, .reiter + .pruefliste + .block { border-top: none; padding-top: 0; margin-top: 0; }
 
 /* ---------- Blöcke & Karten ---------- */
 .block { border-top: 1px solid var(--linie); padding: 20px 0 8px; margin-top: 8px; }
