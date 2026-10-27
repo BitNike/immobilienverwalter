@@ -47,7 +47,11 @@ small { font-size: 12px; }
 .layout { display: flex; min-height: calc(100vh - 68px); }
 .spalte { width: 230px; flex: none; padding: 16px 14px; border-right: 1px solid var(--text); display: flex; flex-direction: column; gap: 8px; }
 .spalte + .spalte { width: 210px; background: #fbfbfc; }
-.spalten-titel { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--leise); margin: 2px 2px 4px; }
+.spalten-titel { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--leise); margin: 2px 2px 4px; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.spalten-knopf { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid transparent; border-radius: 3px;
+  background: none; color: var(--leise); cursor: pointer; }
+.spalten-knopf:hover { color: var(--primaer); border-color: var(--linie); }
+.spalten-knopf .i + .i, .kachel .kurz { display: none; }
 .kachel { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 3px; color: var(--text); }
 .kachel span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kachel:hover { border-color: var(--primaer); text-decoration: none; }
@@ -301,3 +305,17 @@ table.buchungen input[name=text], table.buchungen input.kommentar { max-width: 3
 table.rl-blatt th.zahl, table.rl-blatt td.zahl { padding-left: 22px; }
 table.buchungen:not(.rl-blatt):not(.dauer) th:nth-child(6), table.buchungen:not(.rl-blatt):not(.dauer) td:nth-child(6) { padding-left: 12px; }
 table.rl-blatt th:nth-child(4), table.rl-blatt th:nth-child(5) { min-width: 130px; }
+/* Eingeklappte Spalte (Knopf « / »): schmale Leiste, Namen als Tooltip, Mietobjekte mit Kurzform */
+@media (min-width: 1001px) {
+  .spalte.zu, .spalte.zu + .spalte.zu { width: 60px; padding: 16px 8px; }
+  .spalte.zu .spalten-titel { justify-content: center; margin: 2px 0 4px; }
+  .spalte.zu .spalten-titel > span, .spalte.zu .kachel span, .spalte.zu .archiv-link span { display: none; }
+  .spalte.zu .spalten-knopf .i { display: none; }
+  .spalte.zu .spalten-knopf .i + .i { display: block; }
+  .spalte.zu .kachel { justify-content: center; padding: 10px 0; }
+  .spalte.zu .kachel.klein { padding: 7px 0; }
+  .spalte.zu[data-name="mietobjekte"] .kachel:has(.kurz) .i { display: none; }
+  .spalte.zu .kachel .kurz { display: block; font-size: 13px; font-weight: 600; }
+  .spalte.zu .archiv-link { justify-content: center; }
+}
+@media (max-width: 1000px) { .spalten-knopf { display: none; } }

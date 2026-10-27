@@ -1,4 +1,4 @@
-{% from "_ui.html" import icon %}<!doctype html>
+{% from "_ui.html" import icon, spalten_knopf %}<!doctype html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
@@ -29,10 +29,11 @@
 
 <div class="layout">
   {% if user %}
-  <nav class="spalte sidebar" aria-label="Immobilien">
-    <div class="spalten-titel">Immobilien</div>
+  {% set zu = request.cookies.get('spalte_immobilien') == 'zu' %}
+  <nav class="spalte sidebar {{ 'zu' if zu }}" data-name="immobilien" aria-label="Immobilien">
+    <div class="spalten-titel"><span>Immobilien</span>{{ spalten_knopf(zu) }}</div>
     {% for i in sidebar_immobilien %}
-    <a class="kachel {{ 'aktiv' if immo and immo.id == i.id }}" href="{{ url_for('immobilie', iid=i.id) }}">{{ icon('building') }}<span>{{ i.name }}</span></a>
+    <a class="kachel {{ 'aktiv' if immo and immo.id == i.id }}" href="{{ url_for('immobilie', iid=i.id) }}" title="{{ i.name }}">{{ icon('building') }}<span>{{ i.name }}</span></a>
     {% endfor %}
     {% if ist_admin %}
     <a class="kachel plus {{ 'aktiv' if request.endpoint == 'immobilie_neu' }}" href="{{ url_for('immobilie_neu') }}" title="Immobilie anlegen">{{ icon('plus', 20) }}</a>
@@ -50,5 +51,15 @@
   </main>
 </div>
 {% block fuss %}{% endblock %}
+<script>
+  // Spalten Immobilien/Mietobjekte ein- und ausklappen; das Cookie merkt sich die Einstellung je Browser (ein Jahr)
+  function spalteUmschalten(knopf) {
+    var spalte = knopf.closest('.spalte'), zu = !spalte.classList.contains('zu');
+    spalte.classList.toggle('zu', zu);
+    document.cookie = 'spalte_' + spalte.dataset.name + '=' + (zu ? 'zu' : 'auf') + '; path=/; max-age=31536000; SameSite=Lax';
+    knopf.title = zu ? 'Spalte aufklappen' : 'Spalte einklappen';
+    knopf.setAttribute('aria-expanded', String(!zu));
+  }
+</script>
 </body>
 </html>

@@ -478,6 +478,17 @@ def test_gesamter_ablauf():
     dbcon.execute("DELETE FROM benutzer WHERE id = ?", (zweit,))  # spätere Tests erwarten die bisherigen Nummern
     dbcon.commit()
     c.get("/immobilien/1?jahr=2026")
+    # Spalten einklappen: Zustand kommt aus dem Cookie, Mietobjekte zeigen dann ihre Kurzform
+    seite = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert 'class="spalte sidebar "' in seite and 'onclick="spalteUmschalten(this)"' in seite
+    c.set_cookie("spalte_immobilien", "zu")
+    c.set_cookie("spalte_mietobjekte", "zu")
+    seite = ok(c.get("/immobilien/1")).get_data(as_text=True)
+    assert 'class="spalte sidebar zu"' in seite and 'class="spalte zu" data-name="mietobjekte"' in seite
+    c.delete_cookie("spalte_immobilien")
+    c.delete_cookie("spalte_mietobjekte")
+    from immobilien import kurzname
+    assert [kurzname(x) for x in ("Wohnung 12", "Wohnung 3a", "EG", "10a Dachgeschoss")] == ["12", "3a", "EG", "10a"]
     # Reiter: jeder Bereich hat eine eigene Adresse, der Jahr-Umschalter behält den Reiter
     assert "/immobilien/1?jahr=2025&amp;reiter=ruecklage" in html
     for reiter, text in (("buchungen", "Belege und Buchungen"), ("zaehler", "Hauptzähler"), ("dokumente", "Ablage"),

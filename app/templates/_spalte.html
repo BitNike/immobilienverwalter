@@ -1,9 +1,10 @@
-{% from "_ui.html" import icon %}
-<nav class="spalte" aria-label="Mietobjekte">
-  <div class="spalten-titel">Mietobjekte</div>
-  <a class="kachel klein {{ 'aktiv' if not aktiv_wohnung and request.endpoint == 'immobilie' }}" href="{{ url_for('immobilie', iid=immo.id) }}">{{ icon('list') }}<span>Übersicht Immobilie</span></a>
+{% from "_ui.html" import icon, spalten_knopf %}
+{% set zu = request.cookies.get('spalte_mietobjekte') == 'zu' %}
+<nav class="spalte {{ 'zu' if zu }}" data-name="mietobjekte" aria-label="Mietobjekte">
+  <div class="spalten-titel"><span>Mietobjekte</span>{{ spalten_knopf(zu) }}</div>
+  <a class="kachel klein {{ 'aktiv' if not aktiv_wohnung and request.endpoint == 'immobilie' }}" href="{{ url_for('immobilie', iid=immo.id) }}" title="Übersicht Immobilie">{{ icon('list') }}<span>Übersicht Immobilie</span></a>
   {% for w in spalte_wohnungen %}
-  <a class="kachel {{ 'aktiv' if aktiv_wohnung == w.id }}" href="{{ url_for('wohnung', wid=w.id) }}">{{ icon('home') }}<span>{{ w.bezeichnung }}</span></a>
+  <a class="kachel {{ 'aktiv' if aktiv_wohnung == w.id }}" href="{{ url_for('wohnung', wid=w.id) }}" title="{{ w.bezeichnung }}">{{ icon('home') }}<span>{{ w.bezeichnung }}</span><b class="kurz">{{ w.kurz }}</b></a>
   {% endfor %}
   {% if ist_admin %}
   <a class="kachel plus {{ 'aktiv' if request.endpoint == 'wohnung_hinzufuegen' }}" href="{{ url_for('wohnung_hinzufuegen', iid=immo.id) }}" title="Mietobjekt hinzufügen">{{ icon('plus', 20) }}</a>

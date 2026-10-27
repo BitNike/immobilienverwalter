@@ -1,5 +1,6 @@
 """Immobilien, Mietobjekte (Wohnungen), Mietverhältnisse, Zähler, Kosten, Vorauszahlungen, Dokumente."""
 import os
+import re
 from datetime import date
 
 from flask import abort, flash, g, redirect, render_template, request, send_file, session, url_for
@@ -267,9 +268,18 @@ def dokumente_sichtbar(immo_id, j, wohnung_id=None):
     return erg
 
 
+def kurzname(bezeichnung):
+    """Kurzform für die eingeklappte Spalte: die Nummer („Wohnung 12“ → „12“, „3a“), sonst die ersten drei Zeichen."""
+    m = re.search(r"\d+\s*[a-zA-Z]?\b", bezeichnung or "")
+    return m.group(0).replace(" ", "") if m else (bezeichnung or "?")[:3]
+
+
 def spalte(immo, aktiv_wohnung=None):
     """Daten für die zweite Spalte (Mietobjekte der Immobilie)."""
-    return {"immo": immo, "spalte_wohnungen": wohnungen_der_immobilie(immo["id"]), "aktiv_wohnung": aktiv_wohnung}
+    wohnungen = wohnungen_der_immobilie(immo["id"])
+    for w in wohnungen:
+        w["kurz"] = kurzname(w["bezeichnung"])
+    return {"immo": immo, "spalte_wohnungen": wohnungen, "aktiv_wohnung": aktiv_wohnung}
 
 
 def adresse(o):
