@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_ui.html" import icon, reiter_leiste, wohnung_felder, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl, pruefliste, doppelt_rueckfrage, ablage_bereich, info %}
 {% from "_ui.html" import zaehler_bereich with context %}
+{% from "_vertraege.html" import vertraege_bereich with context %}
 {% block title %}{{ w.bezeichnung }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
@@ -199,13 +200,17 @@
         <label>Einzug *<input type="date" name="von" value="{{ mv.von }}" required></label>
         <label>Auszug<input type="date" name="bis" value="{{ mv.bis or '' }}"></label>
         <label>NK-Vorauszahlung / Monat (€)<input name="vorauszahlung_monat" inputmode="decimal" value="{{ mv.vorauszahlung_monat|num }}"></label>
+        <label>Kaltmiete / Monat (€)<input name="kaltmiete" inputmode="decimal" value="{{ mv.kaltmiete|num if mv.kaltmiete else '' }}"></label>
+        <label>Mietart<select name="mietart">{% for k, t in MIETARTEN.items() %}<option value="{{ k }}" {{ 'selected' if mv.mietart == k }}>{{ t }}</option>{% endfor %}</select></label>
+        <label>Nächste Mietanpassung<input type="date" name="anpassung_am" value="{{ mv.anpassung_am or '' }}"></label>
+        <label>Befristet bis<input type="date" name="befristet_bis" value="{{ mv.befristet_bis or '' }}"></label>
         <label class="breit">Neue Anschrift nach Auszug (für die Abschlussrechnung)<textarea name="neue_anschrift" rows="2">{{ mv.neue_anschrift }}</textarea></label>
         <label class="breit">Notiz<input name="notiz" value="{{ mv.notiz }}"></label>
       </div>
       <div class="knopfleiste">{{ speichern() }}</div>
     </form>
     {% else %}
-    <p>Vorauszahlung {{ mv.vorauszahlung_monat|eur }} / Monat{% if mv.neue_anschrift %} · Neue Anschrift: {{ mv.neue_anschrift }}{% endif %}</p>
+    <p>Vorauszahlung {{ mv.vorauszahlung_monat|eur }} / Monat{% if mv.kaltmiete %} · Kaltmiete {{ mv.kaltmiete|eur }}{% endif %}{% if mv.neue_anschrift %} · Neue Anschrift: {{ mv.neue_anschrift }}{% endif %}</p>
     {% endif %}
   </div>
   {% else %}
@@ -222,6 +227,10 @@
         <label>Einzug *<input type="date" name="von" required></label>
         <label>Auszug<input type="date" name="bis"></label>
         <label>NK-Vorauszahlung / Monat (€)<input name="vorauszahlung_monat" inputmode="decimal"></label>
+        <label>Kaltmiete / Monat (€)<input name="kaltmiete" inputmode="decimal" value="{{ '' }}"></label>
+        <label>Mietart<select name="mietart">{% for k, t in MIETARTEN.items() %}<option value="{{ k }}" {{ 'selected' if not k }}>{{ t }}</option>{% endfor %}</select></label>
+        <label>Nächste Mietanpassung<input type="date" name="anpassung_am" value="{{ '' }}"></label>
+        <label>Befristet bis<input type="date" name="befristet_bis" value="{{ '' }}"></label>
       </div>
       <p class="leise">Weitere Personen (z. B. Partner, WG) kannst du danach über + hinzufügen.
         Das Mietverhältnis erhält eine fortlaufende Nummer und einen eigenen Dokumentenordner.</p>
@@ -246,6 +255,35 @@
   {{ zaehler_bereich(zaehler, darf, jahr, url_for('wohnung', wid=w.id, reiter='zaehler'), {'wohnung_id': w.id}, 'z. B. Bad, Küche') }}
 </section>
 
+{% endif %}
+
+{# ---------- Verträge ---------- #}
+{% if aktiv == 'vertraege' %}
+<section class="block" id="vertraege">
+  <h2>Verträge {{ info("Verträge, die nur diese Wohnung betreffen (z. B. Strom, Internet, Rauchmelder). Die App berechnet, bis wann du kündigen musst, und erinnert dich per Mail (Einstellungen → Erinnerungen). Verträge für das ganze Haus stehen bei der Immobilie.") }}</h2>
+  {{ vertraege_bereich(vliste, vk, darf, immo.id, w.id, 'wohnung', kostenarten) }}
+
+  <h3>Mietverträge {{ info("Die Angaben pflegst du beim Mietverhältnis (Reiter Mieter). Ein Ende der Befristung und die nächste Mietanpassung (Staffel- oder Indexmiete) kommen ebenfalls per Mail-Erinnerung.") }}</h3>
+  {% if mietvertraege %}
+  <div class="tabelle">
+  <table>
+    <thead><tr><th>Mieter</th><th>Zeitraum</th><th class="zahl">Kaltmiete</th><th class="zahl">NK-Abschlag</th><th>Befristet bis</th><th>Nächste Anpassung</th></tr></thead>
+    <tbody>
+    {% for mv in mietvertraege %}
+    <tr class="{{ 'leise' if not mv.laufend }}">
+      <td><a href="{{ url_for('wohnung', wid=w.id, reiter='mieter') }}">{{ mv_name(mv) }}</a></td>
+      <td>{{ mv.von|datum(True) }} – {{ mv.bis|datum(True) if mv.bis else 'laufend' }}</td>
+      <td class="zahl">{{ mv.kaltmiete|eur if mv.kaltmiete else '–' }}</td>
+      <td class="zahl">{{ mv.vorauszahlung_monat|eur }}</td>
+      <td>{% if mv.befristet_bis %}{{ mv.befristet_bis|datum(True) }}{% if mv.befristung %}<br><small class="{{ 'warnung' if mv.befristung.bald else 'leise' }}">{{ 'vorbei' if mv.befristung.vorbei else 'noch %d Tage' % mv.befristung.tage }}</small>{% endif %}{% else %}–{% endif %}</td>
+      <td>{% if mv.anpassung_am %}{{ MIETARTEN[mv.mietart] }} ab {{ mv.anpassung_am|datum(True) }}{% if mv.anpassung %}<br><small class="{{ 'warnung' if mv.anpassung.bald else 'leise' }}">{{ 'fällig' if mv.anpassung.vorbei else 'noch %d Tage' % mv.anpassung.tage }}</small>{% endif %}{% else %}{{ MIETARTEN[mv.mietart] if mv.mietart else '–' }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="leise">Kein Mietverhältnis erfasst.</p>{% endif %}
+</section>
 {% endif %}
 
 {# ---------- Dokumente ---------- #}

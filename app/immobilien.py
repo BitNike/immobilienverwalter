@@ -7,6 +7,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 
 import dateien
 import db
+from vertraege import MIETARTEN, kennzahlen as vertrag_kennzahlen, mietvertraege, vertraege
 from calc import berechne, cent_genau, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
 from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
@@ -418,12 +419,13 @@ def immobilie(iid):
     reiter = [("uebersicht", "Übersicht"), ("buchungen", "Buchungen"), ("ruecklage", "Rücklage")]
     if ist_admin() or hauptzaehler:
         reiter.append(("zaehler", "Zähler"))
-    reiter.append(("dokumente", "Dokumente"))
+    reiter += [("vertraege", "Verträge"), ("dokumente", "Dokumente")]
     if ist_admin():
         reiter.append(("stammdaten", "Stammdaten"))
+    vliste = vertraege(iid)
     pruefung = pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin())
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
-                           reiter=reiter, aktiv=reiter_waehlen(reiter),
+                           reiter=reiter, aktiv=reiter_waehlen(reiter), vliste=vliste, vk=vertrag_kennzahlen(vliste),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefung, buchungen=buchungen, alle_buchungen=alle_buchungen, filter_=filter_,
                            hg_opt=hg_opt if immo["weg"] else [], belege=belege, vorlage=vorlage,
@@ -1190,11 +1192,13 @@ def wohnung(wid):
         a, b = parse_date(mv["von"]), parse_date(mv["bis"])
         mv["im_jahr"] = a <= date(j, 12, 31) and (b is None or b >= date(j, 1, 1))
     direkt = {k["id"]: k for k in rows("SELECT * FROM kosten WHERE wohnung_id = ? AND jahr = ?", (wid, j))}
-    reiter = [("abrechnung", "Abrechnung"), ("mieter", "Mieter"), ("zaehler", "Zähler"), ("dokumente", "Dokumente"),
-              ("stammdaten", "Stammdaten")]
+    reiter = [("abrechnung", "Abrechnung"), ("mieter", "Mieter"), ("zaehler", "Zähler"), ("vertraege", "Verträge"),
+              ("dokumente", "Dokumente"), ("stammdaten", "Stammdaten")]
+    vliste = vertraege(immo["id"], wid)
     return render_template(
         "wohnung.html", **spalte(immo, wid), w=w, r=r, erg=erg, mvs=mvs, direkt=direkt,
-        reiter=reiter, aktiv=reiter_waehlen(reiter),
+        reiter=reiter, aktiv=reiter_waehlen(reiter), vliste=vliste, vk=vertrag_kennzahlen(vliste),
+        mietvertraege=mietvertraege(wid),
         benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname") if ist_admin() else [],
         pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
         darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),
@@ -1224,8 +1228,15 @@ def mv_werte():
         raise ValueError("Bitte das Einzugsdatum angeben.")
     if bis and parse_date(bis) < parse_date(von):
         raise ValueError("Der Auszug liegt vor dem Einzug.")
-    return {"von": von, "bis": bis, "vorauszahlung_monat": parse_num(f.get("vorauszahlung_monat")),
+    vals = {"von": von, "bis": bis, "vorauszahlung_monat": parse_num(f.get("vorauszahlung_monat")),
             "neue_anschrift": f.get("neue_anschrift", "").strip(), "notiz": f.get("notiz", "").strip()}
+    if "kaltmiete" in f:  # Mietvertragsangaben
+        mietart = f.get("mietart", "")
+        if mietart not in MIETARTEN:
+            raise ValueError("Unbekannte Mietart.")
+        vals.update(kaltmiete=parse_num(f.get("kaltmiete")), mietart=mietart,
+                    befristet_bis=f.get("befristet_bis") or None, anpassung_am=f.get("anpassung_am") or None)
+    return vals
 
 
 @app.post("/wohnungen/<int:wid>/mieter")

@@ -62,6 +62,8 @@ Gebäudekosten erfasst du als Buchungen, eine Zeile je Rechnung oder Kassenbon (
 
 **Hausgeld (WEG):** Überweisungen der Eigentümer als Buchungen erfassen – für eine Wohnung oder gleichmäßig für alle Wohnungen eines Eigentümers. Die Summe geht in die Eigentümer-Abrechnung. Buchungen lassen sich filtern und durchsuchen.
 
+**Verträge:** je Immobilie oder Mietobjekt mit Laufzeit, Kündigungsfrist und Preisgarantie; die App berechnet den nächsten Kündigungstermin und erinnert per E-Mail (Einstellungen → Erinnerungen). Mietverträge: Kaltmiete, Befristung und Staffel-/Indexmiete am Mietverhältnis.
+
 **Erhaltungsrücklage (WEG):** Buchungen mit dem Ziel „Erhaltungsrücklage“ werden nicht umgelegt; Einnahmen (z. B. PV-Anlage) fließen hinein, Ausgaben werden entnommen. Die Zuführung kommt aus einer Kostenart mit Haken „Rücklage“. Anfangsbestand, Zuführung, Einnahmen, Entnahmen und Endbestand stehen auf der Immobilie und in der Eigentümer-Abrechnung. Dazu Kontostände je Konto (z. B. Girokonto, Tagesgeld) zum Stichtag laut Kontoauszug, mit Abgleich gegen die Rücklage.
 
 Auf Leerstand entfallende und nicht umlagefähige Kosten trägt der Eigentümer. Der Wasserverbrauch ergibt sich aus den Zählerständen. Bei einem Zählertausch bleibt der alte Zähler mit seinen Ständen erhalten.

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_ui.html" import icon, info, reiter_leiste, speichern, loeschen, jahr_umschalter, immobilie_felder, upload_felder, dokumentliste, feld, kostenart_auswahl, schluessel_auswahl, pruefliste, ablage_bereich, saldo %}
 {% from "_ui.html" import zaehler_bereich with context %}
+{% from "_vertraege.html" import vertraege_bereich with context %}
 {% block title %}{{ immo.name }}{% endblock %}
 
 {% macro ziel_auswahl(form, b, kostenarten) -%}
@@ -618,6 +619,13 @@
   {% else %}
   <p class="leise">Noch keine Mietobjekte. Lege sie über das + in der mittleren Spalte an.</p>
   {% endif %}
+</section>
+{% endif %}
+
+{% if aktiv == 'vertraege' %}
+<section class="block" id="vertraege">
+  <h2>Verträge {{ info("Verträge für das ganze Haus (z. B. Allgemeinstrom, Versicherungen, Hausmeister, Wartung) und – für den Admin – auch die der einzelnen Mietobjekte. Die App berechnet, bis wann du kündigen musst, und erinnert per Mail (Einstellungen → Erinnerungen).\n\nMit Kostenart und regelmäßiger Zahlweise legt das Listen-Symbol einen Dauerauftrag fürs angezeigte Jahr an; den prüfst und buchst du danach bei den Buchungen.") }}</h2>
+  {{ vertraege_bereich(vliste, vk, ist_admin, immo.id, none, 'immobilie', kostenarten) }}
 </section>
 {% endif %}
 

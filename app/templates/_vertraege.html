@@ -1,0 +1,104 @@
+{% from "_ui.html" import icon, info, loeschen, speichern %}
+
+{% macro vertrag_formular(v, ziel, seite, wohnung_id, kostenarten, ist_immobilie) -%}
+<form method="post" action="{{ ziel }}">
+  <input type="hidden" name="seite" value="{{ seite }}">
+  {% if wohnung_id %}<input type="hidden" name="wohnung_id" value="{{ wohnung_id }}">{% endif %}
+  <div class="raster">
+    <label>Vertrag *<input name="art" value="{{ v.art or '' }}" list="vertragsarten" placeholder="z. B. Strom (Allgemeinstrom)" required></label>
+    <label>Anbieter<input name="anbieter" value="{{ v.anbieter or '' }}" placeholder="z. B. Stadtwerke"></label>
+    <label>Vertragsnummer<input name="vertragsnummer" value="{{ v.vertragsnummer or '' }}"></label>
+    <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" value="{{ v.betrag|num if v.betrag else '' }}"></label>
+    <label>Zahlweise<select name="zahlweise">{% for z, (t, _, _) in ZAHLWEISEN.items() %}<option value="{{ z }}" {{ 'selected' if (v.zahlweise or 'monatlich') == z }}>{{ t }}</option>{% endfor %}</select></label>
+    {% if ist_immobilie %}
+    <label>Kostenart <small>für Dauerauftrag (optional)</small><select name="kostenart_id"><option value="">–</option>
+      {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if v.kostenart_id == k.id }}>{{ k.name }}</option>{% endfor %}</select></label>
+    {% endif %}
+  </div>
+  <fieldset><legend>Laufzeit {{ info("Vertragsende: Ende der ersten Laufzeit (Mindestlaufzeit). Leer = ein Jahr nach Beginn.\nVerlängerung: um wie viel sich der Vertrag ohne Kündigung verlängert.\nKündigungsfrist: so lange vor dem Vertragsende muss die Kündigung beim Anbieter sein.\n\nDaraus berechnet die App den nächsten Termin, zu dem du kündigen musst, und erinnert dich rechtzeitig per Mail.") }}</legend>
+  <div class="raster">
+    <label>Beginn<input type="date" name="beginn" value="{{ v.beginn or '' }}"></label>
+    <label>Vertragsende (erste Laufzeit)<input type="date" name="ablauf" value="{{ v.ablauf or '' }}"></label>
+    <label>Verlängerung<select name="verlaengerung">{% for m, t in VERLAENGERUNG.items() %}<option value="{{ m }}" {{ 'selected' if (v.verlaengerung if v.id else 12) == m }}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Kündigungsfrist<select name="frist">{% for m, t in FRIST.items() %}<option value="{{ m }}" {{ 'selected' if (v.frist if v.id else 3) == m }}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Preisgarantie bis<input type="date" name="preisgarantie_bis" value="{{ v.preisgarantie_bis or '' }}"></label>
+    <label>Gekündigt zum<input type="date" name="gekuendigt_zum" value="{{ v.gekuendigt_zum or '' }}"></label>
+  </div>
+  <label class="haken"><input type="checkbox" name="erinnern" {{ 'checked' if not v.id or v.erinnern }}> per Mail an die Kündigungsfrist und das Ende der Preisgarantie erinnern</label>
+  </fieldset>
+  <details {{ 'open' if v.id and (v.arbeitspreis is not none or v.kontakt or v.notiz) }}>
+    <summary>Tarif, Kontakt und Notiz</summary>
+    <div class="raster">
+      <label>Arbeitspreis (ct/kWh)<input class="betrag" name="arbeitspreis" inputmode="decimal" value="{{ v.arbeitspreis|num if v.id and v.arbeitspreis is not none else '' }}"></label>
+      <label>Grundpreis (€/Monat)<input class="betrag" name="grundpreis" inputmode="decimal" value="{{ v.grundpreis|num if v.id and v.grundpreis is not none else '' }}"></label>
+      <label>Verbrauch (kWh/Jahr)<input class="betrag" name="verbrauch" inputmode="decimal" value="{{ v.verbrauch|num(0) if v.id and v.verbrauch is not none else '' }}"></label>
+      <label class="breit">Kontakt<input name="kontakt" value="{{ v.kontakt or '' }}" placeholder="Ansprechpartner, Telefon, E-Mail"></label>
+      <label class="breit">Notiz<textarea name="notiz" rows="2">{{ v.notiz or '' }}</textarea></label>
+    </div>
+  </details>
+  <div class="knopfleiste">{{ speichern("Speichern" if v.id else "Vertrag anlegen") }}
+    {% if v.id %}<a href="{{ request.base_url }}?reiter=vertraege">Abbrechen</a>{% endif %}</div>
+</form>
+{%- endmacro %}
+
+{% macro vertraege_bereich(vliste, vk, darf_anlegen, immobilie_id, wohnung_id, seite, kostenarten) -%}
+{% set vbb = request.args.get('vertrag')|int %}
+<datalist id="vertragsarten">{% for a in VERTRAGSARTEN %}<option value="{{ a }}">{% endfor %}</datalist>
+<div class="kennzahlen">
+  <div><span>Laufende Verträge</span><strong>{{ vk.anzahl }}</strong><small class="leise">ohne beendete</small></div>
+  <div><span>Kosten pro Jahr</span><strong>{{ vk.jahr|eur }}</strong><small class="leise">aus Betrag und Zahlweise</small></div>
+  <div class="{{ 'betont' if vk.naechste }}"><span>Nächste Kündigungsfrist</span>
+    <strong>{{ vk.naechste.termin.kuendigen_bis|datum(True) if vk.naechste else '–' }}</strong>
+    <small class="leise">{% if vk.naechste %}{{ vk.naechste.art }}{% if vk.naechste.anbieter %} · {{ vk.naechste.anbieter }}{% endif %}{% else %}keine anstehend{% endif %}</small></div>
+  <div><span>Bald zu erledigen</span><strong class="{{ 'warnung' if vk.bald }}">{{ vk.bald }}</strong><small class="leise">Kündigung oder Preisgarantie</small></div>
+</div>
+
+{% if vliste %}
+<div class="tabelle">
+<table class="vertraege">
+  <thead><tr><th>Vertrag</th><th class="zahl">Kosten</th><th>Vertragsende</th><th>Kündigen bis</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for v in vliste %}{% set t = v.termin %}
+  <tr class="{{ 'leise' if t.status == 'beendet' }}">
+    <td><strong>{{ v.art }}</strong>{% if v.anbieter %} · {{ v.anbieter }}{% endif %}
+      <br><small class="leise">{% if v.vertragsnummer %}Nr. {{ v.vertragsnummer }}{% endif %}{% if v.wohnung and not wohnung_id %}{{ ' · ' if v.vertragsnummer }}{{ v.wohnung }}{% endif %}
+      {% if v.notiz %}<br><span class="notiz">{{ v.notiz }}</span>{% endif %}</small></td>
+    <td class="zahl">{{ v.betrag|eur }}<br><small class="leise">{{ ZAHLWEISEN[v.zahlweise][0] }}{% if ZAHLWEISEN[v.zahlweise][1] > 1 %} · {{ v.jahr|eur }}/Jahr{% endif %}</small>
+      {% if v.tarif is not none %}<br><small class="leise" title="Verbrauch × Arbeitspreis + 12 × Grundpreis">Tarif: {{ v.tarif|eur }}/Jahr</small>{% endif %}</td>
+    <td>{% if t.ende %}{{ t.ende|datum(True) }}{% else %}<span class="leise">–</span>{% endif %}
+      <br><small class="leise">{% if t.status in ('gekuendigt', 'beendet', 'endet') %}endet{% elif t.flexibel %}laufend kündbar{% else %}verlängert sich {{ VERLAENGERUNG[v.verlaengerung] }}{% endif %}</small></td>
+    <td>{% if t.kuendigen_bis and not t.flexibel %}{{ t.kuendigen_bis|datum(True) }}<br><small class="{{ 'warnung' if t.status == 'bald' else 'leise' }}">noch {{ t.tage }} Tage</small>
+      {% elif t.flexibel %}<small class="leise">Frist {{ FRIST[v.frist] }}</small>{% else %}<span class="leise">–</span>{% endif %}
+      {% if v.preis and not v.preis.vorbei %}<br><small class="{{ 'warnung' if v.preis.bald else 'leise' }}">Preisgarantie bis {{ v.preis.datum|datum(True) }}</small>{% endif %}</td>
+    <td><span class="marke status-{{ t.status }}">{{ VERTRAG_STATUS[t.status] }}</span>{% if not v.erinnern %}<br><small class="leise">ohne Erinnerung</small>{% endif %}</td>
+    <td class="aktionen">
+      {% if ist_admin and not v.wohnung_id and v.kostenart_id and ZAHLWEISEN[v.zahlweise][2] and t.status != 'beendet' %}
+      <form method="post" action="{{ url_for('vertrag_dauerauftrag', vid=v.id) }}" class="inline">
+        <button class="btn-icon" title="Dauerauftrag für {{ jahr }} anlegen (danach bei den Buchungen prüfen und buchen)">{{ icon('list', 16) }}</button></form>{% endif %}
+      {% if (v.wohnung_id and wohnung_bearbeitbar({'eigentuemer_id': v.eigentuemer_id})) or ist_admin %}
+      <a class="btn-icon" href="{{ request.base_url }}?reiter=vertraege&vertrag={{ v.id }}#vertrag-formular" title="Bearbeiten">{{ icon('edit', 16) }}</a>
+      <form method="post" action="{{ url_for('vertrag_loeschen', vid=v.id) }}" class="inline" onsubmit="return confirm({{ ('Vertrag „%s“ löschen?' % v.art)|tojson|forceescape }})">
+        <input type="hidden" name="seite" value="{{ seite }}"><button class="btn-icon gefahr" title="Löschen">{{ icon('trash', 16) }}</button></form>
+      {% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="leise">Noch kein Vertrag erfasst.</p>
+{% endif %}
+
+{% set bearbeitet = (vliste|selectattr('id', 'equalto', vbb)|list)[0] if vbb else none %}
+<div id="vertrag-formular">
+{% if bearbeitet %}
+<h3>Vertrag bearbeiten</h3>
+{{ vertrag_formular(bearbeitet, url_for('vertrag_speichern', vid=bearbeitet.id), seite, none, kostenarten, not bearbeitet.wohnung_id) }}
+{% elif darf_anlegen %}
+<details>
+  <summary>{{ icon('plus') }} Vertrag hinzufügen</summary>
+  {{ vertrag_formular({}, url_for('vertrag_neu', iid=immobilie_id), seite, wohnung_id, kostenarten, not wohnung_id) }}
+</details>
+{% endif %}
+</div>
+{%- endmacro %}

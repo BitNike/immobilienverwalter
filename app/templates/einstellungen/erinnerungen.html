@@ -1,0 +1,35 @@
+{% extends "einstellungen/_layout.html" %}
+{% from "_ui.html" import icon, info, speichern %}
+{% block title %}Erinnerungen{% endblock %}
+{% block panel %}
+<h1>Erinnerungen {{ info("Die App prüft alle 6 Stunden, ob bei einem Vertrag die Kündigungsfrist oder die Preisgarantie abläuft, ob die Befristung eines Mietvertrags endet oder eine Mietanpassung (Staffel/Index) ansteht. Je Empfänger kommt eine Sammel-Mail, für jeden Termin nur einmal.") }}</h1>
+{% if not konfiguriert %}
+<div class="meldung fehler">Der E-Mail-Versand ist noch nicht eingerichtet (SMTP in der <code>.env</code>, siehe <a href="{{ url_for('smtp_admin') }}">SMTP / E-Mail</a>). Bis dahin gehen keine Erinnerungen raus.</div>
+{% endif %}
+<form method="post">
+  <label class="haken"><input type="checkbox" name="aktiv" {{ 'checked' if aktiv }}> Erinnerungen per Mail verschicken</label>
+  <div class="raster">
+    <label>Vorlauf in Tagen<input name="vorlauf" inputmode="numeric" value="{{ vorlauf }}">
+      <small>So viele Tage vor dem Termin (z. B. letzter Tag zum Kündigen) kommt die Mail.</small></label>
+  </div>
+  <fieldset><legend>Wer bekommt die Mails?</legend>
+    <p class="leise">Angehakte Benutzer bekommen alle Erinnerungen aller Immobilien. Benutzer ohne E-Mail-Adresse können keine Mails bekommen.</p>
+    {% for b in benutzer %}
+    <label class="haken"><input type="checkbox" name="empfaenger" value="{{ b.id }}" {{ 'checked' if b.erinnerung }} {{ 'disabled' if not b.email }}>
+      {{ person_name(b) }} <span class="leise">{{ b.email or '(keine E-Mail-Adresse – im Profil bzw. unter Vermieter eintragen)' }} · {{ ROLLEN[b.rolle] }}</span></label>
+    {% endfor %}
+    <label class="haken"><input type="checkbox" name="eigentuemer" {{ 'checked' if eigentuemer }}>
+      Eigentümer zusätzlich an die Termine ihrer eigenen Mietobjekte erinnern (sofern eine E-Mail-Adresse hinterlegt ist)</label>
+  </fieldset>
+  <div class="knopfleiste">{{ speichern() }}</div>
+</form>
+
+<section class="block">
+  <h2>Anstehend ({{ faellig|length }}) {{ info("Termine im Vorlauf, für die noch keine Mail ging. „Jetzt prüfen“ verschickt sie sofort, statt auf die nächste automatische Prüfung zu warten.") }}</h2>
+  {% if faellig %}
+  <ul>{% for p in faellig %}<li class="notiz">{{ p.text }}</li>{% endfor %}</ul>
+  {% else %}<p class="leise">Zurzeit steht nichts an.</p>{% endif %}
+  <form method="post"><input type="hidden" name="aktion" value="jetzt">
+    <button class="btn hell" {{ 'disabled' if not konfiguriert }}>{{ icon('mail') }}<span>Jetzt prüfen und senden</span></button></form>
+</section>
+{% endblock %}

@@ -24,8 +24,9 @@
           {{ eintrag('ablage_kategorien_admin', 'Ablage-Kategorien', 'folder', bereich == 'admin_ablage') }}
           {{ eintrag('logo_admin', 'Logo & Brief', 'image', bereich == 'admin_logo') }}
           {{ eintrag('smtp_admin', 'SMTP / E-Mail', 'mail', bereich == 'admin_smtp') }}
+          {{ eintrag('erinnerungen_admin', 'Erinnerungen', 'mail', bereich == 'admin_erinnerungen') }}
         {% else %}
-          {% for t in ['Vermieter anlegen', 'Mietobjekte (Wohnungen)', 'Kostenarten', 'Ablage-Kategorien', 'Logo & Brief', 'SMTP / E-Mail'] %}<span>{{ t }}</span>{% endfor %}
+          {% for t in ['Vermieter anlegen', 'Mietobjekte (Wohnungen)', 'Kostenarten', 'Ablage-Kategorien', 'Logo & Brief', 'SMTP / E-Mail', 'Erinnerungen'] %}<span>{{ t }}</span>{% endfor %}
         {% endif %}
       </div>
     {% endif %}

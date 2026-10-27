@@ -276,6 +276,43 @@ MIGRATIONEN = [
     ALTER TABLE buchung ADD COLUMN hausgeld_eigentuemer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL;
     ALTER TABLE buchung ADD COLUMN hausgeld_wohnung_id INTEGER REFERENCES wohnung(id) ON DELETE SET NULL;
     """,
+    # 16: Verträge je Immobilie oder Mietobjekt (Laufzeit, Kündigungsfrist, Preisgarantie, Tarif) mit Erinnerung per Mail;
+    #     Mietvertragsangaben am Mietverhältnis; Empfänger der Erinnerungen je Benutzer
+    """
+    CREATE TABLE vertrag (
+        id INTEGER PRIMARY KEY,
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        wohnung_id INTEGER REFERENCES wohnung(id) ON DELETE CASCADE,
+        art TEXT NOT NULL,
+        anbieter TEXT NOT NULL DEFAULT '',
+        vertragsnummer TEXT NOT NULL DEFAULT '',
+        beginn TEXT,
+        ablauf TEXT,
+        verlaengerung INTEGER NOT NULL DEFAULT 12,
+        frist INTEGER NOT NULL DEFAULT 3,
+        gekuendigt_zum TEXT,
+        preisgarantie_bis TEXT,
+        betrag REAL NOT NULL DEFAULT 0,
+        zahlweise TEXT NOT NULL DEFAULT 'monatlich',
+        kostenart_id INTEGER REFERENCES kostenart(id),
+        arbeitspreis REAL,
+        grundpreis REAL,
+        verbrauch REAL,
+        kontakt TEXT NOT NULL DEFAULT '',
+        notiz TEXT NOT NULL DEFAULT '',
+        erinnern INTEGER NOT NULL DEFAULT 1,
+        erinnert_fuer TEXT,
+        erinnert_preis TEXT
+    );
+    ALTER TABLE mietverhaeltnis ADD COLUMN kaltmiete REAL NOT NULL DEFAULT 0;
+    ALTER TABLE mietverhaeltnis ADD COLUMN mietart TEXT NOT NULL DEFAULT '';
+    ALTER TABLE mietverhaeltnis ADD COLUMN befristet_bis TEXT;
+    ALTER TABLE mietverhaeltnis ADD COLUMN anpassung_am TEXT;
+    ALTER TABLE mietverhaeltnis ADD COLUMN erinnert_befristung TEXT;
+    ALTER TABLE mietverhaeltnis ADD COLUMN erinnert_anpassung TEXT;
+    ALTER TABLE benutzer ADD COLUMN erinnerung INTEGER NOT NULL DEFAULT 0;
+    UPDATE benutzer SET erinnerung = 1 WHERE rolle = 'admin';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

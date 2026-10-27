@@ -8,6 +8,7 @@ import tempfile
 TMP = tempfile.mkdtemp()
 os.environ["NK_DATA"] = os.path.join(TMP, "data")
 os.environ["NK_DOKUMENTE"] = os.path.join(TMP, "dokumente")
+os.environ["NK_ERINNERUNG"] = "aus"  # keine Hintergrund-Prüfung im Test
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 from PIL import Image  # noqa: E402
@@ -489,6 +490,77 @@ def test_gesamter_ablauf():
     c.delete_cookie("spalte_mietobjekte")
     from immobilien import kurzname
     assert [kurzname(x) for x in ("Wohnung 12", "Wohnung 3a", "EG", "10a Dachgeschoss")] == ["12", "3a", "EG", "10a"]
+    # Verträge: Kündigungstermin wie in der Vertragsübersicht
+    from datetime import date as datum_, timedelta
+    import vertraege as vt
+    t = vt.termin("2024-01-15", None, 12, 3, None, datum_(2026, 10, 27), 30)
+    assert (t["status"], t["ende"], t["kuendigen_bis"]) == ("laeuft", datum_(2028, 1, 15), datum_(2027, 10, 15))
+    t = vt.termin("2025-01-01", "2027-01-01", 12, 3, None, datum_(2026, 9, 15), 30)
+    assert (t["status"], t["kuendigen_bis"], t["tage"]) == ("bald", datum_(2026, 10, 1), 16)
+    assert vt.termin("2025-01-01", "2026-01-01", 1, 1, None, datum_(2026, 10, 27), 30)["flexibel"]
+    assert vt.termin(None, "2027-03-01", 0, 3, None, datum_(2026, 10, 27), 30)["status"] == "endet"
+    assert vt.termin(None, None, 12, 3, "2026-12-31", datum_(2026, 10, 27), 30)["status"] == "gekuendigt"
+    assert vt.termin(None, None, 12, 3, None, datum_(2026, 10, 27), 30)["status"] == "unbekannt"
+    # Anlegen: Immobilie (Strom mit naher Kündigungsfrist, Versicherung mit Kostenart) und Mietobjekt
+    heute = datum_.today()
+    post(c, "/immobilien/1/vertraege", data={"art": "Strom (Allgemeinstrom)", "anbieter": "Muster-Energie", "betrag": "80",
+                                             "zahlweise": "monatlich", "beginn": "2024-01-01",
+                                             "ablauf": (heute + timedelta(days=40)).isoformat(), "verlaengerung": "12",
+                                             "frist": "1", "erinnern": "on", "arbeitspreis": "30", "grundpreis": "10",
+                                             "verbrauch": "2000", "seite": "immobilie"})
+    post(c, "/immobilien/1/vertraege", data={"art": "Gebäudeversicherung", "anbieter": "Muster AG", "betrag": "1.200",
+                                             "zahlweise": "jaehrlich", "beginn": "2020-01-01", "verlaengerung": "12",
+                                             "frist": "3", "kostenart_id": ka["Gebäudeversicherung"], "erinnern": "on"})
+    r = post(c, "/immobilien/1/vertraege", data={"art": "Internet / TV", "betrag": "30", "zahlweise": "monatlich",
+                                                 "wohnung_id": "1", "seite": "wohnung", "verlaengerung": "1", "frist": "1"})
+    assert r.headers["Location"].endswith("/wohnungen/1?reiter=vertraege")
+    seite = ok(c.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
+    assert "Muster-Energie" in seite and "bald kündigen" in seite and "<strong>Internet / TV</strong>" in seite  # auch Wohnung
+    assert "<strong>3</strong>" in seite and "2.520,00 €" in seite  # 12×80 + 1.200 + 12×30
+    assert "Tarif: 720,00 €/Jahr" in seite  # 2000 kWh × 30 ct + 12 × 10 €
+    seite = ok(c.get("/wohnungen/1?reiter=vertraege")).get_data(as_text=True)
+    assert "<strong>Internet / TV</strong>" in seite and "Muster-Energie" not in seite and "Mietverträge" in seite
+    # Bearbeiten und Dauerauftrag aus dem Vertrag (nur Immobilie, mit Kostenart)
+    vid = dbcon.execute("SELECT id FROM vertrag WHERE art = 'Gebäudeversicherung'").fetchone()[0]
+    assert 'name="art" value="Gebäudeversicherung"' in ok(c.get(f"/immobilien/1?reiter=vertraege&vertrag={vid}")).get_data(as_text=True)
+    post(c, f"/vertraege/{vid}", data={"art": "Gebäudeversicherung", "anbieter": "Muster AG", "betrag": "1.250",
+                                       "zahlweise": "jaehrlich", "beginn": "2020-01-01", "verlaengerung": "12", "frist": "3",
+                                       "kostenart_id": ka["Gebäudeversicherung"], "erinnern": "on"})
+    r = post(c, f"/vertraege/{vid}/dauerauftrag")
+    assert r.headers["Location"].endswith("reiter=buchungen#dauerauftraege")
+    assert dbcon.execute("SELECT betrag, rhythmus, von, bis FROM dauerauftrag WHERE text = 'Gebäudeversicherung · Muster AG'"
+                         ).fetchone() == (1250.0, "jahr", "2026-01-01", "2026-12-31")
+    dbcon.execute("DELETE FROM dauerauftrag WHERE text = 'Gebäudeversicherung · Muster AG'")
+    dbcon.commit()
+    # Mietvertragsangaben am Mietverhältnis
+    post(c, "/mieter/1", data={"von": "2025-04-01", "vorauszahlung_monat": "150", "kaltmiete": "520", "mietart": "index",
+                               "anpassung_am": (heute + timedelta(days=20)).isoformat(),
+                               "befristet_bis": (heute + timedelta(days=400)).isoformat()})
+    seite = ok(c.get("/wohnungen/1?reiter=vertraege")).get_data(as_text=True)
+    assert "520,00 €" in seite and "Indexmiete ab" in seite and "noch 20 Tage" in seite
+    # Erinnerung: eine Sammel-Mail an Benutzer mit Haken, je Termin nur einmal
+    post(c, "/profil", data={"vorname": "Max", "name": "Vermieter", "email": "max@example.org"})
+    gesendet = []
+    import mail as mailmodul
+    alt = mailmodul.konfiguriert, mailmodul.senden
+    mailmodul.konfiguriert = lambda: True
+    mailmodul.senden = lambda an, betreff, text: gesendet.append((an, betreff, text))
+    try:
+        seite = ok(c.get("/einstellungen/admin/erinnerungen")).get_data(as_text=True)
+        assert "Muster-Energie" in seite and "Mietanpassung möglich ab" in seite
+        post(c, "/einstellungen/admin/erinnerungen", data={"aktiv": "on", "vorlauf": "30", "empfaenger": "1"})
+        post(c, "/einstellungen/admin/erinnerungen", data={"aktion": "jetzt"})
+        assert len(gesendet) == 1 and gesendet[0][0] == "max@example.org"
+        assert "Kündigungsfrist" in gesendet[0][2] and "Muster-Energie" in gesendet[0][2] and "Mietanpassung" in gesendet[0][2]
+        with app.app_context():
+            assert vt.pruefen() == 0  # schon gemeldet
+        post(c, "/einstellungen/admin/erinnerungen", data={"vorlauf": "30", "empfaenger": "1"})  # ausgeschaltet
+    finally:
+        mailmodul.konfiguriert, mailmodul.senden = alt
+    vid = dbcon.execute("SELECT id FROM vertrag WHERE art = 'Strom (Allgemeinstrom)'").fetchone()[0]
+    post(c, f"/vertraege/{vid}/loeschen", data={"seite": "immobilie"})
+    assert "Muster-Energie" not in ok(c.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
+
     # Reiter: jeder Bereich hat eine eigene Adresse, der Jahr-Umschalter behält den Reiter
     assert "/immobilien/1?jahr=2025&amp;reiter=ruecklage" in html
     for reiter, text in (("buchungen", "Belege und Buchungen"), ("zaehler", "Hauptzähler"), ("dokumente", "Ablage"),
@@ -660,6 +732,12 @@ def test_gesamter_ablauf():
     ok(a.post("/immobilien/1/buchungen", data={"datum": "2025-01-01", "text": "x", "art": "ausgabe", "ziel": "1",
                                                 "betrag": "1", "bezahlt": "konto"}), 403)
     ok(a.post("/buchungen/1/loeschen"), 403)
+    ok(a.post("/immobilien/1/vertraege", data={"art": "Gas"}), 403)  # Verträge der Immobilie nur Admin
+    post(a, "/immobilien/1/vertraege", data={"art": "Strom Wohnung", "wohnung_id": "2", "seite": "wohnung"})
+    ok(a.post("/immobilien/1/vertraege", data={"art": "Fremd", "wohnung_id": "1"}), 403)
+    seite = ok(a.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
+    assert "<strong>Strom Wohnung</strong>" in seite and "<strong>Internet / TV</strong>" not in seite
+    assert "<strong>Gebäudeversicherung</strong>" in seite
     # Hausgeld fremder Wohnungen bleibt für Eigentümer unsichtbar, eigenes ist sichtbar
     dbcon.execute("INSERT INTO buchung (immobilie_id, jahr, datum, text, art, betrag, hausgeld_eigentuemer_id, "
                   "hausgeld_wohnung_id) VALUES (1, 2026, '2026-03-01', 'HG fremd', 'einnahme', 99, 1, 1), "
