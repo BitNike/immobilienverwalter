@@ -57,8 +57,8 @@ def einrichtung():
         name = f.get("benutzername", "").strip()
         if not name:
             raise ValueError("Bitte einen Benutzernamen angeben.")
-        uid = exe("INSERT INTO benutzer (benutzername, passwort_hash, rolle, vorname, name, email) "
-                  "VALUES (?, ?, 'admin', ?, ?, ?)",
+        uid = exe("INSERT INTO benutzer (benutzername, passwort_hash, rolle, vorname, name, email, erinnerung) "
+                  "VALUES (?, ?, 'admin', ?, ?, ?, 1)",  # der erste Admin bekommt die Erinnerungen
                   (name, passwort_pruefen(f.get("passwort", ""), f.get("passwort2", "")),
                    f.get("vorname", "").strip(), f.get("name", "").strip(), f.get("email", "").strip()))
         session.clear()

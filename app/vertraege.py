@@ -223,60 +223,124 @@ def vertrag_dauerauftrag(vid):
 
 # ---------- Erinnerung ----------
 
+def _posten(art, eigentuemer, datum, titel, ort, zeilen, merker):
+    """Ein Termin für die Erinnerung. zeilen: [(Bezeichnung, Wert, hervorheben)]; text = Fassung für reine Text-Mails."""
+    text = f"{titel} ({ort})\n" + "\n".join(f"  {a}: {b}" for a, b, _ in zeilen)
+    return {"art": art, "eigentuemer": eigentuemer, "datum": datum, "titel": titel, "ort": ort, "zeilen": zeilen,
+            "text": text, "merker": merker}
+
+
 def faellige(heute=None):
-    """Alle Termine im Vorlauf, für die noch keine Mail ging: [(art, objekt, text, merker)].
-    art: kuendigung | preis | befristung | anpassung; merker = (Tabelle, Spalte, id, Wert) zum Abhaken."""
+    """Alle Termine im Vorlauf, für die noch keine Mail ging (Kündigung, Preisgarantie, Befristung, Mietanpassung).
+    merker = (Tabelle, Spalte, id, Wert) zum Abhaken nach dem Versand."""
     heute = heute or date.today()
     erg = []
     for immo in rows("SELECT * FROM immobilie WHERE archiviert = 0"):
         for v in vertraege(immo["id"], heute=heute, nur_sichtbare=False):
             if not v["erinnern"]:
                 continue
-            name = " · ".join(x for x in (v["art"], v["anbieter"]) if x)
-            ort = f"{immo['name']}{', ' + v['wohnung'] if v['wohnung'] else ''}"
+            titel = " · ".join(x for x in (v["art"], v["anbieter"]) if x)
+            ort = " · ".join(x for x in (immo["name"], v["wohnung"],
+                                         f"Vertragsnummer {v['vertragsnummer']}" if v["vertragsnummer"] else "") if x)
             t = v["termin"]
             if t["status"] == "bald" and v["erinnert_fuer"] != t["kuendigen_bis"].isoformat():
-                erg.append({"art": "kuendigung", "eigentuemer": v["eigentuemer_id"], "datum": t["kuendigen_bis"],
-                            "text": f"{name} ({ort})\n  kündigen bis {t['kuendigen_bis']:%d.%m.%Y} zum {t['ende']:%d.%m.%Y}"
-                                    f" (noch {t['tage']} Tage), {de_num(v['jahr'])} € pro Jahr"
-                                    + (f", Vertragsnummer {v['vertragsnummer']}" if v["vertragsnummer"] else ""),
-                            "merker": ("vertrag", "erinnert_fuer", v["id"], t["kuendigen_bis"].isoformat())})
+                zeilen = [("Kündigen bis", f"{t['kuendigen_bis']:%d.%m.%Y} · noch {t['tage']} Tage", True),
+                          ("Vertragsende", f"{t['ende']:%d.%m.%Y}, sonst Verlängerung {VERLAENGERUNG[v['verlaengerung']]}",
+                           False)]
+                if v["jahr"]:
+                    zeilen.append(("Kosten", f"{de_num(v['jahr'])} € pro Jahr", False))
+                if v["kontakt"]:
+                    zeilen.append(("Kontakt", v["kontakt"], False))
+                erg.append(_posten("kuendigung", v["eigentuemer_id"], t["kuendigen_bis"], titel, ort, zeilen,
+                                   ("vertrag", "erinnert_fuer", v["id"], t["kuendigen_bis"].isoformat())))
             p = v["preis"]
             if p and p["bald"] and v["erinnert_preis"] != p["datum"].isoformat():
-                erg.append({"art": "preis", "eigentuemer": v["eigentuemer_id"], "datum": p["datum"],
-                            "text": f"{name} ({ort})\n  Preisgarantie bis {p['datum']:%d.%m.%Y} (noch {p['tage']} Tage)",
-                            "merker": ("vertrag", "erinnert_preis", v["id"], p["datum"].isoformat())})
+                zeilen = [("Preisgarantie bis", f"{p['datum']:%d.%m.%Y} · noch {p['tage']} Tage", True),
+                          ("Tipp", "Guter Zeitpunkt, neue Konditionen zu vergleichen.", False)]
+                erg.append(_posten("preis", v["eigentuemer_id"], p["datum"], titel, ort, zeilen,
+                                   ("vertrag", "erinnert_preis", v["id"], p["datum"].isoformat())))
         for w in rows("SELECT * FROM wohnung WHERE immobilie_id = ?", (immo["id"],)):
             for mv in mietvertraege(w["id"], heute):
-                mieter = ", ".join(person_name(p) for p in mv["personen"]) or "Mieter"
-                ort = f"{immo['name']}, {w['bezeichnung']}"
-                for art, s, spalte, was in (("befristung", mv["befristung"], "erinnert_befristung", "Befristung endet"),
-                                            ("anpassung", mv["anpassung"], "erinnert_anpassung", "Mietanpassung möglich ab")):
-                    if s and s["bald"] and mv[spalte] != s["datum"].isoformat():
-                        erg.append({"art": art, "eigentuemer": w["eigentuemer_id"], "datum": s["datum"],
-                                    "text": f"Mietvertrag {mieter} ({ort})\n  {was} {s['datum']:%d.%m.%Y} (noch {s['tage']} Tage)",
-                                    "merker": ("mietverhaeltnis", spalte, mv["id"], s["datum"].isoformat())})
+                titel = "Mietvertrag " + (", ".join(person_name(x) for x in mv["personen"]) or "ohne Namen")
+                ort = f"{immo['name']} · {w['bezeichnung']}"
+                b, a = mv["befristung"], mv["anpassung"]
+                if b and b["bald"] and mv["erinnert_befristung"] != b["datum"].isoformat():
+                    erg.append(_posten("befristung", w["eigentuemer_id"], b["datum"], titel, ort,
+                                       [("Befristung endet", f"{b['datum']:%d.%m.%Y} · noch {b['tage']} Tage", True)],
+                                       ("mietverhaeltnis", "erinnert_befristung", mv["id"], b["datum"].isoformat())))
+                if a and a["bald"] and mv["erinnert_anpassung"] != a["datum"].isoformat():
+                    zeilen = [("Mietanpassung ab", f"{a['datum']:%d.%m.%Y} · noch {a['tage']} Tage", True),
+                              ("Art", MIETARTEN.get(mv["mietart"], "") +
+                               (f", Kaltmiete derzeit {de_num(mv['kaltmiete'])} €" if mv["kaltmiete"] else ""), False)]
+                    erg.append(_posten("anpassung", w["eigentuemer_id"], a["datum"], titel, ort, zeilen,
+                                       ("mietverhaeltnis", "erinnert_anpassung", mv["id"], a["datum"].isoformat())))
     return sorted(erg, key=lambda x: x["datum"])
 
 
-UEBERSCHRIFTEN = {"kuendigung": "Hier läuft bald die Kündigungsfrist ab. Ohne Kündigung verlängern sich die Verträge:",
-                  "preis": "Hier endet bald die Preisgarantie – ein guter Zeitpunkt, neue Konditionen auszuhandeln:",
-                  "befristung": "Hier endet bald die Befristung eines Mietvertrags:",
-                  "anpassung": "Hier ist bald eine Mietanpassung möglich (Staffel- oder Indexmiete):"}
+# Abschnitte der Mail: (Art, Überschrift, Farbe am linken Rand, Satz für die reine Textfassung)
+ABSCHNITTE = [("kuendigung", "Kündigungsfrist läuft ab", "#8a5300",
+               "Hier läuft bald die Kündigungsfrist ab. Ohne Kündigung verlängern sich die Verträge:"),
+              ("preis", "Preisgarantie endet", "#17325c",
+               "Hier endet bald die Preisgarantie – ein guter Zeitpunkt, neue Konditionen auszuhandeln:"),
+              ("befristung", "Mietverträge: Befristung endet", "#1d6b3a", "Hier endet bald die Befristung eines Mietvertrags:"),
+              ("anpassung", "Mietverträge: Mietanpassung", "#1d6b3a",
+               "Hier ist bald eine Mietanpassung möglich (Staffel- oder Indexmiete):")]
 
 
 def empfaenger(posten):
-    """{E-Mail: [Posten]}: Benutzer mit Haken „Erinnerungen“ bekommen alles; Eigentümer (falls eingeschaltet) die
-    Termine ihrer Mietobjekte."""
+    """{E-Mail: (Benutzer, [Posten])}: Benutzer mit Haken „Erinnerungen“ bekommen alles; Eigentümer (falls
+    eingeschaltet) die Termine ihrer Mietobjekte."""
     an = {}
     for b in rows("SELECT * FROM benutzer WHERE erinnerung = 1 AND email <> ''"):
-        an.setdefault(b["email"], []).extend(posten)
+        an.setdefault(b["email"], (b, []))[1].extend(posten)
     if einstellung("erinnerung_eigentuemer", "0") == "1":
         for p in posten:
             b = one("SELECT * FROM benutzer WHERE id = ? AND email <> ''", (p["eigentuemer"],)) if p["eigentuemer"] else None
-            if b and p not in an.get(b["email"], []):
-                an.setdefault(b["email"], []).append(p)
+            if b and p not in an.get(b["email"], (None, []))[1]:
+                an.setdefault(b["email"], (b, []))[1].append(p)
     return an
+
+
+def logo_fuer_mail():
+    """Logo wie oben links in der App (Einstellungen → Logo & Brief): eingebautes Standard-Logo, hochgeladenes Bild
+    oder – bei „Text“ – keins. Ergebnis: (bytes, Untertyp, Breite in px) oder None."""
+    import dateien
+    typ = einstellung("logo_typ", "standard")
+    if typ == "standard":
+        pfad = os.path.join(os.path.dirname(__file__), "static", "logo.png")
+    elif typ == "bild" and einstellung("logo_datei"):
+        pfad = os.path.join(dateien.BILD_DIR, einstellung("logo_datei"))
+    else:
+        return None
+    if not os.path.exists(pfad):
+        return None
+    with open(pfad, "rb") as f:
+        daten = f.read()
+    untertyp = {".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg", ".gif": "gif", ".webp": "webp"}.get(
+        os.path.splitext(pfad)[1].lower(), "png")
+    return daten, untertyp, 260 if typ == "standard" else 200
+
+
+def mail_inhalt(empfaenger_b, liste, url=""):
+    """(Betreff, Text, HTML, Bilder) für eine Erinnerungsmail."""
+    logo = logo_fuer_mail()
+    anzahl = len(liste)
+    betreff = f"Erinnerung: {anzahl} Termin{'e' if anzahl != 1 else ''} bei Verträgen"
+    anrede = f"Hallo {empfaenger_b['vorname']}" if empfaenger_b and empfaenger_b.get("vorname") else "Guten Tag"
+    einleitung = "bei diesen Verträgen ist bald etwas zu tun." if anzahl != 1 else "bei diesem Vertrag ist bald etwas zu tun."
+    if any(p["art"] == "kuendigung" for p in liste):
+        einleitung += " Ohne Kündigung verlängern sie sich automatisch."
+    gruppen = [{"titel": titel, "farbe": farbe, "posten": [p for p in liste if p["art"] == art]}
+               for art, titel, farbe, _ in ABSCHNITTE if any(p["art"] == art for p in liste)]
+    teile = [satz + "\n\n" + "\n\n".join("- " + p["text"] for p in liste if p["art"] == art)
+             for art, _, _, satz in ABSCHNITTE if any(p["art"] == art for p in liste)]
+    text = f"{anrede},\n\n" + "\n\n\n".join(teile) + (f"\n\nImmobilienverwalter: {url}" if url else "") + \
+        "\n\nDiese Erinnerung kommt einmal je Termin."
+    html = render_template("mail/erinnerung.html", betreff=betreff, anrede=anrede, einleitung=einleitung,
+                           ueberschrift=f"{anzahl} Termin{'e' if anzahl != 1 else ''} {'stehen' if anzahl != 1 else 'steht'} an",
+                           gruppen=gruppen, url=url, logo=bool(logo), logo_breite=logo[2] if logo else 0,
+                           logo_text=einstellung("logo_text", "Immobilienverwalter"))
+    return betreff, text, html, ({"logo": logo[:2]} if logo else {})
 
 
 def pruefen(heute=None):
@@ -284,18 +348,16 @@ def pruefen(heute=None):
     if einstellung("erinnerung_aktiv", "1") != "1" or not mail.konfiguriert():
         return 0
     posten = faellige(heute)
-    an = empfaenger(posten)
+    if not posten:  # nichts Neues – keine (leere) Mail
+        return 0
+    an = {adresse: (b, liste) for adresse, (b, liste) in empfaenger(posten).items() if liste}
     if not an:
         return 0
     url = os.environ.get("APP_URL", "")
-    for adresse, liste in an.items():
-        teile = [UEBERSCHRIFTEN[art] + "\n\n" + "\n\n".join("- " + p["text"] for p in liste if p["art"] == art)
-                 for art in UEBERSCHRIFTEN if any(p["art"] == art for p in liste)]
-        text = "Hallo,\n\n" + "\n\n\n".join(teile) + (f"\n\nImmobilienverwalter: {url}" if url else "") + \
-            "\n\nDiese Erinnerung kommt einmal je Termin."
-        betreff = f"Erinnerung: {len(liste)} Termin{'e' if len(liste) != 1 else ''} bei Verträgen"
-        mail.senden(adresse, betreff, text)
-    gemeldet = {id(p) for liste in an.values() for p in liste}
+    for adresse, (benutzer, liste) in an.items():
+        betreff, text, html, bilder = mail_inhalt(benutzer, liste, url)
+        mail.senden(adresse, betreff, text, html=html, bilder=bilder)
+    gemeldet = {id(p) for _, liste in an.values() for p in liste}
     for p in posten:
         if id(p) in gemeldet:
             tabelle, spalte, pid, wert = p["merker"]
@@ -325,6 +387,21 @@ def starten():
 @admin_noetig
 def erinnerungen_admin():
     if request.method == "POST":
+        if request.form.get("aktion") == "beispiel":
+            # Vorschau im eigenen Postfach: anstehende Termine bzw. ein Muster; es wird nichts als „erinnert“ markiert
+            if not g.user["email"]:
+                raise ValueError("Bitte zuerst im Profil eine E-Mail-Adresse eintragen.")
+            liste = faellige() or [_posten("kuendigung", None, date.today(), "Strom (Allgemeinstrom) · Muster-Energie",
+                                           "Beispiel-Immobilie · Vertragsnummer 12345",
+                                           [("Kündigen bis", f"{date.today():%d.%m.%Y} · noch 10 Tage", True),
+                                            ("Kosten", "960,00 € pro Jahr", False)], None)]
+            betreff, text, html, bilder = mail_inhalt(g.user, liste, os.environ.get("APP_URL", ""))
+            try:
+                mail.senden(g.user["email"], "[Beispiel] " + betreff, text, html=html, bilder=bilder)
+                flash(f"Beispiel-Erinnerung an {g.user['email']} gesendet.")
+            except Exception as e:  # noqa: BLE001
+                flash(f"Versand fehlgeschlagen: {e}", "fehler")
+            return redirect(url_for("erinnerungen_admin"))
         if request.form.get("aktion") == "jetzt":
             try:
                 n = pruefen(date.today())

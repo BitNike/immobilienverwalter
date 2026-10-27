@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ betreff }}</title></head>
+<body style="margin:0;padding:0;background:#eef0f3;">
+{# Mailprogramme verstehen nur einfaches HTML: Tabellen und Stile direkt an den Elementen #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f3;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #d5d9df;border-radius:4px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1a1d23;">
+  <tr><td style="padding:22px 28px 18px;border-bottom:3px solid #17325c;">
+    {% if logo %}<img src="cid:logo" width="{{ logo_breite }}" alt="{{ logo_text }}" style="display:block;width:{{ logo_breite }}px;max-width:100%;height:auto;border:0;">
+    {% else %}<div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#17325c;">{{ logo_text }}</div>{% endif %}
+  </td></tr>
+  <tr><td style="padding:26px 28px 6px;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;">{{ ueberschrift }}</div>
+    <div style="font-size:15px;line-height:1.55;color:#5f6670;margin-top:8px;">{{ anrede }}, {{ einleitung }}</div>
+  </td></tr>
+  {% for gruppe in gruppen %}
+  <tr><td style="padding:18px 28px 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:{{ gruppe.farbe }};font-weight:bold;">{{ gruppe.titel }}</td></tr>
+  {% for p in gruppe.posten %}
+  <tr><td style="padding:6px 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #d5d9df;border-left:4px solid {{ gruppe.farbe }};border-radius:3px;">
+      <tr><td style="padding:14px 16px;">
+        <div style="font-size:16px;font-weight:bold;">{{ p.titel }}</div>
+        <div style="font-size:13px;color:#5f6670;margin-top:2px;">{{ p.ort }}</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;font-size:14px;">
+          {% for label, wert, hervor in p.zeilen %}
+          <tr><td style="color:#5f6670;padding:2px 16px 2px 0;vertical-align:top;">{{ label }}</td>
+            <td style="{{ 'font-weight:bold;color:%s;' % gruppe.farbe if hervor }}">{{ wert }}</td></tr>
+          {% endfor %}
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endfor %}
+  {% endfor %}
+  {% if url %}
+  <tr><td align="left" style="padding:24px 28px 8px;">
+    <a href="{{ url }}" style="display:inline-block;background:#17325c;color:#ffffff;text-decoration:none;font-size:15px;padding:12px 22px;border-radius:3px;">Im Immobilienverwalter ansehen</a>
+  </td></tr>
+  {% endif %}
+  <tr><td style="padding:22px 28px 24px;font-size:12px;line-height:1.5;color:#8a9099;border-top:1px solid #e3e6ea;">
+    Diese Erinnerung kommt einmal je Termin. Empfänger und Vorlauf änderst du unter Einstellungen → Erinnerungen.<br>
+    Gesendet von {{ logo_text }}{% if url %} · {{ url.split('//')[-1].rstrip('/') }}{% endif %}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>

@@ -544,16 +544,23 @@ def test_gesamter_ablauf():
     import mail as mailmodul
     alt = mailmodul.konfiguriert, mailmodul.senden
     mailmodul.konfiguriert = lambda: True
-    mailmodul.senden = lambda an, betreff, text: gesendet.append((an, betreff, text))
+    mailmodul.senden = lambda an, betreff, text, html=None, bilder=None: gesendet.append((an, betreff, text, html, bilder))
     try:
         seite = ok(c.get("/einstellungen/admin/erinnerungen")).get_data(as_text=True)
-        assert "Muster-Energie" in seite and "Mietanpassung möglich ab" in seite
-        post(c, "/einstellungen/admin/erinnerungen", data={"aktiv": "on", "vorlauf": "30", "empfaenger": "1"})
+        assert "Muster-Energie" in seite and "Mietanpassung ab" in seite
+        assert 'name="empfaenger" value="1" checked' in seite  # der Admin aus der Einrichtung ist vorausgewählt
         post(c, "/einstellungen/admin/erinnerungen", data={"aktion": "jetzt"})
         assert len(gesendet) == 1 and gesendet[0][0] == "max@example.org"
         assert "Kündigungsfrist" in gesendet[0][2] and "Muster-Energie" in gesendet[0][2] and "Mietanpassung" in gesendet[0][2]
+        _, betreff, text, mail_html, bilder = gesendet[0]
+        assert betreff == "Erinnerung: 2 Termine bei Verträgen" and text.startswith("Hallo Max,")
+        assert 'src="cid:logo"' in mail_html and "Kündigen bis" in mail_html and "Im Immobilienverwalter ansehen" not in mail_html
+        assert bilder["logo"][1] == "png" and bilder["logo"][0][:4] == b"\x89PNG"  # eingebautes Standard-Logo
         with app.app_context():
             assert vt.pruefen() == 0  # schon gemeldet
+        assert len(gesendet) == 1  # nichts Neues: keine leere Mail
+        post(c, "/einstellungen/admin/erinnerungen", data={"aktion": "beispiel"})  # Vorschau, markiert nichts
+        assert len(gesendet) == 2 and gesendet[1][1].startswith("[Beispiel] Erinnerung:") and "Muster-Energie" in gesendet[1][2]
         post(c, "/einstellungen/admin/erinnerungen", data={"vorlauf": "30", "empfaenger": "1"})  # ausgeschaltet
     finally:
         mailmodul.konfiguriert, mailmodul.senden = alt

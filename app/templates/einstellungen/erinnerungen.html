@@ -29,7 +29,12 @@
   {% if faellig %}
   <ul>{% for p in faellig %}<li class="notiz">{{ p.text }}</li>{% endfor %}</ul>
   {% else %}<p class="leise">Zurzeit steht nichts an.</p>{% endif %}
-  <form method="post"><input type="hidden" name="aktion" value="jetzt">
-    <button class="btn hell" {{ 'disabled' if not konfiguriert }}>{{ icon('mail') }}<span>Jetzt prüfen und senden</span></button></form>
+  <div class="knopfleiste">
+    <form method="post" class="inline"><input type="hidden" name="aktion" value="jetzt">
+      <button class="btn hell" {{ 'disabled' if not konfiguriert }}>{{ icon('mail') }}<span>Jetzt prüfen und senden</span></button></form>
+    <form method="post" class="inline"><input type="hidden" name="aktion" value="beispiel">
+      <button class="btn hell" {{ 'disabled' if not konfiguriert }} title="Schickt dir die Erinnerungsmail zur Ansicht; es wird nichts als erledigt markiert">{{ icon('eye') }}<span>Beispiel an mich senden</span></button></form>
+    {{ info("„Beispiel an mich senden“ zeigt dir, wie die Mail aussieht – mit den anstehenden Terminen oder, wenn keine anstehen, mit einem Muster. Danach kommen die echten Erinnerungen trotzdem.") }}
+  </div>
 </section>
 {% endblock %}
