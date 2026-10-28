@@ -655,6 +655,17 @@ def test_gesamter_ablauf():
     seite = ok(c.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
     assert "Kd.-Nr. K-123" in seite and "Zähler Flurstrom Haus 1 (Nr. F-4)" in seite and "Zähler Flurstrom Haus 2" in seite
     assert "Verbrauch 2025 laut Zähler: 550 kWh" in seite  # beide Flurstromzähler zusammen
+    # Zähler auch direkt im Vertragsformular an- und abhaken
+    seite = ok(c.get(f"/immobilien/1?reiter=vertraege&vertrag={strom}")).get_data(as_text=True)
+    assert 'name="zaehler" value="4" checked' in seite and 'name="zaehler" value="6" >' in seite
+    vertragsdaten = {"art": "Strom (Allgemeinstrom)", "anbieter": "Stadtwerke Muster", "betrag": "50",
+                     "zahlweise": "monatlich", "zaehler_auswahl": "1"}
+    post(c, f"/vertraege/{strom}", data={**vertragsdaten, "zaehler": ["4"]})
+    assert [r[0] for r in dbcon.execute("SELECT id FROM zaehler WHERE vertrag_id = ?", (strom,))] == [4]
+    post(c, f"/vertraege/{strom}", data={**vertragsdaten, "zaehler": ["4", "5"]})
+    assert [r[0] for r in dbcon.execute("SELECT id FROM zaehler WHERE vertrag_id = ? ORDER BY id", (strom,))] == [4, 5]
+    seite = ok(c.get("/wohnungen/1?reiter=vertraege")).get_data(as_text=True)
+    assert 'name="zaehler" value="4"' not in seite  # Mietobjekt bietet nur seine eigenen Zähler an
     post(c, f"/vertraege/{strom}/loeschen", data={"seite": "immobilie"})
     assert dbcon.execute("SELECT COUNT(*) FROM zaehler WHERE vertrag_id IS NOT NULL").fetchone()[0] == 0
     html = ok(c.get("/immobilien/1?jahr=2025&reiter=zaehler")).get_data(as_text=True)

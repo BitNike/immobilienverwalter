@@ -54,7 +54,7 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
 {% set zbb = request.args.get('zaehler')|int %}{% set abb = request.args.get('ablesung')|int %}
 {% set vopt = (vliste or [])|selectattr('wohnung_id', 'equalto', neu_versteckt.wohnung_id)|list if neu_versteckt.wohnung_id
    else (vliste or [])|rejectattr('wohnung_id')|list %}
-{% macro vertrag_wahl(gewaehlt) %}{% if vopt %}<label><span>Vertrag {{ info("Zu welchem Vertrag gehört der Zähler (z. B. Stromvertrag)? Dann siehst du beim Vertrag die Zähler und ihren Verbrauch.") }}</span><select name="vertrag_id"><option value="">– keiner –</option>
+{% macro vertrag_wahl(gewaehlt) %}{% if not vopt %}<label><span>Vertrag</span><small class="leise feldhinweis">Noch kein Vertrag {{ 'bei diesem Mietobjekt' if neu_versteckt.wohnung_id else 'bei der Immobilie' }} – im Reiter „Verträge“ anlegen.</small></label>{% else %}<label><span>Vertrag {{ info("Zu welchem Vertrag gehört der Zähler (z. B. Stromvertrag)? Dann siehst du beim Vertrag die Zähler und ihren Verbrauch.") }}</span><select name="vertrag_id"><option value="">– keiner –</option>
   {% for v in vopt %}<option value="{{ v.id }}" {{ 'selected' if v.id == gewaehlt }}>{{ v.art }}{% if v.anbieter %} · {{ v.anbieter }}{% endif %}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
 {% if zs %}
 <div class="tabelle">

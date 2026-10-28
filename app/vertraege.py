@@ -177,14 +177,32 @@ def _zurueck(v):
     return redirect(url_for("immobilie", iid=v["immobilie_id"], reiter="vertraege"))
 
 
+def _zaehler_setzen(vid, iid, wid):
+    """Angehakte Zähler aus dem Vertragsformular verbinden, abgewählte lösen. Nur Zähler derselben Stelle: Hauptzähler
+    der Immobilie bzw. Zähler der Wohnung. Ohne das Feld im Formular bleibt alles, wie es ist."""
+    if "zaehler_auswahl" not in request.form:
+        return
+    gewaehlt = {int(z) for z in request.form.getlist("zaehler") if z.isdigit()}
+    passend = {z["id"] for z in (rows("SELECT id FROM zaehler WHERE wohnung_id = ?", (wid,)) if wid else
+                                 rows("SELECT id FROM zaehler WHERE immobilie_id = ?", (iid,)))}
+    if gewaehlt - passend:
+        raise ValueError("Ein gewählter Zähler gehört nicht zu diesem Vertrag.")
+    for zid in passend:
+        if zid in gewaehlt:
+            exe("UPDATE zaehler SET vertrag_id = ? WHERE id = ?", (vid, zid))
+        else:
+            exe("UPDATE zaehler SET vertrag_id = NULL WHERE id = ? AND vertrag_id = ?", (zid, vid))
+
+
 @app.post("/immobilien/<int:iid>/vertraege")
 def vertrag_neu(iid):
     row("SELECT id FROM immobilie WHERE id = ?", (iid,))
     wid = int(request.form["wohnung_id"]) if request.form.get("wohnung_id") else None
     _recht(iid, wid)
     vals = _werte()
-    exe(f"INSERT INTO vertrag (immobilie_id, wohnung_id, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
-        [iid, wid, *vals.values()])
+    vid = exe(f"INSERT INTO vertrag (immobilie_id, wohnung_id, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
+              [iid, wid, *vals.values()])
+    _zaehler_setzen(vid, iid, wid)
     flash(f"Vertrag „{vals['art']}“ angelegt.")
     return _zurueck({"immobilie_id": iid, "wohnung_id": wid})
 
@@ -195,6 +213,7 @@ def vertrag_speichern(vid):
     _recht(v["immobilie_id"], v["wohnung_id"])
     vals = _werte()
     exe(f"UPDATE vertrag SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), vid])
+    _zaehler_setzen(vid, v["immobilie_id"], v["wohnung_id"])
     return _zurueck(v)
 
 

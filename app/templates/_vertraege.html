@@ -1,6 +1,6 @@
 {% from "_ui.html" import icon, info, loeschen, speichern %}
 
-{% macro vertrag_formular(v, ziel, seite, wohnung_id, kostenarten, ist_immobilie) -%}
+{% macro vertrag_formular(v, ziel, seite, wohnung_id, kostenarten, ist_immobilie, zliste=none) -%}
 <form method="post" action="{{ ziel }}">
   <input type="hidden" name="seite" value="{{ seite }}">
   {% if wohnung_id %}<input type="hidden" name="wohnung_id" value="{{ wohnung_id }}">{% endif %}
@@ -27,6 +27,19 @@
   </div>
   <label class="haken"><input type="checkbox" name="erinnern" {{ 'checked' if not v.id or v.erinnern }}> per Mail an die Kündigungsfrist und das Ende der Preisgarantie erinnern</label>
   </fieldset>
+  {% if zliste is not none %}
+  <fieldset><legend>Zähler {{ info("Welche Zähler laufen über diesen Vertrag? Mehrere sind möglich (z. B. alle Flurstromzähler). Beim Vertrag siehst du dann ihren Verbrauch im Jahr. Zur Auswahl stehen " ~ ("die Hauptzähler der Immobilie." if ist_immobilie else "die Zähler dieses Mietobjekts.")) }}</legend>
+    <input type="hidden" name="zaehler_auswahl" value="1">
+    {% set zeigen = zliste|selectattr('ausgebaut', 'none')|list + zliste|rejectattr('ausgebaut', 'none')|selectattr('vertrag_id', 'equalto', v.id)|list if v.id else zliste|selectattr('ausgebaut', 'none')|list %}
+    {% for z in zeigen %}
+    <label class="haken"><input type="checkbox" name="zaehler" value="{{ z.id }}" {{ 'checked' if v.id and z.vertrag_id == v.id }}>
+      {{ ZAEHLERARTEN[z.art] }}{% if z.bezeichnung %} · {{ z.bezeichnung }}{% endif %}{% if z.nummer %} <span class="leise">(Nr. {{ z.nummer }})</span>{% endif %}
+      {% if z.vertrag_id and z.vertrag_id != v.id %}<span class="leise">– gehört bisher zu einem anderen Vertrag</span>{% endif %}</label>
+    {% else %}
+    <p class="leise">Noch kein Zähler erfasst – Zähler legst du im Reiter „Zähler“ an.</p>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
   <details {{ 'open' if v.id and (v.arbeitspreis is not none or v.kontakt or v.notiz) }}>
     <summary>Tarif, Kontakt und Notiz</summary>
     <div class="raster">
@@ -44,6 +57,7 @@
 
 {% macro vertraege_bereich(vliste, vk, darf_anlegen, immobilie_id, wohnung_id, seite, kostenarten) -%}
 {% set vbb = request.args.get('vertrag')|int %}
+{% set zliste = (zaehler if wohnung_id else hauptzaehler) or [] %}
 <datalist id="vertragsarten">{% for a in VERTRAGSARTEN %}<option value="{{ a }}">{% endfor %}</datalist>
 <div class="kennzahlen">
   <div><span>Laufende Verträge</span><strong>{{ vk.anzahl }}</strong><small class="leise">ohne beendete</small></div>
@@ -96,11 +110,12 @@
 <div id="vertrag-formular">
 {% if bearbeitet %}
 <h3>Vertrag bearbeiten</h3>
-{{ vertrag_formular(bearbeitet, url_for('vertrag_speichern', vid=bearbeitet.id), seite, none, kostenarten, not bearbeitet.wohnung_id) }}
+{{ vertrag_formular(bearbeitet, url_for('vertrag_speichern', vid=bearbeitet.id), seite, none, kostenarten, not bearbeitet.wohnung_id,
+                    zliste if (not bearbeitet.wohnung_id) == (not wohnung_id) else none) }}
 {% elif darf_anlegen %}
 <details>
   <summary>{{ icon('plus') }} Vertrag hinzufügen</summary>
-  {{ vertrag_formular({}, url_for('vertrag_neu', iid=immobilie_id), seite, wohnung_id, kostenarten, not wohnung_id) }}
+  {{ vertrag_formular({}, url_for('vertrag_neu', iid=immobilie_id), seite, wohnung_id, kostenarten, not wohnung_id, zliste) }}
 </details>
 {% endif %}
 </div>
