@@ -334,3 +334,6 @@ table.schluessel-tabelle th:nth-child(5) { white-space: normal; min-width: 70px;
 table.schluessel-tabelle td:nth-child(2) { white-space: nowrap; }
 table.schluessel-tabelle select { min-width: 170px; }
 table.schluessel-tabelle input[name^="g_"] { width: 100%; min-width: 180px; }
+
+/* Buchungen: Zeile zum Aufklappen der älteren Einträge */
+table.buchungen tr.mehr-zeile td { text-align: center; padding: 10px 8px; }

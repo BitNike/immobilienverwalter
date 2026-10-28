@@ -175,7 +175,8 @@ def schluessel_fuer(immo, ka, regeln=None, anzahl_wohnungen=None):
 
 
 def kostenarten_immobilie(immo):
-    """Aktive Kostenarten ohne die, die diese Immobilie ausgeblendet hat; „schluessel“ ist der der Immobilie."""
+    """Aktive Kostenarten ohne die, die diese Immobilie für ihre Gebäudekosten ausgeblendet hat; „schluessel“ ist der der
+    Immobilie. Beim Mietobjekt bleiben alle Kostenarten wählbar (z. B. Müllgebühr, die der Eigentümer direkt bezahlt)."""
     regeln = kostenart_regeln(immo["id"])
     anzahl = one("SELECT COUNT(*) AS n FROM wohnung WHERE immobilie_id = ?", (immo["id"],))["n"]
     return [dict(k, schluessel=schluessel_fuer(immo, k, regeln, anzahl)) for k in kostenarten_aktiv()
@@ -1283,7 +1284,7 @@ def wohnung(wid):
         mietvertraege=mietvertraege(wid),
         benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname") if ist_admin() else [],
         pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
-        darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_immobilie(immo),
+        darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),  # „nicht genutzt“ gilt nur für die Gebäudekosten
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
         zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? "
                                      "ORDER BY art, ausgebaut IS NOT NULL, bezeichnung COLLATE NATUERLICH, id", (wid,), j),

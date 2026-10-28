@@ -168,6 +168,8 @@
       <td class="aktionen">{{ beleg_knopf('bneu', vorlage) }}<button class="btn-icon" form="bneu" title="Speichern (Enter)">{{ icon('save', 16) }}</button></td>
     </tr>
     {% endif %}
+    {# Ohne Filter nur die neuesten 15 zeigen, der Rest lässt sich aufklappen (beim Bearbeiten alle) #}
+    {% set kappen = buchungen|length > 15 and buchungen|length == alle_buchungen|length and not bb %}
     {% for b in buchungen %}
     {% if ist_admin and bb == b.id %}
     <tr class="in-bearbeitung">
@@ -180,7 +182,7 @@
       </td>
     </tr>
     {% else %}
-    <tr>
+    <tr{% if kappen and loop.index > 15 %} class="weitere" hidden{% endif %}>
       <td>{{ b.datum|datum(True) if b.datum else '–' }}{% if b.datum and b.datum[:4] != b.jahr|string %}<br>
         <small class="warnung" title="Belegdatum außerhalb des Abrechnungsjahres">nicht {{ b.jahr }}</small>{% if ist_admin %}<form method="post" action="{{ url_for('buchung_ins_datumsjahr', bid=b.id) }}" class="inline">
           <button class="link-knopf" title="Buchung ins Jahr {{ b.datum[:4] }} verschieben">→ {{ b.datum[:4] }}</button></form>{% endif %}{% endif %}</td>
@@ -207,6 +209,13 @@
     {% else %}
     <tr><td colspan="7" class="leise">{{ 'Keine Buchung passt zum Filter.' if alle_buchungen else 'Für %d sind noch keine Buchungen erfasst.' % jahr }}</td></tr>
     {% endfor %}
+    {% if kappen %}
+    <tr class="mehr-zeile"><td colspan="7">
+      <button type="button" class="link-knopf" data-mehr="▾ Alle {{ buchungen|length }} Buchungen anzeigen ({{ buchungen|length - 15 }} ältere)" data-weniger="▴ Nur die neuesten 15 anzeigen"
+        onclick="var t = this.closest('tbody'), zu = !t.classList.toggle('alle'); t.querySelectorAll('tr.weitere').forEach(function (r) { r.hidden = zu; }); this.textContent = zu ? this.dataset.mehr : this.dataset.weniger"
+        >▾ Alle {{ buchungen|length }} Buchungen anzeigen ({{ buchungen|length - 15 }} ältere)</button>
+      <small class="leise">– oder oben suchen bzw. filtern</small></td></tr>
+    {% endif %}
     </tbody>
     {% if buchungen %}
     {% set ausgaben = buchungen|selectattr('art', 'equalto', 'ausgabe')|sum(attribute='betrag') %}
@@ -700,7 +709,7 @@
 
 {% if ist_admin and aktiv == 'schluessel' %}
 <section class="block" id="schluessel">
-  <h2>Umlageschlüssel dieser Immobilie {{ info("Wie jede Kostenart in dieser Immobilie verteilt wird – z. B. laut Teilungserklärung oder Beschluss der Eigentümerversammlung. Unter „Grundlage“ hältst du fest, woher die Regel stammt (z. B. „§ 13 Abs. 1 b TE“ oder „Beschluss ETV 12.05.2027“).\n\nOhne eigene Regel gilt die Vorgabe (Standard der Immobilie bzw. der Kostenart aus Einstellungen → Kostenarten). Neue Kostenpositionen übernehmen den Schlüssel automatisch; vorhandene änderst du mit „auf das Jahr anwenden“ oder einzeln über den Stift bei den Gebäudekosten.\n\n„nicht genutzt“ blendet die Kostenart bei dieser Immobilie in den Auswahllisten aus.") }}</h2>
+  <h2>Umlageschlüssel dieser Immobilie {{ info("Wie jede Kostenart in dieser Immobilie verteilt wird – z. B. laut Teilungserklärung oder Beschluss der Eigentümerversammlung. Unter „Grundlage“ hältst du fest, woher die Regel stammt (z. B. „§ 13 Abs. 1 b TE“ oder „Beschluss ETV 12.05.2027“).\n\nOhne eigene Regel gilt die Vorgabe (Standard der Immobilie bzw. der Kostenart aus Einstellungen → Kostenarten). Neue Kostenpositionen übernehmen den Schlüssel automatisch; vorhandene änderst du mit „auf das Jahr anwenden“ oder einzeln über den Stift bei den Gebäudekosten.\n\n„nicht genutzt“ blendet die Kostenart bei den Buchungen, Daueraufträgen und Verträgen der Immobilie aus – z. B. Kosten, die nicht über das Konto der Gemeinschaft laufen (Müllgebühren zahlt jeder Eigentümer selbst). Beim Mietobjekt bleibt sie wählbar, damit der Eigentümer sie dort als Kosten seiner Wohnung eintragen kann.") }}</h2>
   <form method="post" action="{{ url_for('umlageschluessel_speichern', iid=immo.id) }}">
     <div class="raster">
       <label>Standard der Immobilie

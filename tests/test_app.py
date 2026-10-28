@@ -465,8 +465,11 @@ def test_gesamter_ablauf():
     def zeilen(params):
         html_ = ok(c.get(f"/immobilien/{hid}?reiter=buchungen&{params}")).get_data(as_text=True)
         tbody = html_.split("<tbody>")[1].split("</tbody>")[0]
-        return tbody.count("<tr>") - tbody.count("Keine Buchung passt zum Filter")
+        return tbody.count("<tr>") + tbody.count('<tr class="weitere" hidden>') - tbody.count("Keine Buchung passt zum Filter")
     assert zeilen("") == 25
+    seite = ok(c.get(f"/immobilien/{hid}?reiter=buchungen")).get_data(as_text=True)
+    assert seite.count('<tr class="weitere" hidden>') == 10 and "Alle 25 Buchungen anzeigen (10 ältere)" in seite
+    assert 'class="weitere"' not in ok(c.get(f"/immobilien/{hid}?reiter=buchungen&q=450")).get_data(as_text=True)
     assert zeilen("eigentuemer=1") == 13 and zeilen(f"wohnung={w2}") == 13 and zeilen(f"wohnung={w4}") == 12
     assert zeilen("q=450") == 12 and zeilen("q=Januar") == 1 and zeilen("monat=1") == 3 and zeilen("ziel=hausgeld") == 25
     assert zeilen("ziel=ruecklage") == 0 and zeilen("ohne=1") == 0  # Hausgeld braucht keinen Beleg
@@ -533,6 +536,7 @@ def test_gesamter_ablauf():
     assert "Beschluss ETV 2027" in seite and "Regel der Immobilie" not in seite
     seite = ok(c.get(f"/immobilien/{tid}?reiter=buchungen")).get_data(as_text=True)
     assert f'<option value="{hm}"' in seite and f'<option value="{aufzug}"' not in seite  # Aufzug ausgeblendet
+    assert f'<option value="{aufzug}"' in ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)  # beim Mietobjekt wählbar
     # Regel nachträglich geändert: Prüfliste weist auf die Abweichung hin, „anwenden“ zieht die Position nach
     post(c, f"/immobilien/{tid}/umlageschluessel", data={f"s_{instand}": "flaeche"})
     assert "die Regel der Immobilie sagt Wohnfläche" in ok(c.get(f"/immobilien/{tid}")).get_data(as_text=True)
