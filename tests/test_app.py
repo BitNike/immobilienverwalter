@@ -666,8 +666,29 @@ def test_gesamter_ablauf():
     assert [r[0] for r in dbcon.execute("SELECT id FROM zaehler WHERE vertrag_id = ? ORDER BY id", (strom,))] == [4, 5]
     seite = ok(c.get("/wohnungen/1?reiter=vertraege")).get_data(as_text=True)
     assert 'name="zaehler" value="4"' not in seite  # Mietobjekt bietet nur seine eigenen Zähler an
+    # Unterlagen am Vertrag: hochladen (landen in der Ablage) und vorhandene Ablage-Dokumente verbinden
+    post(c, "/immobilien/1/ablage", data={"kategorie": "sonstiges", "titel": "Preisblatt 2025", "dateien": pdf_datei()},
+         content_type="multipart/form-data")
+    preisblatt = dbcon.execute("SELECT id FROM ablage WHERE titel = 'Preisblatt 2025'").fetchone()[0]
+    seite = ok(c.get(f"/immobilien/1?reiter=vertraege&vertrag={strom}")).get_data(as_text=True)
+    assert 'enctype="multipart/form-data"' in seite and f'name="unterlagen" value="{preisblatt}"' in seite
+    post(c, f"/vertraege/{strom}", data={**vertragsdaten, "zaehler": ["4", "5"], "unterlagen_auswahl": "1",
+                                         "unterlagen": [str(preisblatt)], "unterlagen_neu": pdf_datei("Stromvertrag.pdf")},
+         content_type="multipart/form-data")
+    assert sorted(r[0] for r in dbcon.execute("SELECT titel FROM ablage WHERE vertrag_id = ?", (strom,))) == \
+        ["Preisblatt 2025", "Stromvertrag"]
+    assert dbcon.execute("SELECT kategorie, notiz FROM ablage WHERE titel = 'Stromvertrag'").fetchone() == \
+        ("vertraege", "Vertrag: Strom (Allgemeinstrom)")
+    seite = ok(c.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
+    assert "Stromvertrag</a>" in seite and "Preisblatt 2025</a>" in seite
+    post(c, f"/vertraege/{strom}", data={**vertragsdaten, "zaehler": ["4", "5"], "unterlagen_auswahl": "1",
+                                         "unterlagen": []})  # Preisblatt abwählen: bleibt in der Ablage
+    assert dbcon.execute("SELECT vertrag_id FROM ablage WHERE id = ?", (preisblatt,)).fetchone()[0] is None
     post(c, f"/vertraege/{strom}/loeschen", data={"seite": "immobilie"})
     assert dbcon.execute("SELECT COUNT(*) FROM zaehler WHERE vertrag_id IS NOT NULL").fetchone()[0] == 0
+    assert dbcon.execute("SELECT vertrag_id FROM ablage WHERE titel = 'Stromvertrag'").fetchone() == (None,)  # bleibt
+    for (aid,) in dbcon.execute("SELECT id FROM ablage WHERE titel IN ('Stromvertrag', 'Preisblatt 2025')").fetchall():
+        post(c, f"/ablage/{aid}/loeschen")  # spätere Tests erwarten eine leere Ablage
     html = ok(c.get("/immobilien/1?jahr=2025&reiter=zaehler")).get_data(as_text=True)
     # Zählertabelle wie die Rücklage: Stand 01.01./31.12., Verbrauch je Zähler; Ablesung über die Auswahl eintragen
     assert "Stand 01.01.2025" in html and "1.000,00 kWh" in html and "<strong>400,0 kWh</strong>" in html

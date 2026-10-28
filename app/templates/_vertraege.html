@@ -1,7 +1,7 @@
 {% from "_ui.html" import icon, info, loeschen, speichern %}
 
-{% macro vertrag_formular(v, ziel, seite, wohnung_id, kostenarten, ist_immobilie, zliste=none) -%}
-<form method="post" action="{{ ziel }}">
+{% macro vertrag_formular(v, ziel, seite, wohnung_id, kostenarten, ist_immobilie, zliste=none, ablage=[]) -%}
+<form method="post" action="{{ ziel }}" enctype="multipart/form-data">
   <input type="hidden" name="seite" value="{{ seite }}">
   {% if wohnung_id %}<input type="hidden" name="wohnung_id" value="{{ wohnung_id }}">{% endif %}
   <div class="raster">
@@ -40,6 +40,20 @@
     {% endfor %}
   </fieldset>
   {% endif %}
+  <fieldset><legend>Unterlagen {{ info("Vertrag, Preisblatt, Kündigungsbestätigung … als PDF oder Foto. Die Dateien landen in der Ablage unter „Verträge & Versicherungen“ und sind mit diesem Vertrag verbunden. Wird der Vertrag gelöscht, bleiben sie in der Ablage.") }}</legend>
+    <label>Dateien anhängen<input type="file" name="unterlagen_neu" multiple accept=".pdf,image/*"></label>
+    {% set auswahl = ablage|selectattr('vertrag_id', 'none')|list + (ablage|selectattr('vertrag_id', 'equalto', v.id)|list if v.id else []) %}
+    {% if auswahl %}
+    <input type="hidden" name="unterlagen_auswahl" value="1">
+    <details {{ 'open' if v.id and auswahl|selectattr('vertrag_id', 'equalto', v.id)|list }}>
+      <summary>Vorhandene Dokumente aus der Ablage verbinden ({{ auswahl|length }})</summary>
+      {% for a in auswahl|sort(attribute='titel') %}
+      <label class="haken"><input type="checkbox" name="unterlagen" value="{{ a.id }}" {{ 'checked' if v.id and a.vertrag_id == v.id }}>
+        {{ a.titel }}{% if a.jahr %} <span class="leise">({{ a.jahr }})</span>{% endif %}</label>
+      {% endfor %}
+    </details>
+    {% endif %}
+  </fieldset>
   <details {{ 'open' if v.id and (v.arbeitspreis is not none or v.kontakt or v.notiz) }}>
     <summary>Tarif, Kontakt und Notiz</summary>
     <div class="raster">
@@ -78,6 +92,7 @@
     <td><strong>{{ v.art }}</strong>{% if v.anbieter %} · {{ v.anbieter }}{% endif %}
       <br><small class="leise">{% if v.vertragsnummer %}Nr. {{ v.vertragsnummer }}{% endif %}{% if v.kundennummer %}{{ ' · ' if v.vertragsnummer }}Kd.-Nr. {{ v.kundennummer }}{% endif %}{% if v.wohnung and not wohnung_id %}{{ ' · ' if v.vertragsnummer or v.kundennummer }}{{ v.wohnung }}{% endif %}
       {% for z in v.zaehler %}<br><span title="{{ z.notiz }}">Zähler {{ z.bezeichnung or ZAEHLERARTEN[z.art] }}{% if z.nummer %} (Nr. {{ z.nummer }}){% endif %}{% if z.ausgebaut %} · ausgebaut{% endif %}</span>{% endfor %}
+      {% for a in v.unterlagen %}<br><a href="{{ url_for('ablage_anzeigen', aid=a.id) }}" target="_blank" title="Unterlage öffnen">{{ icon('klammer', 13) }} {{ a.titel }}</a>{% endfor %}
       {% if v.zaehler_verbrauch is not none %}<br>Verbrauch {{ jahr }} laut Zähler: {{ v.zaehler_verbrauch|num(0) }} {{ EINHEITEN[v.zaehler[0].art] }}{% endif %}
       {% if v.notiz %}<br><span class="notiz">{{ v.notiz }}</span>{% endif %}</small></td>
     <td class="zahl">{{ v.betrag|eur }}<br><small class="leise">{{ ZAHLWEISEN[v.zahlweise][0] }}{% if ZAHLWEISEN[v.zahlweise][1] > 1 %} · {{ v.jahr|eur }}/Jahr{% endif %}</small>
@@ -111,11 +126,13 @@
 {% if bearbeitet %}
 <h3>Vertrag bearbeiten</h3>
 {{ vertrag_formular(bearbeitet, url_for('vertrag_speichern', vid=bearbeitet.id), seite, none, kostenarten, not bearbeitet.wohnung_id,
-                    zliste if (not bearbeitet.wohnung_id) == (not wohnung_id) else none) }}
+                    zliste if (not bearbeitet.wohnung_id) == (not wohnung_id) else none,
+                    vertrag_ablage(immobilie_id, bearbeitet.wohnung_id)) }}
 {% elif darf_anlegen %}
 <details>
   <summary>{{ icon('plus') }} Vertrag hinzufügen</summary>
-  {{ vertrag_formular({}, url_for('vertrag_neu', iid=immobilie_id), seite, wohnung_id, kostenarten, not wohnung_id, zliste) }}
+  {{ vertrag_formular({}, url_for('vertrag_neu', iid=immobilie_id), seite, wohnung_id, kostenarten, not wohnung_id, zliste,
+                      vertrag_ablage(immobilie_id, wohnung_id)) }}
 </details>
 {% endif %}
 </div>

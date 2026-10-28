@@ -331,6 +331,10 @@ MIGRATIONEN = [
     ALTER TABLE benutzer ADD COLUMN telefon TEXT NOT NULL DEFAULT '';
     ALTER TABLE benutzer ADD COLUMN mobil TEXT NOT NULL DEFAULT '';
     """,
+    # 20: Unterlagen (Ablage-Einträge) einem Vertrag zuordnen; beim Löschen des Vertrags bleiben sie in der Ablage
+    """
+    ALTER TABLE ablage ADD COLUMN vertrag_id INTEGER REFERENCES vertrag(id) ON DELETE SET NULL;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

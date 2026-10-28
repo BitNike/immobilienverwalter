@@ -9,10 +9,11 @@ from datetime import date
 
 from flask import abort, flash, g, redirect, render_template, request, url_for
 
+import dateien
 import mail
 from calc import de_num, parse_date, parse_num, rund, verbrauch_zeitraum
-from core import (admin_noetig, app, einstellung, einstellung_setzen, exe, ist_admin, jahr, one, person_name, row, rows,
-                  wohnung_laden)
+from core import (ablage_kategorie_anlegen, ablage_kategorien, admin_noetig, app, einstellung, einstellung_setzen, exe,
+                  ist_admin, jahr, one, person_name, row, rows, wohnung_laden)
 
 ZAHLWEISEN = {"monatlich": ("monatlich", 12, "monat"), "vierteljaehrlich": ("vierteljährlich", 4, "quartal"),
               "halbjaehrlich": ("halbjährlich", 2, "halbjahr"), "jaehrlich": ("jährlich", 1, "jahr"),
@@ -111,7 +112,18 @@ def vertraege(iid, wid=None, heute=None, nur_sichtbare=True, j=None):
                 z["staende"] = [(s["datum"], s["stand"]) for s in
                                 rows("SELECT datum, stand FROM zaehlerstand WHERE zaehler_id = ?", (z["id"],))]
             v["zaehler_verbrauch"] = verbrauch_zeitraum(v["zaehler"], date(j, 1, 1), date(j, 12, 31))
+        v["unterlagen"] = rows("SELECT * FROM ablage WHERE vertrag_id = ?" + ("" if ist_admin() else " AND intern = 0")
+                               + " ORDER BY titel COLLATE NATUERLICH", (v["id"],)) if nur_sichtbare else []
     return erg
+
+
+def ablage_zur_auswahl(iid, wid):
+    """Ablage-Einträge derselben Stelle (Immobilie bzw. Mietobjekt), die man einem Vertrag zuordnen kann."""
+    sql = "SELECT * FROM ablage WHERE immobilie_id = ? AND " + ("wohnung_id = ?" if wid else "wohnung_id IS NULL")
+    args = [iid, wid] if wid else [iid]
+    if not ist_admin():
+        sql += " AND intern = 0"
+    return rows(sql + " ORDER BY titel COLLATE NATUERLICH", args)
 
 
 def kennzahlen(liste):
@@ -177,6 +189,37 @@ def _zurueck(v):
     return redirect(url_for("immobilie", iid=v["immobilie_id"], reiter="vertraege"))
 
 
+def _unterlagen_speichern(vid, iid, wid, art):
+    """Hochgeladene Dateien als Ablage-Einträge (Kategorie „Verträge & Versicherungen“) mit dem Vertrag verbinden;
+    angehakte vorhandene Ablage-Einträge zuordnen, abgewählte lösen (sie bleiben in der Ablage)."""
+    f = request.form
+    if "unterlagen_auswahl" in f:
+        gewaehlt = {int(a) for a in f.getlist("unterlagen") if a.isdigit()}
+        passend = {a["id"] for a in ablage_zur_auswahl(iid, wid)}
+        if gewaehlt - passend:
+            raise ValueError("Ein gewähltes Dokument gehört nicht zu diesem Vertrag.")
+        for aid in passend:
+            if aid in gewaehlt:
+                exe("UPDATE ablage SET vertrag_id = ? WHERE id = ?", (vid, aid))
+            else:
+                exe("UPDATE ablage SET vertrag_id = NULL WHERE id = ? AND vertrag_id = ?", (aid, vid))
+    dateiliste = [d for d in request.files.getlist("unterlagen_neu") if d and d.filename]
+    if not dateiliste:
+        return 0
+    kategorie = "vertraege" if "vertraege" in ablage_kategorien() else ablage_kategorie_anlegen("Verträge & Versicherungen")
+    immo = row("SELECT * FROM immobilie WHERE id = ?", (iid,))
+    ordner = [immo["ordner"], "Ablage"]
+    if wid:
+        ordner.append(dateien.ordnername(row("SELECT bezeichnung FROM wohnung WHERE id = ?", (wid,))["bezeichnung"]))
+    ordner.append(dateien.ordnername(ablage_kategorien()[kategorie]))
+    for d in dateiliste:
+        pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(*ordner))
+        exe("INSERT INTO ablage (immobilie_id, wohnung_id, kategorie, titel, notiz, pfad, mime, groesse, hochgeladen_von, "
+            "vertrag_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (iid, wid, kategorie, os.path.splitext(d.filename)[0], f"Vertrag: {art}", pfad, mime, groesse, g.user["id"], vid))
+    return len(dateiliste)
+
+
 def _zaehler_setzen(vid, iid, wid):
     """Angehakte Zähler aus dem Vertragsformular verbinden, abgewählte lösen. Nur Zähler derselben Stelle: Hauptzähler
     der Immobilie bzw. Zähler der Wohnung. Ohne das Feld im Formular bleibt alles, wie es ist."""
@@ -203,7 +246,8 @@ def vertrag_neu(iid):
     vid = exe(f"INSERT INTO vertrag (immobilie_id, wohnung_id, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
               [iid, wid, *vals.values()])
     _zaehler_setzen(vid, iid, wid)
-    flash(f"Vertrag „{vals['art']}“ angelegt.")
+    n = _unterlagen_speichern(vid, iid, wid, vals["art"])
+    flash(f"Vertrag „{vals['art']}“ angelegt." + (f" {n} Unterlage(n) in der Ablage gespeichert." if n else ""))
     return _zurueck({"immobilie_id": iid, "wohnung_id": wid})
 
 
@@ -214,6 +258,9 @@ def vertrag_speichern(vid):
     vals = _werte()
     exe(f"UPDATE vertrag SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), vid])
     _zaehler_setzen(vid, v["immobilie_id"], v["wohnung_id"])
+    n = _unterlagen_speichern(vid, v["immobilie_id"], v["wohnung_id"], vals["art"])
+    if n:
+        flash(f"{n} Unterlage(n) in der Ablage gespeichert und mit dem Vertrag verbunden.")
     return _zurueck(v)
 
 
@@ -454,4 +501,4 @@ def erinnerungen_admin():
 
 
 app.jinja_env.globals.update(VERTRAG_STATUS=STATUS, ZAHLWEISEN=ZAHLWEISEN, VERLAENGERUNG=VERLAENGERUNG, FRIST=FRIST,
-                             VERTRAGSARTEN=ARTEN, MIETARTEN=MIETARTEN)
+                             VERTRAGSARTEN=ARTEN, MIETARTEN=MIETARTEN, vertrag_ablage=ablage_zur_auswahl)
