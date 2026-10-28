@@ -52,6 +52,10 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
 {% macro zaehler_bereich(zs, darf, jahr, zurueck, neu_versteckt, platzhalter="z. B. Flurstrom Haus 1") -%}
 {# Zähler wie das Kontoblatt der Rücklage: Tabelle mit Stand 01.01./31.12. und Verbrauch, Eingabezeile, Liste der Ablesungen #}
 {% set zbb = request.args.get('zaehler')|int %}{% set abb = request.args.get('ablesung')|int %}
+{% set vopt = (vliste or [])|selectattr('wohnung_id', 'equalto', neu_versteckt.wohnung_id)|list if neu_versteckt.wohnung_id
+   else (vliste or [])|rejectattr('wohnung_id')|list %}
+{% macro vertrag_wahl(gewaehlt) %}{% if vopt %}<label><span>Vertrag {{ info("Zu welchem Vertrag gehört der Zähler (z. B. Stromvertrag)? Dann siehst du beim Vertrag die Zähler und ihren Verbrauch.") }}</span><select name="vertrag_id"><option value="">– keiner –</option>
+  {% for v in vopt %}<option value="{{ v.id }}" {{ 'selected' if v.id == gewaehlt }}>{{ v.art }}{% if v.anbieter %} · {{ v.anbieter }}{% endif %}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
 {% if zs %}
 <div class="tabelle">
 <table class="zaehler-tabelle" id="zaehler-tabelle">
@@ -65,6 +69,8 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
       <input type="hidden" name="next" value="{{ zurueck }}">
       <label>Bezeichnung / Standort<input name="bezeichnung" value="{{ z.bezeichnung }}" placeholder="{{ platzhalter }}"></label>
       <label>Nummer<input name="nummer" value="{{ z.nummer }}"></label>
+      {{ vertrag_wahl(z.vertrag_id) }}
+      <label class="notizfeld">Kommentar<input name="notiz" value="{{ z.notiz }}" placeholder="z. B. Keller Haus 13, links neben der Tür"></label>
     </form>
     {% if not z.ausgebaut %}
     <details>
@@ -86,7 +92,9 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   {% else %}
   <tr class="{{ 'leise' if z.ausgebaut or not z.im_jahr }}">
     <td><strong>{{ ZAEHLERARTEN[z.art] }}{% if z.bezeichnung %} · {{ z.bezeichnung }}{% endif %}</strong>
-      <br><small class="leise">Nr. {{ z.nummer or '–' }}{% if z.ausgebaut %} · ausgebaut {{ z.ausgebaut|datum(True) }}{% elif z.eingebaut %} · seit {{ z.eingebaut|datum(True) }}{% endif %}</small></td>
+      <br><small class="leise">Nr. {{ z.nummer or '–' }}{% if z.ausgebaut %} · ausgebaut {{ z.ausgebaut|datum(True) }}{% elif z.eingebaut %} · seit {{ z.eingebaut|datum(True) }}{% endif %}
+        {% set zv = vopt|selectattr('id', 'equalto', z.vertrag_id)|first if z.vertrag_id %}{% if zv %}<br>Vertrag: {{ zv.art }}{% if zv.anbieter %} · {{ zv.anbieter }}{% endif %}{% endif %}
+        {% if z.notiz %}<br><span class="notiz">{{ z.notiz }}</span>{% endif %}</small></td>
     <td class="zahl">{% if z.anfang %}{{ z.anfang.stand|num }} {{ EINHEITEN[z.art] }}<br><small class="leise">vom {{ z.anfang.datum|datum(True) }}</small>{% else %}<span class="leise">–</span>{% endif %}</td>
     <td class="zahl">{% if z.ende %}{{ z.ende.stand|num }} {{ EINHEITEN[z.art] }}<br><small class="leise">vom {{ z.ende.datum|datum(True) }}</small>
       {% elif z.im_jahr %}<span class="warnung">noch kein Stand</span>{% else %}<span class="leise">–</span>{% endif %}</td>
@@ -126,6 +134,8 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
     <label>Nummer<input name="nummer"></label>
     <label>Eingebaut am<input type="date" name="eingebaut"></label>
     <label>Anfangsstand<input class="betrag" name="stand" inputmode="decimal"></label>
+    {{ vertrag_wahl(none) }}
+    <label class="notizfeld">Kommentar<input name="notiz" placeholder="optional, z. B. genauer Standort"></label>
     <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
   </form>
 </details>
@@ -249,6 +259,7 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
   {{ feld('wohnflaeche', 'Wohnfläche (m²)', w.wohnflaeche|num if w.wohnflaeche else '', pflicht=True, attrs='inputmode="decimal"') }}
   {{ feld('mea', 'MEA', w.mea|num if w.mea else '', attrs='inputmode="decimal" placeholder="86,13"', hinweis='Miteigentumsanteil laut Teilungserklärung, z. B. 86,13. Nur bei WEG, sonst leer lassen.' ~ (' Aktuell ' ~ (w.mea / w.mea_basis * 100)|num ~ ' %.' if w.mea and w.mea_basis else '')) }}
   {{ feld('mea_basis', 'MEA-Basis', w.mea_basis|num(0) if w.mea_basis else '1.000', attrs='inputmode="decimal"', hinweis='z. B. 1.000 (für 86,13/1.000)') }}
+  {{ feld('haus', 'Haus / Eingang', w.haus, attrs='placeholder="z. B. Haus 13"', hinweis='Nur bei mehreren Häusern in einer Immobilie: Wohnungen mit gleicher Angabe bilden ein Haus. Kosten (z. B. Treppenhaus) lassen sich dann nur auf dieses Haus verteilen.') }}
   {{ feld('umlageschluessel', 'Umlageschlüssel (Text für die Abrechnung)', w.umlageschluessel, breit=True, attrs='placeholder="z. B. Heizung nach Verbrauch und Fläche laut Abrechnung der Eigentümergemeinschaft"') }}
   <fieldset class="breit"><legend>Konto für die Mieter-Abrechnung</legend>
     <p class="leise">Nur ausfüllen, wenn die Mieter dieser Wohnung auf ein anderes Konto zahlen als bei der Immobilie hinterlegt –

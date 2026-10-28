@@ -15,7 +15,7 @@ from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLER
 
 IMMOBILIE_FELDER = ("name", "strasse", "hausnummer", "plz", "ort", "absender", "kontoinhaber", "iban", "bank", "notiz",
                     "schluessel")
-WOHNUNG_FELDER = ("bezeichnung", "umlageschluessel", "kontoinhaber", "iban", "bank", "notiz")
+WOHNUNG_FELDER = ("bezeichnung", "haus", "umlageschluessel", "kontoinhaber", "iban", "bank", "notiz")
 
 
 # ---------- Hilfen ----------
@@ -33,6 +33,12 @@ app.jinja_env.globals.update(mv_name=mv_name)
 
 def kostenarten_aktiv():
     return rows("SELECT * FROM kostenart WHERE aktiv = 1 ORDER BY sortierung, name")
+
+
+def haeuser(iid):
+    """Häuser bzw. Hauseingänge der Immobilie (Feld „Haus“ der Mietobjekte), natürlich sortiert."""
+    return [r["haus"] for r in rows("SELECT DISTINCT haus FROM wohnung WHERE immobilie_id = ? AND haus <> '' "
+                                    "ORDER BY haus COLLATE NATUERLICH", (iid,))]
 
 
 def hausgeld_wohnungen(iid, b):
@@ -399,7 +405,7 @@ def immobilie(iid):
             b["ziel_text"] = f"Hausgeld {name}"
             b["ziel_zusatz"] = ", ".join(wohnung_bez.get(w, "?") for w in b["wohnungen"]) or "keine Wohnung"
         else:
-            b["wohnungen"], b["ziel_zusatz"] = [], ""
+            b["wohnungen"], b["ziel_zusatz"] = [], f"nur {b['haus']}" if b["haus"] else ""
             b["ziel_text"] = b["kostenart"] if b["kostenart_id"] else "Erhaltungsrücklage"
     if not ist_admin():  # Eigentümer sehen nur das Hausgeld ihrer eigenen Wohnungen
         buchungen = [b for b in buchungen if not b["hausgeld_eigentuemer_id"] or set(b["wohnungen"]) & eigene]
@@ -422,13 +428,13 @@ def immobilie(iid):
     reiter += [("vertraege", "Verträge"), ("dokumente", "Dokumente")]
     if ist_admin():
         reiter.append(("stammdaten", "Stammdaten"))
-    vliste = vertraege(iid)
+    vliste = vertraege(iid, j=j)
     pruefung = pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin())
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
                            reiter=reiter, aktiv=reiter_waehlen(reiter), vliste=vliste, vk=vertrag_kennzahlen(vliste),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
                            pruefung=pruefung, buchungen=buchungen, alle_buchungen=alle_buchungen, filter_=filter_,
-                           hg_opt=hg_opt if immo["weg"] else [], belege=belege, vorlage=vorlage,
+                           hg_opt=hg_opt if immo["weg"] else [], haeuser=haeuser(iid), belege=belege, vorlage=vorlage,
                            rl_vorlage=rl_vorlage, BEZAHLT=BEZAHLT, RL_ARTEN=RL_ARTEN, fremde=fremde,
                            kt=konten(iid, j), kontostand_vorlage=session.get("kontostand_vorlage") or {},
                            dauer=dauerauftraege(iid, j), RHYTHMEN=RHYTHMEN,
@@ -540,8 +546,8 @@ def kosten_loeschen(kid):
 def vorjahr_uebernehmen(iid):
     j = jahr()
     con = db.get_db()
-    con.execute("""INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, schluessel, notiz)
-                   SELECT immobilie_id, ?, wohnung_id, NULL, kostenart_id, 0, schluessel, notiz
+    con.execute("""INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, schluessel, notiz, haus)
+                   SELECT immobilie_id, ?, wohnung_id, NULL, kostenart_id, 0, schluessel, notiz, haus
                    FROM kosten WHERE immobilie_id = ? AND jahr = ? AND mv_id IS NULL ORDER BY id""",
                 (j, iid, j - 1))
     con.commit()
@@ -554,17 +560,18 @@ def vorjahr_uebernehmen(iid):
 BEZAHLT = {"konto": "Konto", "bar": "Bar ausgelegt"}
 
 
-def kostenposition(immo, j, kostenart_id):
-    """Gebäudekosten-Position der Kostenart im Jahr; fehlt sie, wird sie mit dem passenden Schlüssel angelegt."""
+def kostenposition(immo, j, kostenart_id, haus=""):
+    """Gebäudekosten-Position der Kostenart (und ggf. des Hauses) im Jahr; fehlt sie, wird sie mit dem passenden
+    Schlüssel angelegt."""
     k = one("SELECT id FROM kosten WHERE immobilie_id = ? AND jahr = ? AND kostenart_id = ? AND wohnung_id IS NULL "
-            "ORDER BY id", (immo["id"], j, kostenart_id))
+            "AND haus = ? ORDER BY id", (immo["id"], j, kostenart_id, haus or ""))
     if k:
         return k["id"]
     ka = row("SELECT * FROM kostenart WHERE id = ?", (kostenart_id,))
     anzahl = one("SELECT COUNT(*) AS n FROM wohnung WHERE immobilie_id = ?", (immo["id"],))["n"]
     schl = ka["schluessel"] if ka["schluessel"] == "wasser" else standard_schluessel(immo, anzahl) or ka["schluessel"]
-    return exe("INSERT INTO kosten (immobilie_id, jahr, kostenart_id, betrag, schluessel) VALUES (?, ?, ?, 0, ?)",
-               (immo["id"], j, kostenart_id, schl))
+    return exe("INSERT INTO kosten (immobilie_id, jahr, kostenart_id, betrag, schluessel, haus) VALUES (?, ?, ?, 0, ?, ?)",
+               (immo["id"], j, kostenart_id, schl, haus or ""))
 
 
 def kosten_aus_buchungen(kid):
@@ -640,6 +647,9 @@ def buchung_werte(iid):
     if vals["bezahlt"] not in BEZAHLT:
         raise ValueError("Bitte angeben, wie bezahlt wurde.")
     vals["kostenart_id"], vals["hausgeld_eigentuemer_id"], vals["hausgeld_wohnung_id"] = ziel_aufloesen(ziel, iid)
+    vals["haus"] = f.get("haus", "").strip() if vals["kostenart_id"] else ""
+    if vals["haus"] and vals["haus"] not in haeuser(iid):
+        raise ValueError(f"Kein Mietobjekt gehört zum Haus „{vals['haus']}“.")
     if vals["hausgeld_eigentuemer_id"]:
         vals["art"] = "einnahme"  # Hausgeld ist immer eine Einnahme; Korrekturen mit negativem Betrag
     vals["erstattet"] = (f.get("erstattet") or None) if vals["bezahlt"] == "bar" and vals["art"] == "ausgabe" else None
@@ -681,7 +691,7 @@ def buchung_neu(iid):
     vals = buchung_werte(iid)
     if not vals["datum"]:
         raise ValueError("Bitte das Datum des Belegs angeben.")
-    vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"]) if vals["kostenart_id"] else None
+    vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"], vals["haus"]) if vals["kostenart_id"] else None
     vals["dokument_id"] = _beleg_speichern(immo, j, vals)
     exe(f"INSERT INTO buchung (immobilie_id, jahr, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
         [iid, j, *vals.values()])
@@ -704,7 +714,7 @@ def buchung_speichern(bid):
     immo = row("SELECT * FROM immobilie WHERE id = ?", (b["immobilie_id"],))
     vals = buchung_werte(immo["id"])
     vals["jahr"] = j = _buchungsjahr(b["jahr"])
-    vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"]) if vals["kostenart_id"] else None
+    vals["kosten_id"] = kostenposition(immo, j, vals["kostenart_id"], vals["haus"]) if vals["kostenart_id"] else None
     dok = _beleg_speichern(immo, j, vals)
     if dok:
         vals["dokument_id"] = dok
@@ -726,7 +736,7 @@ def buchung_ins_datumsjahr(bid):
     if not b["datum"]:
         raise ValueError("Die Buchung hat kein Datum.")
     j = int(b["datum"][:4])
-    kid = kostenposition(immo, j, b["kostenart_id"]) if b["kostenart_id"] else None
+    kid = kostenposition(immo, j, b["kostenart_id"], b["haus"]) if b["kostenart_id"] else None
     exe("UPDATE buchung SET jahr = ?, kosten_id = ? WHERE id = ?", (j, kid, bid))
     if kid:
         kosten_aus_buchungen(kid)
@@ -869,7 +879,8 @@ def _dauerauftrag_buchung(immo, j, da, datum, text, betrag, notiz, buchung=None)
     vals = {"datum": datum.isoformat(), "text": text, "art": da["art"], "betrag": betrag, "bezahlt": "konto",
             "notiz": notiz, "kostenart_id": da["kostenart_id"], "hausgeld_eigentuemer_id": da["hausgeld_eigentuemer_id"],
             "hausgeld_wohnung_id": da["hausgeld_wohnung_id"],
-            "kosten_id": kostenposition(immo, j, da["kostenart_id"]) if da["kostenart_id"] else None}
+            "kosten_id": kostenposition(immo, j, da["kostenart_id"], buchung["haus"] if buchung else "")
+            if da["kostenart_id"] else None}
     if buchung:
         exe(f"UPDATE buchung SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), buchung["id"]])
         if buchung["kosten_id"] and buchung["kosten_id"] != vals["kosten_id"]:
@@ -1194,7 +1205,7 @@ def wohnung(wid):
     direkt = {k["id"]: k for k in rows("SELECT * FROM kosten WHERE wohnung_id = ? AND jahr = ?", (wid, j))}
     reiter = [("abrechnung", "Abrechnung"), ("mieter", "Mieter"), ("zaehler", "Zähler"), ("vertraege", "Verträge"),
               ("dokumente", "Dokumente"), ("stammdaten", "Stammdaten")]
-    vliste = vertraege(immo["id"], wid)
+    vliste = vertraege(immo["id"], wid, j=j)
     return render_template(
         "wohnung.html", **spalte(immo, wid), w=w, r=r, erg=erg, mvs=mvs, direkt=direkt,
         reiter=reiter, aktiv=reiter_waehlen(reiter), vliste=vliste, vk=vertrag_kennzahlen(vliste),
@@ -1352,6 +1363,17 @@ def _zaehler_recht(z):
         abort(403)
 
 
+def _zaehler_vertrag(vid, wid, iid):
+    """Vertrag für einen Zähler prüfen: Wohnungszähler nur mit Verträgen dieser Wohnung, Hauptzähler mit denen der
+    Immobilie. Leer = keiner."""
+    if not vid:
+        return None
+    v = row("SELECT * FROM vertrag WHERE id = ?", (int(vid),))
+    if (wid and v["wohnung_id"] != wid) or (not wid and (v["wohnung_id"] or v["immobilie_id"] != iid)):
+        raise ValueError("Dieser Vertrag gehört nicht zu diesem Zähler.")
+    return v["id"]
+
+
 @app.post("/zaehler")
 def zaehler_neu():
     f = request.form
@@ -1361,9 +1383,11 @@ def zaehler_neu():
     wid = int(f["wohnung_id"]) if f.get("wohnung_id") else None
     iid = int(f["immobilie_id"]) if f.get("immobilie_id") else None
     _zaehler_recht({"wohnung_id": wid})
-    zid = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, bezeichnung, eingebaut) VALUES (?, ?, ?, ?, ?, ?)",
+    vid = _zaehler_vertrag(f.get("vertrag_id"), wid, iid)
+    zid = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, bezeichnung, eingebaut, notiz, vertrag_id) "
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
               (wid, None if wid else iid, art, f.get("nummer", "").strip(), f.get("bezeichnung", "").strip(),
-               f.get("eingebaut") or None))
+               f.get("eingebaut") or None, f.get("notiz", "").strip(), vid))
     if f.get("stand", "").strip() and f.get("eingebaut"):
         exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Einbau')",
             (zid, f["eingebaut"], parse_num(f["stand"])))
@@ -1382,8 +1406,9 @@ def zaehler_tausch(zid):
     exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Ausbau')",
         (zid, datum, parse_num(f.get("endstand"))))
     exe("UPDATE zaehler SET ausgebaut = ? WHERE id = ?", (datum, zid))
-    neu = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, bezeichnung, eingebaut) VALUES (?, ?, ?, ?, ?, ?)",
-              (z["wohnung_id"], z["immobilie_id"], z["art"], f.get("nummer", "").strip(), z["bezeichnung"], datum))
+    neu = exe("INSERT INTO zaehler (wohnung_id, immobilie_id, art, nummer, bezeichnung, eingebaut, notiz, vertrag_id) "
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (z["wohnung_id"], z["immobilie_id"], z["art"], f.get("nummer", "").strip(),
+                                                  z["bezeichnung"], datum, z["notiz"], z["vertrag_id"]))
     exe("INSERT INTO zaehlerstand (zaehler_id, datum, stand, notiz) VALUES (?, ?, ?, 'Einbau')",
         (neu, datum, parse_num(f.get("anfangsstand"))))
     flash("Zähler getauscht. Der alte Zähler bleibt mit seinen Ständen erhalten.")
@@ -1395,8 +1420,10 @@ def zaehler_bearbeiten(zid):
     z = row("SELECT * FROM zaehler WHERE id = ?", (zid,))
     _zaehler_recht(z)
     f = request.form
-    exe("UPDATE zaehler SET bezeichnung = ?, nummer = ? WHERE id = ?",
-        (f.get("bezeichnung", "").strip(), f.get("nummer", "").strip(), zid))
+    iid = z["immobilie_id"] or one("SELECT immobilie_id FROM wohnung WHERE id = ?", (z["wohnung_id"],))["immobilie_id"]
+    exe("UPDATE zaehler SET bezeichnung = ?, nummer = ?, notiz = ?, vertrag_id = ? WHERE id = ?",
+        (f.get("bezeichnung", "").strip(), f.get("nummer", "").strip(), f.get("notiz", "").strip(),
+         _zaehler_vertrag(f.get("vertrag_id"), z["wohnung_id"], iid), zid))
     return zurueck()
 
 

@@ -313,6 +313,19 @@ MIGRATIONEN = [
     ALTER TABLE benutzer ADD COLUMN erinnerung INTEGER NOT NULL DEFAULT 0;
     UPDATE benutzer SET erinnerung = 1 WHERE rolle = 'admin';
     """,
+    # 17: Haus bzw. Hauseingang je Mietobjekt; Gebäudekosten nur auf die Wohnungen eines Hauses verteilen
+    #     (z. B. Instandhaltung der Treppenhäuser laut Teilungserklärung). '' = ganze Immobilie.
+    """
+    ALTER TABLE wohnung ADD COLUMN haus TEXT NOT NULL DEFAULT '';
+    ALTER TABLE kosten ADD COLUMN haus TEXT NOT NULL DEFAULT '';
+    ALTER TABLE buchung ADD COLUMN haus TEXT NOT NULL DEFAULT '';
+    """,
+    # 18: Zähler mit Vertrag verbinden (z. B. Stromvertrag ↔ Flurstromzähler), Kommentar am Zähler, Kundennummer
+    """
+    ALTER TABLE zaehler ADD COLUMN vertrag_id INTEGER REFERENCES vertrag(id) ON DELETE SET NULL;
+    ALTER TABLE zaehler ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
+    ALTER TABLE vertrag ADD COLUMN kundennummer TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

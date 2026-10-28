@@ -141,9 +141,10 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
     """
     von, bis           Abrechnungszeitraum (date)
     immobilie          dict mit gesamtflaeche, einheiten_gesamt (optional)
-    wohnungen          [{id, bezeichnung, wohnflaeche, mea, mea_basis}]
-    kosten             [{id, wohnung_id, mv_id, kostenart_id, betrag, schluessel}]
+    wohnungen          [{id, bezeichnung, wohnflaeche, mea, mea_basis, haus}]
+    kosten             [{id, wohnung_id, mv_id, kostenart_id, betrag, schluessel, haus}]
                          wohnung_id None  -> Gebäudekosten, Verteilung nach `schluessel`
+                                             (mit `haus` nur auf die Wohnungen dieses Hauses)
                          wohnung_id gesetzt -> Kosten der Wohnung, zeitanteilig auf die Mieter
                          mv_id gesetzt    -> 100 % für dieses Mietverhältnis (z. B. Heizkostenabrechnung)
     kostenarten        {id: {name, umlagefaehig}}
@@ -165,37 +166,52 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
 
     def verteile(k):
         b, s = k["betrag"], k["schluessel"]
+        haus = k.get("haus") or ""
+        if haus:  # nur die Wohnungen dieses Hauses; MEA, Fläche und Einheiten beziehen sich dann auf das Haus
+            ws = [w for w in wohnungen if (w.get("haus") or "") == haus]
+            if not ws:
+                return {}, f"Kein Mietobjekt ist dem Haus „{haus}“ zugeordnet."
+            fl, n = sum(w["wohnflaeche"] for w in ws), len(ws)
+        else:
+            ws, fl, n = wohnungen, F, N
         if s == "mea":
-            if not any(w["mea"] for w in wohnungen):
+            if not any(w["mea"] for w in ws):
                 return {}, "Keine MEA hinterlegt."
+            if haus:
+                summe = sum(w["mea"] / w["mea_basis"] for w in ws if w["mea_basis"])
+                return {w["id"]: (b * w["mea"] / w["mea_basis"] / summe,
+                                  f"{de_num(w['mea'])} von {de_num(sum(x['mea'] for x in ws if x['mea_basis']))} MEA ({haus})")
+                        for w in ws if w["mea_basis"]}, None
             return {w["id"]: (b * w["mea"] / w["mea_basis"],
                               f"{de_num(w['mea'])}/{de_num(w['mea_basis'], 0)} MEA")
-                    for w in wohnungen if w["mea_basis"]}, None
+                    for w in ws if w["mea_basis"]}, None
+        zusatz = f" ({haus})" if haus else ""
         if s == "flaeche":
-            if F <= 0:
+            if fl <= 0:
                 return {}, "Keine Wohnfläche hinterlegt."
-            return {w["id"]: (b * w["wohnflaeche"] / F, f"{de_num(w['wohnflaeche'])} von {de_num(F)} m²")
-                    for w in wohnungen}, None
+            return {w["id"]: (b * w["wohnflaeche"] / fl, f"{de_num(w['wohnflaeche'])} von {de_num(fl)} m²{zusatz}")
+                    for w in ws}, None
         if s == "einheiten":
-            if N <= 0:
+            if n <= 0:
                 return {}, "Keine Einheiten vorhanden."
-            return {w["id"]: (b / N, f"1 von {N} Einheiten") for w in wohnungen}, None
+            return {w["id"]: (b / n, f"1 von {n} Einheiten{zusatz}") for w in ws}, None
         if s == "wasser":
-            fehlt = [w["bezeichnung"] for w in wohnungen if erg[w["id"]]["wasser"] is None]
+            fehlt = [w["bezeichnung"] for w in ws if erg[w["id"]]["wasser"] is None]
             if fehlt:
                 return {}, "Zählerstände Wasser fehlen: " + ", ".join(fehlt)
-            S = sum(erg[w["id"]]["wasser"] for w in wohnungen)
+            S = sum(erg[w["id"]]["wasser"] for w in ws)
             if S <= 0:
                 return {}, "Kein Wasserverbrauch erfasst."
             return {w["id"]: (b * erg[w["id"]]["wasser"] / S,
-                              f"{de_num(erg[w['id']]['wasser'], 1)} von {de_num(S, 1)} m³")
-                    for w in wohnungen}, None
+                              f"{de_num(erg[w['id']]['wasser'], 1)} von {de_num(S, 1)} m³{zusatz}")
+                    for w in ws}, None
         return {}, f"Unbekannter Schlüssel {s}."
 
     gebaeude = []
     for k in kosten:
         ka = kostenarten[k["kostenart_id"]]
-        basis = {"kostenart": ka["name"], "umlagefaehig": ka["umlagefaehig"], "kosten_id": k["id"]}
+        name = ka["name"] + (f" – {k['haus']}" if k.get("haus") and not k["wohnung_id"] else "")
+        basis = {"kostenart": name, "umlagefaehig": ka["umlagefaehig"], "kosten_id": k["id"]}
         if k["wohnung_id"]:
             if k["wohnung_id"] in erg:
                 erg[k["wohnung_id"]]["posten"].append({
@@ -210,7 +226,7 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
             verteilt += x
             erg[wid]["posten"].append({**basis, "gesamt": k["betrag"], "betrag": x, "basis": text,
                                        "art": "wasser" if k["schluessel"] == "wasser" else "zeit", "mv_id": None})
-        gebaeude.append({"kosten": k, "kostenart": ka["name"], "verteilt": rund(verteilt),
+        gebaeude.append({"kosten": k, "kostenart": name, "verteilt": rund(verteilt),
                          "rest": rund(k["betrag"] - verteilt), "warnung": warnung})
 
     for wid, r in erg.items():

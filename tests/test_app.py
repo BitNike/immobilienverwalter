@@ -479,6 +479,47 @@ def test_gesamter_ablauf():
     dbcon.execute("DELETE FROM benutzer WHERE id = ?", (zweit,))  # spätere Tests erwarten die bisherigen Nummern
     dbcon.commit()
     c.get("/immobilien/1?jahr=2026")
+
+    # Kosten nur eines Hauses (Teilungserklärung: Treppenhaus nach MEA der Wohnungen dieses Hauses)
+    post(c, "/immobilien/neu", data={"name": "Haus-Test", "weg": "on"})
+    tid = dbcon.execute("SELECT id FROM immobilie WHERE name = 'Haus-Test'").fetchone()[0]
+    for bez, haus, mea in (("H1", "Haus A", "250"), ("H2", "Haus A", "250"), ("H3", "Haus B", "300"), ("H4", "Haus B", "200")):
+        post(c, f"/immobilien/{tid}/wohnungen/neu", data={"bezeichnung": bez, "haus": haus, "wohnflaeche": "50",
+                                                         "mea": f"{mea}/1000", "eigentuemer_id": "1"})
+    h1, h2, h3, h4 = [x[0] for x in dbcon.execute("SELECT id FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung",
+                                                  (tid,))]
+    instand = str(dbcon.execute("SELECT id FROM kostenart WHERE name = 'Instandhaltung / Reparaturen'").fetchone()[0])
+    seite = ok(c.get(f"/immobilien/{tid}?reiter=buchungen")).get_data(as_text=True)
+    assert '<option value="Haus A"' in seite and ">nur Haus B<" in seite
+    post(c, f"/immobilien/{tid}/buchungen", data={"datum": "2026-04-01", "text": "Treppenhaus streichen", "art": "ausgabe",
+                                                  "ziel": instand, "haus": "Haus B", "betrag": "100", "bezahlt": "konto"})
+    post(c, f"/immobilien/{tid}/buchungen", data={"datum": "2026-05-01", "text": "Dachrinne", "art": "ausgabe",
+                                                  "ziel": instand, "haus": "", "betrag": "40", "bezahlt": "konto"})
+    assert "Kein Mietobjekt gehört" in fehlermeldung(f"/immobilien/{tid}/buchungen", {
+        "datum": "2026-05-01", "text": "x", "art": "ausgabe", "ziel": instand, "haus": "Haus C", "betrag": "1"})
+    assert sorted(dbcon.execute("SELECT haus, betrag FROM kosten WHERE immobilie_id = ?", (tid,)).fetchall()) == \
+        [("", 40.0), ("Haus B", 100.0)]  # je Haus eine eigene Kostenposition
+    from core import row
+    from immobilien import berechnung
+    with app.test_request_context():
+        erg = berechnung(row("SELECT * FROM immobilie WHERE id = ?", (tid,)), 2026)
+    summe = {w: erg["wohnungen"][w]["summe"] for w in (h1, h2, h3, h4)}
+    assert summe == {h1: 10.0, h2: 10.0, h3: 72.0, h4: 48.0}  # 100 € nur auf Haus B (300:200), 40 € auf alle nach MEA
+    texte = [p["basis"] for p in erg["wohnungen"][h3]["posten"]]
+    assert "300,00 von 500,00 MEA (Haus B)" in texte and "300,00/1.000 MEA" in texte
+    seite = ok(c.get(f"/immobilien/{tid}?reiter=buchungen")).get_data(as_text=True)
+    assert "nur Haus B" in seite
+    assert "Instandhaltung / Reparaturen – Haus B" in ok(c.get(f"/immobilien/{tid}")).get_data(as_text=True)
+    # Belegliste: Kosten des anderen Hauses tauchen bei Haus A nicht auf
+    from export import belegliste
+    with app.test_request_context():
+        def namen(haus):
+            return [gr["name"] for gr in belegliste({"partei": "eigentuemer", "immo": {"id": tid}, "jahr": 2026,
+                                                      "w": {"haus": haus}})]
+        assert namen("Haus A") == ["Instandhaltung / Reparaturen"]
+        assert namen("Haus B") == ["Instandhaltung / Reparaturen", "Instandhaltung / Reparaturen – Haus B"]
+    post(c, f"/immobilien/{tid}/loeschen")
+    c.get("/immobilien/1?jahr=2026")
     # Spalten einklappen: Zustand kommt aus dem Cookie, Mietobjekte zeigen dann ihre Kurzform
     seite = ok(c.get("/immobilien/1")).get_data(as_text=True)
     assert 'class="spalte sidebar "' in seite and 'onclick="spalteUmschalten(this)"' in seite
@@ -593,6 +634,30 @@ def test_gesamter_ablauf():
     assert "Flurstrom Haus 2" in html and "Hauptwasser Keller" in html and "Jahresablesung" in html
     assert "550,0 kWh" in html                                    # 400 + 150
     assert "Wohnungsuhren 50,0 m³ · Differenz 10,0 m³" in html
+    # Zähler mit Vertrag verbinden, Kommentar am Zähler, Kundennummer am Vertrag
+    post(c, "/immobilien/1/vertraege", data={"art": "Strom (Allgemeinstrom)", "anbieter": "Stadtwerke Muster",
+                                             "kundennummer": "K-123", "betrag": "50", "zahlweise": "monatlich"})
+    strom = dbcon.execute("SELECT id FROM vertrag WHERE anbieter = 'Stadtwerke Muster'").fetchone()[0]
+    internet = dbcon.execute("SELECT id FROM vertrag WHERE art = 'Internet / TV'").fetchone()[0]
+    seite = ok(c.get("/immobilien/1?reiter=zaehler&zaehler=4")).get_data(as_text=True)
+    assert f'<option value="{strom}"' in seite and f'<option value="{internet}"' not in seite  # nur Verträge der Immobilie
+    for zid in (4, 5):
+        post(c, f"/zaehler/{zid}/bearbeiten", data={"bezeichnung": f"Flurstrom Haus {zid - 3}", "nummer": f"F-{zid}",
+                                                     "vertrag_id": str(strom), "notiz": "Keller links"})
+    with c.session_transaction() as sitzung:
+        sitzung.pop("_flashes", None)
+    ok(c.post("/zaehler/4/bearbeiten", data={"bezeichnung": "x", "vertrag_id": str(internet)}), 302)
+    with c.session_transaction() as sitzung:
+        assert "gehört nicht zu diesem Zähler" in " ".join(m for _, m in sitzung.pop("_flashes", []))
+    assert dbcon.execute("SELECT vertrag_id FROM zaehler WHERE id = 4").fetchone()[0] == strom
+    seite = ok(c.get("/immobilien/1?jahr=2025&reiter=zaehler")).get_data(as_text=True)
+    assert "Vertrag: Strom (Allgemeinstrom) · Stadtwerke Muster" in seite and "Keller links" in seite
+    seite = ok(c.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
+    assert "Kd.-Nr. K-123" in seite and "Zähler Flurstrom Haus 1 (Nr. F-4)" in seite and "Zähler Flurstrom Haus 2" in seite
+    assert "Verbrauch 2025 laut Zähler: 550 kWh" in seite  # beide Flurstromzähler zusammen
+    post(c, f"/vertraege/{strom}/loeschen", data={"seite": "immobilie"})
+    assert dbcon.execute("SELECT COUNT(*) FROM zaehler WHERE vertrag_id IS NOT NULL").fetchone()[0] == 0
+    html = ok(c.get("/immobilien/1?jahr=2025&reiter=zaehler")).get_data(as_text=True)
     # Zählertabelle wie die Rücklage: Stand 01.01./31.12., Verbrauch je Zähler; Ablesung über die Auswahl eintragen
     assert "Stand 01.01.2025" in html and "1.000,00 kWh" in html and "<strong>400,0 kWh</strong>" in html
     r = post(c, "/zaehlerstaende", data={"zaehler_id": "4", "datum": "2026-06-30", "stand": "1.500",

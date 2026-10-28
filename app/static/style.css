@@ -163,6 +163,7 @@ table.buchungen label.erstattet { margin-top: 6px; font-size: 11.5px; }
 .beleg-wahl { cursor: pointer; white-space: nowrap; flex-direction: row; gap: 4px; padding: 4px 7px; color: var(--primaer); font-size: 13px; }
 .beleg-wahl.gewaehlt { color: var(--gut); border-color: var(--gut); background: #eef6f0; }
 .link-knopf { background: none; border: none; padding: 0; text-align: left; color: var(--primaer); cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; }
+table.buchungen select.haus-wahl { display: block; margin-top: 4px; height: 30px !important; font-size: 12.5px; }
 table.buchungen input.kommentar { display: block; width: 100%; height: 30px !important; margin-top: 4px; font-size: 12.5px; }
 table.rl-blatt select[name=rl_art] { width: 115px; }
 table.rl-blatt tr.anfang td { background: var(--flaeche); }

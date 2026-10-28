@@ -322,6 +322,7 @@
     <tr><th>Wohnfläche</th><td>{{ w.wohnflaeche|num }} m²</td></tr>
     <tr><th>Miteigentumsanteil</th><td>{{ (w.mea|num ~ '/' ~ w.mea_basis|num(0) ~ ' MEA') if w.mea else '–' }}</td></tr>
     <tr><th>Eigentümer</th><td>{{ person_name(eigentuemer) if eigentuemer else '–' }}</td></tr>
+    {% if w.haus %}<tr><th>Haus / Eingang</th><td>{{ w.haus }}</td></tr>{% endif %}
     {% if w.umlageschluessel %}<tr><th>Umlageschlüssel</th><td>{{ w.umlageschluessel }}</td></tr>{% endif %}
     {% if w.iban %}<tr><th>Konto für Mieter</th><td>{{ w.kontoinhaber }} {{ w.iban }} {{ w.bank }}</td></tr>{% endif %}
     {% if w.notiz %}<tr><th>Notiz</th><td class="notiz">{{ w.notiz }}</td></tr>{% endif %}

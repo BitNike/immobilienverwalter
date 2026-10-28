@@ -10,7 +10,7 @@ from datetime import date
 from flask import abort, flash, g, redirect, render_template, request, url_for
 
 import mail
-from calc import de_num, parse_date, parse_num, rund
+from calc import de_num, parse_date, parse_num, rund, verbrauch_zeitraum
 from core import (admin_noetig, app, einstellung, einstellung_setzen, exe, ist_admin, jahr, one, person_name, row, rows,
                   wohnung_laden)
 
@@ -81,8 +81,9 @@ def jahresbetrag(v):
     return rund((v["betrag"] or 0) * ZAHLWEISEN.get(v["zahlweise"], ZAHLWEISEN["monatlich"])[1])
 
 
-def vertraege(iid, wid=None, heute=None, nur_sichtbare=True):
-    """Verträge einer Immobilie (wid=None: alle, auch die der Mietobjekte) bzw. eines Mietobjekts, mit Termin."""
+def vertraege(iid, wid=None, heute=None, nur_sichtbare=True, j=None):
+    """Verträge einer Immobilie (wid=None: alle, auch die der Mietobjekte) bzw. eines Mietobjekts, mit Termin und
+    verbundenen Zählern (mit Jahr j zusätzlich deren Verbrauch im Jahr)."""
     heute = heute or date.today()
     sql = ("SELECT v.*, w.bezeichnung AS wohnung, w.eigentuemer_id, ka.name AS kostenart FROM vertrag v "
            "LEFT JOIN wohnung w ON w.id = v.wohnung_id LEFT JOIN kostenart ka ON ka.id = v.kostenart_id "
@@ -102,6 +103,14 @@ def vertraege(iid, wid=None, heute=None, nur_sichtbare=True):
         v["aktiv"] = v["termin"]["status"] not in ("beendet",)
         v["tarif"] = rund(v["verbrauch"] * v["arbeitspreis"] / 100 + (v["grundpreis"] or 0) * 12) \
             if v["verbrauch"] is not None and v["arbeitspreis"] is not None else None
+        v["zaehler"] = rows("SELECT * FROM zaehler WHERE vertrag_id = ? ORDER BY ausgebaut IS NOT NULL, "
+                            "bezeichnung COLLATE NATUERLICH, id", (v["id"],))
+        v["zaehler_verbrauch"] = None
+        if j and v["zaehler"]:
+            for z in v["zaehler"]:
+                z["staende"] = [(s["datum"], s["stand"]) for s in
+                                rows("SELECT datum, stand FROM zaehlerstand WHERE zaehler_id = ?", (z["id"],))]
+            v["zaehler_verbrauch"] = verbrauch_zeitraum(v["zaehler"], date(j, 1, 1), date(j, 12, 31))
     return erg
 
 
@@ -144,7 +153,8 @@ def _werte():
         return parse_num(f.get(name), None) if f.get(name, "").strip() else None
 
     vals = {"art": f.get("art", "").strip(), "anbieter": f.get("anbieter", "").strip(),
-            "vertragsnummer": f.get("vertragsnummer", "").strip(), "beginn": f.get("beginn") or None,
+            "vertragsnummer": f.get("vertragsnummer", "").strip(), "kundennummer": f.get("kundennummer", "").strip(),
+            "beginn": f.get("beginn") or None,
             "ablauf": f.get("ablauf") or None, "verlaengerung": int(f.get("verlaengerung") or 12),
             "frist": int(f.get("frist") or 0), "gekuendigt_zum": f.get("gekuendigt_zum") or None,
             "preisgarantie_bis": f.get("preisgarantie_bis") or None, "betrag": parse_num(f.get("betrag")),

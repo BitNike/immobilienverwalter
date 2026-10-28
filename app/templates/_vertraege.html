@@ -8,10 +8,11 @@
     <label>Vertrag *<input name="art" value="{{ v.art or '' }}" list="vertragsarten" placeholder="z. B. Strom (Allgemeinstrom)" required></label>
     <label>Anbieter<input name="anbieter" value="{{ v.anbieter or '' }}" placeholder="z. B. Stadtwerke"></label>
     <label>Vertragsnummer<input name="vertragsnummer" value="{{ v.vertragsnummer or '' }}"></label>
+    <label>Kundennummer<input name="kundennummer" value="{{ v.kundennummer or '' }}"></label>
     <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" value="{{ v.betrag|num if v.betrag else '' }}"></label>
     <label>Zahlweise<select name="zahlweise">{% for z, (t, _, _) in ZAHLWEISEN.items() %}<option value="{{ z }}" {{ 'selected' if (v.zahlweise or 'monatlich') == z }}>{{ t }}</option>{% endfor %}</select></label>
     {% if ist_immobilie %}
-    <label>Kostenart <small>für Dauerauftrag (optional)</small><select name="kostenart_id"><option value="">–</option>
+    <label><span>Kostenart {{ info("Optional. Nur nötig, wenn du aus dem Vertrag per Knopf einen Dauerauftrag für die Buchungen anlegen willst.") }}</span><select name="kostenart_id"><option value="">– keine –</option>
       {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if v.kostenart_id == k.id }}>{{ k.name }}</option>{% endfor %}</select></label>
     {% endif %}
   </div>
@@ -61,7 +62,9 @@
   {% for v in vliste %}{% set t = v.termin %}
   <tr class="{{ 'leise' if t.status == 'beendet' }}">
     <td><strong>{{ v.art }}</strong>{% if v.anbieter %} · {{ v.anbieter }}{% endif %}
-      <br><small class="leise">{% if v.vertragsnummer %}Nr. {{ v.vertragsnummer }}{% endif %}{% if v.wohnung and not wohnung_id %}{{ ' · ' if v.vertragsnummer }}{{ v.wohnung }}{% endif %}
+      <br><small class="leise">{% if v.vertragsnummer %}Nr. {{ v.vertragsnummer }}{% endif %}{% if v.kundennummer %}{{ ' · ' if v.vertragsnummer }}Kd.-Nr. {{ v.kundennummer }}{% endif %}{% if v.wohnung and not wohnung_id %}{{ ' · ' if v.vertragsnummer or v.kundennummer }}{{ v.wohnung }}{% endif %}
+      {% for z in v.zaehler %}<br><span title="{{ z.notiz }}">Zähler {{ z.bezeichnung or ZAEHLERARTEN[z.art] }}{% if z.nummer %} (Nr. {{ z.nummer }}){% endif %}{% if z.ausgebaut %} · ausgebaut{% endif %}</span>{% endfor %}
+      {% if v.zaehler_verbrauch is not none %}<br>Verbrauch {{ jahr }} laut Zähler: {{ v.zaehler_verbrauch|num(0) }} {{ EINHEITEN[v.zaehler[0].art] }}{% endif %}
       {% if v.notiz %}<br><span class="notiz">{{ v.notiz }}</span>{% endif %}</small></td>
     <td class="zahl">{{ v.betrag|eur }}<br><small class="leise">{{ ZAHLWEISEN[v.zahlweise][0] }}{% if ZAHLWEISEN[v.zahlweise][1] > 1 %} · {{ v.jahr|eur }}/Jahr{% endif %}</small>
       {% if v.tarif is not none %}<br><small class="leise" title="Verbrauch × Arbeitspreis + 12 × Grundpreis">Tarif: {{ v.tarif|eur }}/Jahr</small>{% endif %}</td>

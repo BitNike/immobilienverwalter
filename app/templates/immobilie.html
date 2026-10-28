@@ -46,7 +46,10 @@
 <td><select name="art" form="{{ form }}">
   <option value="ausgabe" {{ 'selected' if b.art != 'einnahme' }}>Ausgabe</option>
   <option value="einnahme" {{ 'selected' if b.art == 'einnahme' }}>Einnahme</option></select></td>
-<td>{{ ziel_auswahl(form, b, kostenarten) }}</td>
+<td>{{ ziel_auswahl(form, b, kostenarten) }}
+  {% if haeuser %}<select name="haus" form="{{ form }}" class="haus-wahl" title="Nur bei einer Kostenart: auf alle Wohnungen oder nur auf die Wohnungen eines Hauses verteilen">
+    <option value="">alle Häuser</option>
+    {% for h in haeuser %}<option value="{{ h }}" {{ 'selected' if b.haus == h }}>nur {{ h }}</option>{% endfor %}</select>{% endif %}</td>
 <td class="zahl"><input class="betrag" name="betrag" form="{{ form }}" inputmode="decimal" value="{{ b.betrag|num if b.betrag else '' }}" required></td>
 <td><select name="bezahlt" form="{{ form }}">{% for s, t in BEZAHLT.items() %}<option value="{{ s }}" {{ 'selected' if b.bezahlt == s }} title="{{ t }}">{{ t.split()[0] }}</option>{% endfor %}</select></td>
 
@@ -151,7 +154,7 @@
   {% endif %}
   <div class="tabelle">
   <table class="buchungen">
-    <thead><tr><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Kostenart / Ziel {{ info("Mit einer Kostenart zählt der Betrag zu den Gebäudekosten und wird nach deren Schlüssel auf die Wohnungen verteilt; eine Einnahme mindert sie (z. B. Erstattung der Stadtwerke).\n\n„→ Rücklage“ wird nicht umgelegt: Einnahmen (PV-Anlage, Zinsen) fließen hinein, Ausgaben werden entnommen.\n\nKosten nur einer Wohnung (z. B. Heizkostenabrechnung) trägst du beim Mietobjekt ein.") }}</th><th class="zahl">Betrag</th>
+    <thead><tr><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Kostenart / Ziel {{ info("Mit einer Kostenart zählt der Betrag zu den Gebäudekosten und wird nach deren Schlüssel auf die Wohnungen verteilt; eine Einnahme mindert sie (z. B. Erstattung der Stadtwerke).\n\n„→ Rücklage“ wird nicht umgelegt: Einnahmen (PV-Anlage, Zinsen) fließen hinein, Ausgaben werden entnommen.\n\nKosten nur einer Wohnung (z. B. Heizkostenabrechnung) trägst du beim Mietobjekt ein." ~ ("\n\n„nur Haus …“: Der Betrag wird nur auf die Wohnungen dieses Hauses verteilt, z. B. eine Reparatur im Treppenhaus (Haus beim Mietobjekt unter Stammdaten eintragen)." if haeuser else "")) }}</th><th class="zahl">Betrag</th>
       <th>Bezahlt {{ info("Konto: von einem Konto der Immobilie bezahlt.\nBar: privat ausgelegt – bleibt als „offen“ markiert, bis du die Erstattung einträgst.") }}</th><th class="aktionen">Beleg</th></tr></thead>
     <tbody>
     {% if ist_admin and not bb %}
@@ -562,7 +565,7 @@
     <tbody>
     {% for r in verteilung %}{% set w = r.wohnung %}
     <tr>
-      <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a></td>
+      <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a>{% if w.haus %}<br><small class="leise">{{ w.haus }}</small>{% endif %}</td>
       <td>{{ person_name(r.eigentuemer) if r.eigentuemer else '–' }}</td>
       <td class="zahl">{{ r.summe|eur }}</td>
       <td class="zahl">{% set hgn = erg.hausgeld_buchungen.get(w.id) %}{% if hgn %}{{ r.vorauszahlung|eur }}<br>
@@ -593,7 +596,7 @@
     <tbody>
     {% for r in verteilung %}{% set w = r.wohnung %}
     <tr>
-      <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a></td>
+      <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a>{% if w.haus %}<br><small class="leise">{{ w.haus }}</small>{% endif %}</td>
       <td>{{ person_name(r.eigentuemer) if r.eigentuemer else '–' }}</td>
       <td class="zahl">{{ w.wohnflaeche|num }} m²</td>
       <td class="zahl">{% if w.mea %}{{ w.mea|num }}/{{ w.mea_basis|num(0) }}<br><small class="leise">{{ (w.mea / w.mea_basis * 100)|num }} %</small>{% else %}<span class="leise">–</span>{% endif %}</td>
