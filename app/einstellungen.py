@@ -15,7 +15,7 @@ from core import (OHNE_ZUGANG, ROLLEN, ZAEHLERARTEN, ablage_kategorie_anlegen, a
                   row, rows, sichtbare_immobilien, wohnungen_der_immobilie, zurueck)
 from immobilien import wohnung_werte, zaehler_aus_formular
 
-PROFIL_FELDER = ("vorname", "name", "strasse", "hausnummer", "plz", "ort", "email")
+PROFIL_FELDER = ("vorname", "name", "strasse", "hausnummer", "plz", "ort", "email", "telefon", "mobil")
 
 
 def profil_werte(mit_notizen=False):

@@ -699,7 +699,8 @@ def test_gesamter_ablauf():
     # Zweiter Vermieter (Vermieter +) als Eigentümer der OG-Wohnung
     post(c, "/einstellungen/admin/vermieter/neu", data={"benutzername": "anna", "rolle": "vermieter_plus",
                                                           "passwort": "passwort1", "passwort2": "passwort1",
-                                                          "vorname": "Anna", "name": "Eigner"})
+                                                          "vorname": "Anna", "name": "Eigner",
+                                                          "telefon": "01234 567 89", "mobil": "0170 1234567"})
     post(c, "/einstellungen/admin/wohnungen/2", data={"bezeichnung": "OG", "wohnflaeche": "50", "mea": "60",
                                                         "mea_basis": "1000", "immobilie_id": "1",
                                                         "eigentuemer_id": "2"})
@@ -749,9 +750,13 @@ def test_gesamter_ablauf():
 
     # Eigentümer ohne Zugang direkt beim Mietobjekt anlegen (nur der Name ist Pflicht)
     post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Garage", "wohnflaeche": "15", "immobilie_id": "",
-                                                          "eigentuemer_id": "neu", "neu_name": "Ohnezugang"})
+                                                          "eigentuemer_id": "neu", "neu_name": "Ohnezugang",
+                                                          "neu_mobil": "0151 7654321"})
     liste = ok(c.get("/einstellungen/vermieter")).get_data(as_text=True)
     assert "Ohnezugang" in liste and "ohne Zugang" in liste
+    assert 'href="tel:0123456789">01234 567 89</a>' in liste and 'href="tel:01701234567"' in liste and "0151 7654321" in liste
+    anna = dbcon.execute("SELECT id FROM benutzer WHERE benutzername = 'anna'").fetchone()[0]
+    assert 'value="0170 1234567"' in ok(c.get(f"/einstellungen/admin/vermieter/{anna}")).get_data(as_text=True)
     # weiteres Mietobjekt beim Eigentümer zuordnen
     post(c, "/einstellungen/admin/wohnungen/neu", data={"bezeichnung": "Keller", "wohnflaeche": "5", "immobilie_id": ""})
     post(c, "/einstellungen/admin/vermieter/3/mietobjekte", data={"wid": "4"})

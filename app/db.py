@@ -326,6 +326,11 @@ MIGRATIONEN = [
     ALTER TABLE zaehler ADD COLUMN notiz TEXT NOT NULL DEFAULT '';
     ALTER TABLE vertrag ADD COLUMN kundennummer TEXT NOT NULL DEFAULT '';
     """,
+    # 19: Telefonnummern der Vermieter bzw. Eigentümer
+    """
+    ALTER TABLE benutzer ADD COLUMN telefon TEXT NOT NULL DEFAULT '';
+    ALTER TABLE benutzer ADD COLUMN mobil TEXT NOT NULL DEFAULT '';
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

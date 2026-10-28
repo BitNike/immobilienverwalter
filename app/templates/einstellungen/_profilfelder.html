@@ -15,5 +15,7 @@
   {{ feld('plz', 'Postleitzahl', b.plz) }}
   {{ feld('ort', 'Wohnort', b.ort) }}
   {{ feld('email', 'E-Mail', b.email, typ='email', hinweis='für „Passwort vergessen“ und Einladungen') }}
+  {{ feld('telefon', 'Telefon (Festnetz)', b.telefon, typ='tel') }}
+  {{ feld('mobil', 'Handy', b.mobil, typ='tel') }}
 </div>
 {%- endmacro %}

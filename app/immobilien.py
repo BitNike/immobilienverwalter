@@ -1151,7 +1151,7 @@ def wohnung_werte():
     eig = f.get("eigentuemer_id")
     if eig == "neu":
         eig = eigentuemer_anlegen({k: f.get("neu_" + k, "").strip()
-                                   for k in ("vorname", "name", "strasse", "hausnummer", "plz", "ort", "email")})
+                                   for k in ("vorname", "name", "strasse", "hausnummer", "plz", "ort", "email", "telefon", "mobil")})
     vals["eigentuemer_id"] = int(eig) if eig else None
     if "immobilie_id" in f:
         vals["immobilie_id"] = int(f["immobilie_id"]) if f["immobilie_id"] else None

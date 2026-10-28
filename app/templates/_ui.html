@@ -254,6 +254,7 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
       {{ feld('neu_strasse', 'Straße') }}{{ feld('neu_hausnummer', 'Hausnummer') }}
       {{ feld('neu_plz', 'Postleitzahl') }}{{ feld('neu_ort', 'Ort') }}
       {{ feld('neu_email', 'E-Mail', typ='email') }}
+      {{ feld('neu_telefon', 'Telefon (Festnetz)', typ='tel') }}{{ feld('neu_mobil', 'Handy', typ='tel') }}
     </div>
   </fieldset>
   {{ feld('wohnflaeche', 'Wohnfläche (m²)', w.wohnflaeche|num if w.wohnflaeche else '', pflicht=True, attrs='inputmode="decimal"') }}
