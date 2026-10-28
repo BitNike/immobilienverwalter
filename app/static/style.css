@@ -326,3 +326,11 @@ table.rl-blatt th:nth-child(4), table.rl-blatt th:nth-child(5) { min-width: 130p
 .marke.status-gekuendigt, .marke.status-endet { border-color: var(--primaer); color: var(--primaer); }
 .marke.status-unbekannt { border-style: dashed; }
 table.vertraege td { vertical-align: top; }
+
+/* Reiter Umlageschlüssel: Spalten so schmal wie nötig, die Grundlage bekommt den Rest */
+table.schluessel-tabelle th { width: 1%; white-space: nowrap; }
+table.schluessel-tabelle th:nth-child(4) { width: auto; }
+table.schluessel-tabelle th:nth-child(5) { white-space: normal; min-width: 70px; }
+table.schluessel-tabelle td:nth-child(2) { white-space: nowrap; }
+table.schluessel-tabelle select { min-width: 170px; }
+table.schluessel-tabelle input[name^="g_"] { width: 100%; min-width: 180px; }

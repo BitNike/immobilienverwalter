@@ -195,7 +195,7 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
 </label>
 {%- endmacro %}
 
-{% macro immobilie_felder(i={}) -%}
+{% macro immobilie_felder(i={}, mit_schluessel=True) -%}
 <fieldset><legend>Immobilie</legend>
 <div class="raster">
   {{ feld('name', 'Bezeichnung', i.name, pflicht=True, attrs='placeholder="z. B. Mühlenstraße 11"') }}
@@ -209,13 +209,13 @@ onsubmit="var o = {{ vorhanden|tojson|forceescape }}[this.kostenart_id.value]; r
 </fieldset>
 <fieldset><legend>Abrechnung</legend>
 <div class="raster">
-  <label>Standard-Umlageschlüssel
+  {% if mit_schluessel %}<label>Standard-Umlageschlüssel
     <select name="schluessel">
       <option value="">Automatisch</option>
       {% for s, t in SCHLUESSEL.items() if s != 'wasser' %}<option value="{{ s }}" {{ 'selected' if i.schluessel == s }}>{{ t }}</option>{% endfor %}
     </select>
     <small>Vorauswahl für neue Gebäudekosten. Automatisch: bei nur einem Mietobjekt Wohnfläche, sonst der Standard der Kostenart. Eigenes Haus ohne WEG: Wohnfläche.</small>
-  </label>
+  </label>{% endif %}
   <label class="haken breit"><input type="checkbox" name="weg" {{ 'checked' if i.weg }}>
     <span>Eigentümergemeinschaft (WEG): zusätzlich eine Eigentümer-Abrechnung je Wohnung erstellen (Kosten gegen Hausgeld)</span></label>
   {{ feld('absender', 'Absender', i.absender, breit=True, hinweis='z. B. „Hausverwaltung, Straße, PLZ Ort“ – leer = Eigentümer') }}

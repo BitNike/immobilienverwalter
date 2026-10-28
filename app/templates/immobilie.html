@@ -319,7 +319,7 @@
     <tr>
       <td>{{ gk.kostenart }}{% if k.notiz %}<br><small class="leise notiz">{{ k.notiz }}</small>{% endif %}
         {% if gk.warnung %}<br><small class="warnung">{{ gk.warnung }}</small>{% endif %}</td>
-      <td>{{ SCHLUESSEL[k.schluessel] }}</td>
+      <td>{{ SCHLUESSEL[k.schluessel] }}{% set rg = regeln.get(k.kostenart_id) %}{% if rg and rg.grundlage %}<br><small class="leise">{{ rg.grundlage }}</small>{% endif %}</td>
       <td class="zahl">{{ k.betrag|eur }}<br><small class="leise">aus {{ belege.get(k.id, 0) }} Buchung{{ 'en' if belege.get(k.id, 0) != 1 }}</small></td>
       <td class="zahl">{{ gk.verteilt|eur }}{% if gk.rest %}<br><small class="leise">nicht im System: {{ gk.rest|eur }}</small>{% endif %}</td>
       <td class="aktionen">
@@ -670,7 +670,7 @@
 {% if ist_admin and aktiv == 'stammdaten' %}
 <section class="block" id="stammdaten">
   <form method="post" action="{{ url_for('immobilie_speichern', iid=immo.id) }}">
-    {{ immobilie_felder(immo) }}
+    {{ immobilie_felder(immo, mit_schluessel=False) }}
     <div class="knopfleiste">{{ speichern() }}</div>
   </form>
   <p class="leise">Dokumentenordner: <code>{{ immo.ordner }}</code></p>
@@ -690,6 +690,43 @@
     </form>
     {{ loeschen(url_for('immobilie_loeschen', iid=immo.id), 'Immobilie „%s“ mit %d Mietobjekten, %d Kostenpositionen und %d Dokumenten endgültig löschen? Das lässt sich nicht rückgängig machen.' % (immo.name, umfang.wohnungen, umfang.kosten, umfang.dokumente), 'Immobilie löschen') }}
   </div>
+</section>
+{% endif %}
+
+{% if ist_admin and aktiv == 'schluessel' %}
+<section class="block" id="schluessel">
+  <h2>Umlageschlüssel dieser Immobilie {{ info("Wie jede Kostenart in dieser Immobilie verteilt wird – z. B. laut Teilungserklärung oder Beschluss der Eigentümerversammlung. Unter „Grundlage“ hältst du fest, woher die Regel stammt (z. B. „§ 13 Abs. 1 b TE“ oder „Beschluss ETV 12.05.2027“).\n\nOhne eigene Regel gilt die Vorgabe (Standard der Immobilie bzw. der Kostenart aus Einstellungen → Kostenarten). Neue Kostenpositionen übernehmen den Schlüssel automatisch; vorhandene änderst du mit „auf das Jahr anwenden“ oder einzeln über den Stift bei den Gebäudekosten.\n\n„nicht genutzt“ blendet die Kostenart bei dieser Immobilie in den Auswahllisten aus.") }}</h2>
+  <form method="post" action="{{ url_for('umlageschluessel_speichern', iid=immo.id) }}">
+    <div class="raster">
+      <label>Standard der Immobilie
+        <select name="schluessel">
+          <option value="">Automatisch (Vorgabe der Kostenart)</option>
+          {% for s, t in SCHLUESSEL.items() if s != 'wasser' %}<option value="{{ s }}" {{ 'selected' if immo.schluessel == s }}>{{ t }}</option>{% endfor %}
+        </select>
+        <small>gilt für alle Kostenarten ohne eigene Regel (außer Wasser)</small>
+      </label>
+    </div>
+    <div class="tabelle">
+    <table class="schluessel-tabelle">
+      <thead><tr><th>Kostenart</th><th>Vorgabe</th><th>Schlüssel hier</th><th>Grundlage</th><th>nicht genutzt</th></tr></thead>
+      <tbody>
+      {% for k in alle_kostenarten %}{% set rg = regeln.get(k.id) or {} %}
+      <tr class="{{ 'leise' if rg.ungenutzt }}">
+        <td>{{ k.name }}{% if not k.umlagefaehig %}<br><small class="leise">nicht umlagefähig</small>{% endif %}</td>
+        <td class="leise">{{ SCHLUESSEL[vorgaben[k.id]] }}</td>
+        <td><select name="s_{{ k.id }}" aria-label="Schlüssel für {{ k.name }}"><option value="">wie Vorgabe</option>
+          {% for s, t in SCHLUESSEL.items() %}<option value="{{ s }}" {{ 'selected' if rg.schluessel == s }}>{{ t }}</option>{% endfor %}</select></td>
+        <td><input name="g_{{ k.id }}" value="{{ rg.grundlage or '' }}" placeholder="z. B. § 13 TE" aria-label="Grundlage für {{ k.name }}"></td>
+        <td><label class="haken"><input type="checkbox" name="u_{{ k.id }}" {{ 'checked' if rg.ungenutzt }} aria-label="{{ k.name }} nicht genutzt"></label></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <label class="haken"><input type="checkbox" name="anwenden"> auch auf die Gebäudekosten {{ jahr }} anwenden (vorhandene Positionen bekommen den Schlüssel der Regel)</label>
+    <div class="knopfleiste">{{ speichern() }}</div>
+  </form>
+  <p class="leise">Die Liste der Kostenarten selbst (Name, umlagefähig, Vorgabe) pflegst du unter <a href="{{ url_for('kostenarten_admin') }}">Einstellungen → Kostenarten</a>.</p>
 </section>
 {% endif %}
 {% endblock %}

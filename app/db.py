@@ -335,6 +335,18 @@ MIGRATIONEN = [
     """
     ALTER TABLE ablage ADD COLUMN vertrag_id INTEGER REFERENCES vertrag(id) ON DELETE SET NULL;
     """,
+    # 21: Umlageschlüssel je Immobilie und Kostenart (z. B. laut Teilungserklärung oder Beschluss), mit Grundlage;
+    #     Kostenarten, die eine Immobilie nicht nutzt, lassen sich ausblenden. Ohne Eintrag gilt die Vorgabe.
+    """
+    CREATE TABLE immobilie_kostenart (
+        immobilie_id INTEGER NOT NULL REFERENCES immobilie(id) ON DELETE CASCADE,
+        kostenart_id INTEGER NOT NULL REFERENCES kostenart(id) ON DELETE CASCADE,
+        schluessel TEXT NOT NULL DEFAULT '',
+        grundlage TEXT NOT NULL DEFAULT '',
+        ungenutzt INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (immobilie_id, kostenart_id)
+    );
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

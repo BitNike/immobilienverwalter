@@ -9,7 +9,7 @@ import dateien
 import db
 from vertraege import MIETARTEN, kennzahlen as vertrag_kennzahlen, mietvertraege, vertraege
 from calc import berechne, cent_genau, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
-from core import (BEREICHE, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
+from core import (BEREICHE, SCHLUESSEL, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
 
@@ -152,6 +152,36 @@ def standard_schluessel(immo, anzahl_wohnungen):
     return immo["schluessel"] or ("flaeche" if anzahl_wohnungen == 1 else None)
 
 
+def kostenart_regeln(iid):
+    """{kostenart_id: {schluessel, grundlage, ungenutzt}} – Regeln der Immobilie (Reiter „Umlageschlüssel“)."""
+    return {r["kostenart_id"]: r for r in rows("SELECT * FROM immobilie_kostenart WHERE immobilie_id = ?", (iid,))}
+
+
+def schluessel_vorgabe(immo, ka, anzahl_wohnungen):
+    """Schlüssel ohne eigene Regel der Immobilie: Wasser bleibt Wasser, sonst Standard der Immobilie bzw. der Kostenart."""
+    if ka["schluessel"] == "wasser":
+        return "wasser"
+    return standard_schluessel(immo, anzahl_wohnungen) or ka["schluessel"]
+
+
+def schluessel_fuer(immo, ka, regeln=None, anzahl_wohnungen=None):
+    """Umlageschlüssel einer Kostenart in dieser Immobilie: eigene Regel, sonst die Vorgabe."""
+    r = (kostenart_regeln(immo["id"]) if regeln is None else regeln).get(ka["id"])
+    if r and r["schluessel"]:
+        return r["schluessel"]
+    if anzahl_wohnungen is None:
+        anzahl_wohnungen = one("SELECT COUNT(*) AS n FROM wohnung WHERE immobilie_id = ?", (immo["id"],))["n"]
+    return schluessel_vorgabe(immo, ka, anzahl_wohnungen)
+
+
+def kostenarten_immobilie(immo):
+    """Aktive Kostenarten ohne die, die diese Immobilie ausgeblendet hat; „schluessel“ ist der der Immobilie."""
+    regeln = kostenart_regeln(immo["id"])
+    anzahl = one("SELECT COUNT(*) AS n FROM wohnung WHERE immobilie_id = ?", (immo["id"],))["n"]
+    return [dict(k, schluessel=schluessel_fuer(immo, k, regeln, anzahl)) for k in kostenarten_aktiv()
+            if not (regeln.get(k["id"]) and regeln[k["id"]]["ungenutzt"])]
+
+
 def vorhandene_kostenarten(iid, j, wid=None):
     """{kostenart_id: Ort} der Kosten eines Jahres – für die Rückfrage bei doppelter Erfassung."""
     orte = {}
@@ -182,6 +212,13 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         elif ganze_immobilie and gk["rest"] > 0:
             punkt(f"{name}: {de_num(gk['rest'])} € sind keinem Mietobjekt zugeordnet. "
                   "Fehlen Mietobjekte oder deren MEA bzw. Wohnfläche?", link, "hinweis")
+    regeln = kostenart_regeln(immo["id"]) if ganze_immobilie else {}
+    for gk in erg["gebaeude"]:
+        r = regeln.get(gk["kosten"]["kostenart_id"])
+        if r and r["schluessel"] and gk["kosten"]["schluessel"] != r["schluessel"]:
+            punkt(f"{gk['kostenart']}: verteilt nach {SCHLUESSEL[gk['kosten']['schluessel']]}, die Regel der Immobilie sagt "
+                  f"{SCHLUESSEL[r['schluessel']]}{' (' + r['grundlage'] + ')' if r['grundlage'] else ''}.",
+                  url_for("immobilie", iid=immo["id"], reiter="schluessel"), "hinweis")
     for b in erg.get("hausgeld_offen", []) if ganze_immobilie else []:
         punkt(f"Hausgeld „{b['text']}“ ({de_num(b['betrag'])} €): Der Eigentümer hat hier keine Wohnung mehr, der Betrag "
               "wird keiner Wohnung zugerechnet.", url_for("immobilie", iid=immo["id"], reiter="buchungen", buchung=b["id"]))
@@ -320,11 +357,11 @@ def archiv():
 
 def immobilie_werte():
     f = request.form
-    vals = {k: f.get(k, "").strip() for k in IMMOBILIE_FELDER}
+    vals = {k: f.get(k, "").strip() for k in IMMOBILIE_FELDER if k != "schluessel" or k in f}
     if not vals["name"]:
         raise ValueError("Bitte einen Namen für die Immobilie angeben.")
     vals["iban"] = vals["iban"].upper()
-    if vals["schluessel"] not in ("", "mea", "flaeche", "einheiten"):
+    if vals.get("schluessel", "") not in ("", "mea", "flaeche", "einheiten"):
         raise ValueError("Unbekannter Umlageschlüssel.")
     vals["weg"] = 1 if f.get("weg") else 0
     vals["gesamtflaeche"] = parse_num(f.get("gesamtflaeche"), None)
@@ -427,7 +464,7 @@ def immobilie(iid):
         reiter.append(("zaehler", "Zähler"))
     reiter += [("vertraege", "Verträge"), ("dokumente", "Dokumente")]
     if ist_admin():
-        reiter.append(("stammdaten", "Stammdaten"))
+        reiter += [("stammdaten", "Stammdaten"), ("schluessel", "Umlageschlüssel")]
     vliste = vertraege(iid, j=j)
     pruefung = pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin())
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
@@ -443,7 +480,9 @@ def immobilie(iid):
                            offen_bar=[b for b in alle_buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
                            rl=ruecklage(iid, j),
-                           vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_aktiv(),
+                           vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_immobilie(immo),
+                           regeln=kostenart_regeln(iid), alle_kostenarten=kostenarten_aktiv(),
+                           vorgaben={k["id"]: schluessel_vorgabe(immo, k, umfang["wohnungen"]) for k in kostenarten_aktiv()},
                            dokumente=dokumente_sichtbar(iid, j), hauptzaehler=hauptzaehler, mvs=mvs,
                            ablage=ablage_sichtbar(iid),
                            wohnungen=rows("SELECT * FROM wohnung WHERE immobilie_id = ? ORDER BY bezeichnung COLLATE NATUERLICH", (iid,)))
@@ -456,6 +495,40 @@ def immobilie_speichern(iid):
     exe(f"UPDATE immobilie SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), iid])
     flash("Immobilie gespeichert.")
     return redirect(url_for("immobilie", iid=iid, reiter="stammdaten"))
+
+
+@app.post("/immobilien/<int:iid>/umlageschluessel")
+@admin_noetig
+def umlageschluessel_speichern(iid):
+    """Regeln je Kostenart (Felder s_<id>, g_<id>, u_<id>) und Standard der Immobilie; auf Wunsch auf das Jahr anwenden."""
+    row("SELECT id FROM immobilie WHERE id = ?", (iid,))
+    f = request.form
+    standard = f.get("schluessel", "")
+    if standard not in ("", "mea", "flaeche", "einheiten"):
+        raise ValueError("Unbekannter Umlageschlüssel.")
+    exe("UPDATE immobilie SET schluessel = ? WHERE id = ?", (standard, iid))
+    for ka in kostenarten_aktiv():
+        s, grundlage, ungenutzt = f.get(f"s_{ka['id']}", ""), f.get(f"g_{ka['id']}", "").strip(), 1 if f.get(f"u_{ka['id']}") else 0
+        if s and s not in SCHLUESSEL:
+            raise ValueError("Unbekannter Umlageschlüssel.")
+        if s or grundlage or ungenutzt:
+            exe("INSERT INTO immobilie_kostenart (immobilie_id, kostenart_id, schluessel, grundlage, ungenutzt) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (immobilie_id, kostenart_id) DO UPDATE SET schluessel = excluded.schluessel, "
+                "grundlage = excluded.grundlage, ungenutzt = excluded.ungenutzt", (iid, ka["id"], s, grundlage, ungenutzt))
+        else:
+            exe("DELETE FROM immobilie_kostenart WHERE immobilie_id = ? AND kostenart_id = ?", (iid, ka["id"]))
+    if f.get("anwenden"):
+        immo, regeln, n = row("SELECT * FROM immobilie WHERE id = ?", (iid,)), kostenart_regeln(iid), 0
+        kostenarten = {k["id"]: k for k in rows("SELECT * FROM kostenart")}
+        for k in rows("SELECT * FROM kosten WHERE immobilie_id = ? AND jahr = ? AND wohnung_id IS NULL", (iid, jahr())):
+            neu = schluessel_fuer(immo, kostenarten[k["kostenart_id"]], regeln)
+            if neu != k["schluessel"]:
+                exe("UPDATE kosten SET schluessel = ? WHERE id = ?", (neu, k["id"]))
+                n += 1
+        flash(f"Umlageschlüssel gespeichert und auf {jahr()} angewendet ({n} Kostenposition{'en' if n != 1 else ''} geändert).")
+    else:
+        flash("Umlageschlüssel gespeichert. Sie gelten für neue Kostenpositionen.")
+    return redirect(url_for("immobilie", iid=iid, reiter="schluessel"))
 
 
 @app.post("/immobilien/<int:iid>/loeschen")
@@ -567,9 +640,7 @@ def kostenposition(immo, j, kostenart_id, haus=""):
             "AND haus = ? ORDER BY id", (immo["id"], j, kostenart_id, haus or ""))
     if k:
         return k["id"]
-    ka = row("SELECT * FROM kostenart WHERE id = ?", (kostenart_id,))
-    anzahl = one("SELECT COUNT(*) AS n FROM wohnung WHERE immobilie_id = ?", (immo["id"],))["n"]
-    schl = ka["schluessel"] if ka["schluessel"] == "wasser" else standard_schluessel(immo, anzahl) or ka["schluessel"]
+    schl = schluessel_fuer(immo, row("SELECT * FROM kostenart WHERE id = ?", (kostenart_id,)))
     return exe("INSERT INTO kosten (immobilie_id, jahr, kostenart_id, betrag, schluessel, haus) VALUES (?, ?, ?, 0, ?, ?)",
                (immo["id"], j, kostenart_id, schl, haus or ""))
 
@@ -1212,7 +1283,7 @@ def wohnung(wid):
         mietvertraege=mietvertraege(wid),
         benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname") if ist_admin() else [],
         pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
-        darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),
+        darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_immobilie(immo),
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
         zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? "
                                      "ORDER BY art, ausgebaut IS NOT NULL, bezeichnung COLLATE NATUERLICH, id", (wid,), j),

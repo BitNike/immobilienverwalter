@@ -518,7 +518,31 @@ def test_gesamter_ablauf():
                                                       "w": {"haus": haus}})]
         assert namen("Haus A") == ["Instandhaltung / Reparaturen"]
         assert namen("Haus B") == ["Instandhaltung / Reparaturen", "Instandhaltung / Reparaturen – Haus B"]
+    # Umlageschlüssel je Immobilie: eigene Regel mit Grundlage, ungenutzte Kostenarten ausblenden, aufs Jahr anwenden
+    hm = str(dbcon.execute("SELECT id FROM kostenart WHERE name = 'Hausmeister'").fetchone()[0])
+    aufzug = str(dbcon.execute("SELECT id FROM kostenart WHERE name = 'Aufzug'").fetchone()[0])
+    assert "Umlageschlüssel dieser Immobilie" in ok(c.get(f"/immobilien/{tid}?reiter=schluessel")).get_data(as_text=True)
+    post(c, f"/immobilien/{tid}/umlageschluessel", data={f"s_{hm}": "einheiten", f"g_{hm}": "Beschluss ETV 2027",
+                                                         f"u_{aufzug}": "on"})
+    post(c, f"/immobilien/{tid}/buchungen", data={"datum": "2026-06-01", "text": "Hausmeister", "art": "ausgabe",
+                                                  "ziel": hm, "betrag": "120", "bezahlt": "konto"})
+    assert dbcon.execute("SELECT schluessel FROM kosten WHERE immobilie_id = ? AND kostenart_id = ?",
+                         (tid, hm)).fetchone() == ("einheiten",)
+    seite = ok(c.get(f"/immobilien/{tid}")).get_data(as_text=True)
+    assert "Beschluss ETV 2027" in seite and "Regel der Immobilie" not in seite
+    seite = ok(c.get(f"/immobilien/{tid}?reiter=buchungen")).get_data(as_text=True)
+    assert f'<option value="{hm}"' in seite and f'<option value="{aufzug}"' not in seite  # Aufzug ausgeblendet
+    # Regel nachträglich geändert: Prüfliste weist auf die Abweichung hin, „anwenden“ zieht die Position nach
+    post(c, f"/immobilien/{tid}/umlageschluessel", data={f"s_{instand}": "flaeche"})
+    assert "die Regel der Immobilie sagt Wohnfläche" in ok(c.get(f"/immobilien/{tid}")).get_data(as_text=True)
+    post(c, f"/immobilien/{tid}/umlageschluessel", data={f"s_{instand}": "flaeche", f"s_{hm}": "einheiten",
+                                                         "anwenden": "on"})
+    assert {r[0] for r in dbcon.execute("SELECT schluessel FROM kosten WHERE immobilie_id = ? AND kostenart_id = ?",
+                                        (tid, instand))} == {"flaeche"}
+    assert "Regel der Immobilie" not in ok(c.get(f"/immobilien/{tid}")).get_data(as_text=True)
+    assert dbcon.execute("SELECT COUNT(*) FROM immobilie_kostenart WHERE immobilie_id = ?", (tid,)).fetchone()[0] == 2
     post(c, f"/immobilien/{tid}/loeschen")
+    assert dbcon.execute("SELECT COUNT(*) FROM immobilie_kostenart").fetchone()[0] == 0
     c.get("/immobilien/1?jahr=2026")
     # Spalten einklappen: Zustand kommt aus dem Cookie, Mietobjekte zeigen dann ihre Kurzform
     seite = ok(c.get("/immobilien/1")).get_data(as_text=True)
