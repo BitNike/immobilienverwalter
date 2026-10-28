@@ -427,6 +427,7 @@ def test_gesamter_ablauf():
     c.get(f"/immobilien/{hid}?jahr=2026")
     seite = ok(c.get(f"/immobilien/{hid}?reiter=buchungen")).get_data(as_text=True)
     assert 'value="e1"' in seite and f'value="w{w4}"' in seite and f'value="e{zweit}"' not in seite  # „alle“ nur bei mehreren
+    assert "Hausgeld der Eigentümer: in der Spalte" in seite and "Bei keinem Mietobjekt ist ein Eigentümer" not in seite
     # 100 € für alle drei Wohnungen: cent-genau 33,34 + 33,33 + 33,33; Art wird immer „Einnahme“
     post(c, f"/immobilien/{hid}/buchungen", data={"datum": "2026-01-05", "text": "Hausgeld Januar", "art": "ausgabe",
                                                   "ziel": "e1", "betrag": "100", "bezahlt": "konto"})
