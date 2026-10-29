@@ -56,6 +56,8 @@ Den Rest von 635,00 € trägt der Eigentümer: Leerstand Januar bis März (125,
 ## Gut zu wissen
 
 - Die Mieter-Vorauszahlungen gehören **nicht** in die Eigentümer-Abrechnung, sie stehen dem Eigentümer zu.
+- Kosten, die ein Eigentümer selbst bezahlt (Müllgebühr, Grundsteuer), trägst du beim Mietobjekt mit
+  **„Bezahlt: Eigentümer direkt“** ein. Sie gehen an den Mieter, aber nicht in die Abrechnung gegenüber der Gemeinschaft.
 - Gegenüber dem Mieter gilt grundsätzlich der Schlüssel der Gemeinschaft (§ 556a Abs. 3 BGB).
 - Die Rücklage ist nicht umlagefähig und erscheint nur in der Eigentümer-Abrechnung, dort mit Entwicklung und Kontoständen auf Seite 2.
 - Kosten nur eines Hauses (z. B. Treppenhaus) lassen sich mit **„nur Haus …“** buchen (siehe [Mehrere Häuser](03-immobilien-mietobjekte.md#mehrere-häuser-in-einer-immobilie)).

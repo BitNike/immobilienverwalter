@@ -581,7 +581,7 @@
     <tr>
       <td><a href="{{ url_for('wohnung', wid=w.id) }}">{{ w.bezeichnung }}</a>{% if w.haus %}<br><small class="leise">{{ w.haus }}</small>{% endif %}</td>
       <td>{{ person_name(r.eigentuemer) if r.eigentuemer else '–' }}</td>
-      <td class="zahl">{{ r.summe|eur }}</td>
+      <td class="zahl">{{ r.summe_weg|eur }}</td>
       <td class="zahl">{% set hgn = erg.hausgeld_buchungen.get(w.id) %}{% if hgn %}{{ r.vorauszahlung|eur }}<br>
           <a class="leise" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', ziel='hausgeld', wohnung=w.id) }}"><small>aus {{ hgn }} Buchung{{ 'en' if hgn != 1 }}</small></a>
         {% else %}<input class="betrag" form="hg" name="hg_{{ w.id }}" inputmode="decimal" placeholder="Hausgeld"
@@ -591,7 +591,7 @@
     </tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><th colspan="2">Summe</th><th class="zahl">{{ verteilung|sum(attribute='summe')|eur }}</th>
+    <tfoot><tr><th colspan="2">Summe</th><th class="zahl">{{ verteilung|sum(attribute='summe_weg')|eur }}</th>
       <th class="zahl">{{ verteilung|sum(attribute='vorauszahlung')|eur }}</th>
       <th class="zahl">{{ saldo(verteilung|sum(attribute='saldo')) }}</th><th></th></tr></tfoot>
   </table>

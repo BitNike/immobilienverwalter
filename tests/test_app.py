@@ -565,6 +565,26 @@ def test_gesamter_ablauf():
     assert "„Müllentsorgung“ war" not in ok(c.get(f"/wohnungen/{h2}")).get_data(as_text=True)
     post(c, f"/wohnungen/{h1}/kosten", data={"kostenart_id": str(muell), "betrag": "95"})
     assert "„Müllentsorgung“ war" not in ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)
+    # Kosten der Wohnung, die der Eigentümer direkt zahlt: an den Mieter ja, in die Eigentümer-Abrechnung (WEG) nicht
+    grundst = dbcon.execute("SELECT id FROM kostenart WHERE name = 'Grundsteuer'").fetchone()[0]
+    assert 'name="eigentuemer_direkt"' in ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)
+    post(c, f"/wohnungen/{h1}/kosten", data={"kostenart_id": str(grundst), "betrag": "50", "eigentuemer_direkt": "1"})
+
+    from calc import rund
+
+    def wohnung_h1():
+        with app.test_request_context():
+            return berechnung(row("SELECT * FROM immobilie WHERE id = ?", (tid,)), 2026)["wohnungen"][h1]
+    r = wohnung_h1()
+    assert r["summe"] - r["summe_weg"] == 50 and "Grundsteuer" not in [p["kostenart"] for p in r["posten_weg"]]
+    seite = ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)
+    assert "zahlt der Eigentümer direkt, nicht in der Eigentümer-Abrechnung" in seite and "ohne 50,00 € direkt gezahlt" in seite
+    mk = dbcon.execute("SELECT id FROM kosten WHERE wohnung_id = ? AND kostenart_id = ? AND jahr = 2026",
+                       (h1, muell)).fetchone()[0]
+    post(c, f"/kosten/{mk}", data={"kostenart_id": str(muell), "betrag": "95", "mv_id": "", "eigentuemer_direkt": "1"})
+    r2 = wohnung_h1()
+    assert r2["summe"] == r["summe"] and r2["summe_weg"] == rund(r["summe_weg"] - 95)
+    assert r2["saldo"] == rund(r2["summe_weg"] - r2["vorauszahlung"])
     post(c, f"/immobilien/{tid}/loeschen")
     assert dbcon.execute("SELECT COUNT(*) FROM immobilie_kostenart").fetchone()[0] == 0
     c.get("/immobilien/1?jahr=2026")

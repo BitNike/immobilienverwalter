@@ -33,6 +33,16 @@ Du erfasst sie im Reiter **Abrechnung** unter der Kostenaufstellung:
 | Wohnung – zeitanteilig auf die Mieter | nach Monaten auf alle Mieter des Jahres, Rest Leerstand |
 | Für Mieter … (100 %) | ganz für diesen Mieter, z. B. eine Einzelabrechnung des Messdienstes, die bereits seinen Zeitraum abdeckt |
 
+**Bei einer WEG** gibt es zusätzlich die Auswahl **Bezahlt**:
+
+| Bezahlt | Beispiel | Mieter-Abrechnung | Eigentümer-Abrechnung (gegen das Hausgeld) |
+|---|---|---|---|
+| über die WEG | Heizkostenabrechnung, wenn die Gemeinschaft den Brennstoff bezahlt | ja | ja |
+| Eigentümer direkt | Müllgebühr, Grundsteuer: der Bescheid geht an den Eigentümer | ja | nein |
+
+Direkt gezahlte Kosten stehen in der Kostenaufstellung mit dem Zusatz „zahlt der Eigentümer direkt“.
+In der Zeile Eigentümer-Abrechnung steht dann „ohne … € direkt gezahlt“.
+
 Kosten, die das ganze Haus betreffen, gehören zu den **Gebäudekosten** der Immobilie (Reiter Buchungen), nicht hierher.
 Die Kostenaufstellung zeigt sie mit dem Zusatz „Gebäudekosten der Immobilie“.
 

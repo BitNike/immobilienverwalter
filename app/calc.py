@@ -216,7 +216,8 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
             if k["wohnung_id"] in erg:
                 erg[k["wohnung_id"]]["posten"].append({
                     **basis, "gesamt": k["betrag"], "betrag": k["betrag"], "basis": "Kosten der Wohnung",
-                    "art": "mieter" if k["mv_id"] else "zeit", "mv_id": k["mv_id"]})
+                    "art": "mieter" if k["mv_id"] else "zeit", "mv_id": k["mv_id"],
+                    "eigentuemer_direkt": bool(k.get("eigentuemer_direkt"))})
             continue
         anteile, warnung = verteile(k)
         verteilt = 0.0
@@ -231,8 +232,11 @@ def berechne(von, bis, immobilie, wohnungen, kosten, kostenarten, mvs, zaehler, 
 
     for wid, r in erg.items():
         r["summe"] = rund(sum(p["betrag"] for p in r["posten"]))
+        # Eigentümer-Abrechnung gegen das Hausgeld: ohne die Kosten, die der Eigentümer direkt zahlt (Müll, Grundsteuer)
+        r["posten_weg"] = [p for p in r["posten"] if not p.get("eigentuemer_direkt")]
+        r["summe_weg"] = rund(sum(p["betrag"] for p in r["posten_weg"]))
         r["vorauszahlung"] = vorauszahlungen.get((wid, None), 0.0)
-        r["saldo"] = rund(r["summe"] - r["vorauszahlung"])
+        r["saldo"] = rund(r["summe_weg"] - r["vorauszahlung"])
         r["parteien"], r["leerstand"] = _aufteilen(r, [m for m in mvs if m["wohnung_id"] == wid],
                                                    wasserzaehler[wid], von, bis, M, vorauszahlungen)
 

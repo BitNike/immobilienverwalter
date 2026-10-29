@@ -66,7 +66,7 @@ def brief_daten(wid, partei):
             empfaenger=[person_name(eig), *adresse(eig)] if eig else ["Eigentümer nicht hinterlegt"],
             absender=immo["absender"] or _zeile(person_name(g.user), g.user),
             nutzung_von=d["abrechnung_von"], nutzung_bis=d["abrechnung_bis"], monate=erg["monate"], prozent=100.0,
-            posten=r["posten"], summe=r["summe"], vorauszahlung=r["vorauszahlung"], saldo=r["saldo"],
+            posten=r["posten_weg"], summe=r["summe_weg"], vorauszahlung=r["vorauszahlung"], saldo=r["saldo"],
             spalte_gesamt="Gesamtkosten Immobilie", mv=None)
         rl = ruecklage(immo["id"], j)
         if rl["vorhanden"]:

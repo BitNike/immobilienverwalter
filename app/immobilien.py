@@ -593,10 +593,10 @@ def wohnung_kosten_neu(wid):
     mv_id = int(f["mv_id"]) if f.get("mv_id") else None
     if mv_id:
         row("SELECT id FROM mietverhaeltnis WHERE id = ? AND wohnung_id = ?", (mv_id, wid))
-    exe("INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, notiz) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+    exe("INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, notiz, eigentuemer_direkt) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (w["immobilie_id"], jahr(), wid, mv_id, _kostenart_id(f), parse_num(f.get("betrag")),
-         f.get("notiz", "").strip()))
+         f.get("notiz", "").strip(), 1 if f.get("eigentuemer_direkt") == "1" else 0))
     return redirect(url_for("wohnung", wid=wid) + "#abrechnung")
 
 
@@ -623,8 +623,10 @@ def kosten_speichern(kid):
             row("SELECT id FROM mietverhaeltnis WHERE id = ? AND wohnung_id = ?", (mv_id, k["wohnung_id"]))
     # Gebäudekosten haben keinen eigenen Betrag mehr, er ist die Summe ihrer Buchungen.
     betrag = parse_num(f.get("betrag")) if k["wohnung_id"] else k["betrag"]
-    exe("UPDATE kosten SET kostenart_id = ?, betrag = ?, schluessel = ?, mv_id = ?, notiz = ? WHERE id = ?",
-        (kostenart_id, betrag, schl, mv_id, f.get("notiz", k["notiz"] or "").strip(), kid))
+    eig_direkt = (1 if f["eigentuemer_direkt"] == "1" else 0) if k["wohnung_id"] and "eigentuemer_direkt" in f \
+        else k["eigentuemer_direkt"]
+    exe("UPDATE kosten SET kostenart_id = ?, betrag = ?, schluessel = ?, mv_id = ?, notiz = ?, eigentuemer_direkt = ? "
+        "WHERE id = ?", (kostenart_id, betrag, schl, mv_id, f.get("notiz", k["notiz"] or "").strip(), eig_direkt, kid))
     exe("UPDATE buchung SET kostenart_id = ? WHERE kosten_id = ?", (kostenart_id, kid))
     return zurueck()
 
@@ -642,8 +644,9 @@ def kosten_loeschen(kid):
 def vorjahr_uebernehmen(iid):
     j = jahr()
     con = db.get_db()
-    con.execute("""INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, schluessel, notiz, haus)
-                   SELECT immobilie_id, ?, wohnung_id, NULL, kostenart_id, 0, schluessel, notiz, haus
+    con.execute("""INSERT INTO kosten (immobilie_id, jahr, wohnung_id, mv_id, kostenart_id, betrag, schluessel, notiz, haus,
+                                      eigentuemer_direkt)
+                   SELECT immobilie_id, ?, wohnung_id, NULL, kostenart_id, 0, schluessel, notiz, haus, eigentuemer_direkt
                    FROM kosten WHERE immobilie_id = ? AND jahr = ? AND mv_id IS NULL ORDER BY id""",
                 (j, iid, j - 1))
     con.commit()

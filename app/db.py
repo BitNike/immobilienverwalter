@@ -347,6 +347,11 @@ MIGRATIONEN = [
         PRIMARY KEY (immobilie_id, kostenart_id)
     );
     """,
+    # 22: Kosten der Wohnung, die der Eigentümer direkt zahlt (Müll, Grundsteuer) statt über die WEG:
+    #     gehen an den Mieter, aber nicht in die Eigentümer-Abrechnung gegen das Hausgeld
+    """
+    ALTER TABLE kosten ADD COLUMN eigentuemer_direkt INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

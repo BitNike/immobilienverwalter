@@ -2,6 +2,12 @@
 {% from "_ui.html" import icon, reiter_leiste, wohnung_felder, speichern, loeschen, jahr_umschalter, upload_felder, dokumentliste, saldo, kostenart_auswahl, pruefliste, doppelt_rueckfrage, ablage_bereich, info %}
 {% from "_ui.html" import zaehler_bereich with context %}
 {% from "_vertraege.html" import vertraege_bereich with context %}
+{% macro bezahlt_wahl(wert, form=None) -%}
+<select name="eigentuemer_direkt" {% if form %}form="{{ form }}"{% endif %} title="Wer zahlt die Rechnung?">
+  <option value="0" {{ 'selected' if not wert }}>über die WEG</option>
+  <option value="1" {{ 'selected' if wert }}>Eigentümer direkt</option>
+</select>
+{%- endmacro %}
 {% block title %}{{ w.bezeichnung }}{% endblock %}
 {% block content %}
 {% set bearbeiten = request.args.get('bearbeiten')|int %}
@@ -75,7 +81,7 @@
     <tr class="weg">
       <th>Eigentümer-Abrechnung (WEG)<br><small class="leise">gesamte Wohnung gegenüber der WEG</small></th>
       <td>{{ erg.monate|monate }} Monate</td><td></td>
-      <th class="zahl">{{ r.summe|eur }}</th>
+      <th class="zahl">{{ r.summe_weg|eur }}{% if r.summe_weg != r.summe %}<br><small class="leise" title="Kosten, die der Eigentümer direkt zahlt, gehören nicht in die Abrechnung gegenüber der WEG">ohne {{ (r.summe - r.summe_weg)|eur }} direkt gezahlt</small>{% endif %}</th>
       <td class="zahl">{% if erg.hausgeld_buchungen.get(w.id) %}{{ r.vorauszahlung|eur }}<br><small class="leise">aus {{ erg.hausgeld_buchungen[w.id] }} Buchung{{ 'en' if erg.hausgeld_buchungen[w.id] != 1 }}</small>
           {% elif darf %}<input class="betrag" form="vz" name="vz_eigentuemer" inputmode="decimal"
           value="{{ vz_gespeichert[None]|num if None in vz_gespeichert else '' }}" placeholder="Hausgeld" title="An die WEG gezahltes Hausgeld">{% else %}{{ r.vorauszahlung|eur }}{% endif %}</td>
@@ -106,7 +112,8 @@
       <td><select name="mv_id" form="k{{ dk.id }}">
           <option value="">Wohnung – zeitanteilig auf die Mieter</option>
           {% for p in r.parteien %}<option value="{{ p.mv.id }}" {{ 'selected' if p.mv.id == dk.mv_id }}>Für Mieter {{ mv_name(p.mv) }} (100 %)</option>{% endfor %}
-        </select></td>
+        </select>
+        {% if immo.weg or extern %}{{ bezahlt_wahl(dk.eigentuemer_direkt, form="k%d" % dk.id) }}{% endif %}</td>
       <td class="zahl">{{ po.gesamt|eur }}</td>
       <td class="zahl"><input class="betrag" name="betrag" form="k{{ dk.id }}" inputmode="decimal" value="{{ dk.betrag|num }}" required></td>
       <td class="aktionen">
@@ -120,6 +127,7 @@
     <tr>
       <td>{{ po.kostenart }}{% if not po.umlagefaehig %} <small class="warnung">nicht umlagefähig</small>{% endif %}</td>
       <td>{% if dk %}{% if dk.mv_id %}direkt für Mieter{% for p in r.parteien if p.mv.id == dk.mv_id %} {{ mv_name(p.mv) }}{% endfor %}{% else %}Kosten der Wohnung, zeitanteilig{% endif %}
+          {% if dk.eigentuemer_direkt and (immo.weg or extern) %}<br><small class="leise">zahlt der Eigentümer direkt, nicht in der Eigentümer-Abrechnung</small>{% endif %}
           {% if dk.notiz %}<br><small class="leise notiz">{{ dk.notiz }}</small>{% endif %}
           {% else %}{{ po.basis }}<br><small class="leise">Gebäudekosten der Immobilie</small>{% endif %}</td>
       <td class="zahl">{{ po.gesamt|eur }}</td>
@@ -143,10 +151,10 @@
   <details>
     <summary>{{ icon('plus') }} Kosten nur für diese Wohnung erfassen</summary>
     <p class="meldung">Hier nur Kosten erfassen, die <strong>allein diese Wohnung</strong> betreffen.
-      Rechnungen für das ganze Haus (z. B. Gebäudeversicherung, Schornsteinfeger, Müll, Allgemeinstrom) gehören zu den
+      Rechnungen für das ganze Haus (z. B. Gebäudeversicherung, Schornsteinfeger, Allgemeinstrom) gehören zu den
       {% if ist_admin %}<a href="{{ url_for('immobilie', iid=immo.id) }}#kosten">Gebäudekosten der Immobilie</a>{% else %}Gebäudekosten der Immobilie{% endif %}
       und werden von dort automatisch verteilt.</p>
-    <p class="leise">Zum Beispiel die Heizkostenabrechnung des Messdienstes oder die Grundsteuer der Wohnung.
+    <p class="leise">Zum Beispiel die Heizkostenabrechnung des Messdienstes, die Grundsteuer oder die Müllgebühr der Wohnung.
       „Für Mieter …“ = der Betrag gilt bereits für dessen Zeitraum und wird zu 100 % umgelegt.</p>
     <form method="post" action="{{ url_for('wohnung_kosten_neu', wid=w.id) }}" class="zeile" {{ doppelt_rueckfrage(vorhanden, jahr) }}>
       <label>Kostenart{{ kostenart_auswahl(kostenarten) }}</label>
@@ -157,6 +165,7 @@
           {% for p in r.parteien %}<option value="{{ p.mv.id }}">Für Mieter {{ mv_name(p.mv) }} (100 %)</option>{% endfor %}
         </select>
       </label>
+      {% if immo.weg or extern %}<label><span>Bezahlt {{ info("Über die WEG: Die Gemeinschaft zahlt die Rechnung (z. B. Heizkostenabrechnung des Messdienstes), sie gehört in die Eigentümer-Abrechnung gegen das Hausgeld.\n\nEigentümer direkt: Der Bescheid geht an den Eigentümer (z. B. Müllgebühr, Grundsteuer). Die Kosten gehen nur in die Mieter-Abrechnung, nicht in die Abrechnung gegenüber der WEG.") }}</span>{{ bezahlt_wahl(0) }}</label>{% endif %}
       <label class="notizfeld">Notiz<textarea name="notiz" rows="1" placeholder="optional"></textarea></label>
       <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
     </form>

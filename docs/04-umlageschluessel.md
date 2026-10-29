@@ -29,7 +29,8 @@ Im Reiter **Umlageschlüssel** (nur Administrator):
   oder „Beschluss ETV 2026“. Die Grundlage erscheint bei den Gebäudekosten unter dem Schlüssel.
 - **nicht genutzt:** Die Kostenart verschwindet aus den Auswahllisten der Immobilie.
   Beim Mietobjekt bleibt sie wählbar. Beispiel: Die Müllgebühr zahlt in einer WEG jeder Eigentümer selbst,
-  also bei der WEG „nicht genutzt“, beim Mietobjekt als Kosten der Wohnung.
+  also bei der WEG „nicht genutzt“, beim Mietobjekt als Kosten der Wohnung mit „Bezahlt: Eigentümer direkt“
+  (siehe [Kosten der Wohnung](06-mieter.md#kosten-der-wohnung)).
 - Haken **„auf <Jahr> anwenden“**: setzt bereits vorhandene Gebäudekosten des Jahres auf die neue Regel.
 
 Weicht eine Kostenposition von der Regel ab, meldet das die Liste „Bitte prüfen“.
