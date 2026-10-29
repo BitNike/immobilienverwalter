@@ -29,7 +29,7 @@ der [`docker-compose.yml`](docker-compose.yml) einfügen. Mehr braucht es nicht,
 Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.25.1` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.26.1` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen, Erinnerungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.
@@ -54,9 +54,11 @@ Ausführlich im **[Handbuch](docs/README.md)**.
 - **Mieter** mit Ein- und Auszug, Vorauszahlungen, Mietvertragsangaben; Kosten zeitanteilig nach Monaten,
   Leerstand und nicht umlagefähige Kosten trägt der Eigentümer.
 - **WEG:** Eigentümer-Abrechnung gegen das Hausgeld, Hausgeld als Buchung, Eigentümer ohne Zugang,
+  Kosten der Wohnung „über die WEG“ oder „vom Eigentümer direkt“ bezahlt (z. B. Müll, Grundsteuer),
   **Erhaltungsrücklage** als Kontoblatt mit Kontoständen.
 - **Zähler** für Wasser, Strom, Gas und Wärme mit Ablesungen und Zählertausch; Wasser nach Verbrauch verteilen.
-- **Verträge** mit Kündigungsterminen, Preisgarantie, Zählern und Unterlagen; **Erinnerungen per E-Mail**.
+- **Verträge** mit Kündigungsterminen, Preisgarantie, Zählern und Unterlagen, Abgleich mit den Buchungen;
+  **Erinnerungen per E-Mail**.
 - **Prüfliste „Bitte prüfen“** vor dem Export: fehlende MEA, ungespeicherte Vorauszahlungen, doppelte Kosten,
   Kosten aus dem Vorjahr, die noch fehlen, und mehr.
 - **Export als PDF:** Brief nach DIN 5008 für Fensterumschläge mit GiroCode, Belegliste und Belegen als Anlagen;
