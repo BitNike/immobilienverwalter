@@ -10,6 +10,8 @@
 
 Web-App im Docker-Container für Vermieter: Immobilien, Mietobjekte, Mieter, Zähler, Belege und die jährliche Betriebskostenabrechnung (§ 556 BGB, § 2 BetrKV).
 
+📖 **[Handbuch](docs/README.md)**: Anleitung zu allen Funktionen, mit einem durchgerechneten WEG-Beispiel.
+
 ## Installation
 
 ### Mit dem fertigen Image (empfohlen)
@@ -45,7 +47,7 @@ docker compose -f docker-compose.build.yml up -d --build
 - **Immobilie** (links): nur der Admin legt sie an, mit Anschrift, Absender, IBAN und Dokumenten.
 - **Mietobjekt** (mittlere Spalte): Wohnung mit Wohnfläche, MEA, Zählern und Eigentümer. Vorgefertigte Wohnungen pflegst du unter Einstellungen → Administration → Mietobjekte.
 - **Mietverhältnis**: eine oder mehrere Personen, Ein- und Auszug, Vorauszahlung. Jedes Mietverhältnis erhält eine fortlaufende Nummer und einen eigenen Ordner, z. B. `001 - Gerber`.
-- **Reiter** unter dem Seitenkopf: Immobilie mit Übersicht, Buchungen, Rücklage, Zähler, Dokumente und Stammdaten; Mietobjekt mit Abrechnung, Mieter, Zähler, Dokumente und Stammdaten.
+- **Reiter** unter dem Seitenkopf: Immobilie mit Übersicht, Buchungen, Rücklage, Zähler, Verträge, Dokumente, Stammdaten und Umlageschlüssel; Mietobjekt mit Abrechnung, Mieter, Zähler, Verträge, Dokumente und Stammdaten.
 - **Jahr-Umschalter** (‹ 2025 ›) oben rechts, um rückwirkend zu arbeiten. Mit „Kostenarten aus Vorjahr übernehmen“ legst du ein neues Jahr schnell an.
 
 ### Kosten
