@@ -29,9 +29,9 @@ der [`docker-compose.yml`](docker-compose.yml) einfügen. Mehr braucht es nicht,
 Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.10.1` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.25.1` eintragen.
 
-E-Mail-Versand (Passwort vergessen, Einladungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
+E-Mail-Versand (Passwort vergessen, Einladungen, Erinnerungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.
 
 ### Aus dem Quellcode (für Entwickler)
@@ -42,45 +42,28 @@ cd immobilienverwalter
 docker compose -f docker-compose.build.yml up -d --build
 ```
 
-## Aufbau
+## Funktionen
 
-- **Immobilie** (links): nur der Admin legt sie an, mit Anschrift, Absender, IBAN und Dokumenten.
-- **Mietobjekt** (mittlere Spalte): Wohnung mit Wohnfläche, MEA, Zählern und Eigentümer. Vorgefertigte Wohnungen pflegst du unter Einstellungen → Administration → Mietobjekte.
-- **Mietverhältnis**: eine oder mehrere Personen, Ein- und Auszug, Vorauszahlung. Jedes Mietverhältnis erhält eine fortlaufende Nummer und einen eigenen Ordner, z. B. `001 - Gerber`.
-- **Reiter** unter dem Seitenkopf: Immobilie mit Übersicht, Buchungen, Rücklage, Zähler, Verträge, Dokumente, Stammdaten und Umlageschlüssel; Mietobjekt mit Abrechnung, Mieter, Zähler, Verträge, Dokumente und Stammdaten.
-- **Jahr-Umschalter** (‹ 2025 ›) oben rechts, um rückwirkend zu arbeiten. Mit „Kostenarten aus Vorjahr übernehmen“ legst du ein neues Jahr schnell an.
+Ausführlich im **[Handbuch](docs/README.md)**.
 
-### Kosten
-
-| Wo erfasst | Verteilung |
-|---|---|
-| Immobilie, Belege und Buchungen | je Kostenart zusammengezählt, auf die Mietobjekte nach MEA, Wohnfläche, Einheiten oder Wasserverbrauch |
-| Mietobjekt | zeitanteilig nach Monaten auf die Mieter |
-| Mietobjekt, „für Mieter …“ | zu 100 % für diesen Mieter (z. B. Heizkostenabrechnung des Messdienstes) |
-
-Gebäudekosten erfasst du als Buchungen, eine Zeile je Rechnung oder Kassenbon (Datum, Beschreibung, Kostenart, Betrag, Konto oder bar ausgelegt, optional mit Belegfoto). Einnahmen mindern die Kostenart. Bar Ausgelegtes bleibt als „noch nicht erstattet“ markiert, bis du die Erstattung einträgst.
-
-**Daueraufträge:** wiederkehrende Zahlungen (z. B. Hausmeister, Hausgeld) je Jahr anlegen; die App bucht eine Jahressumme mit Rechenweg oder je Termin einzeln. Im neuen Jahr werden sie aus dem Vorjahr übernommen und geprüft.
-
-**Hausgeld (WEG):** Überweisungen der Eigentümer als Buchungen erfassen – für eine Wohnung oder gleichmäßig für alle Wohnungen eines Eigentümers. Die Summe geht in die Eigentümer-Abrechnung. Buchungen lassen sich filtern und durchsuchen.
-
-**Verträge:** je Immobilie oder Mietobjekt mit Laufzeit, Kündigungsfrist und Preisgarantie; die App berechnet den nächsten Kündigungstermin und erinnert per E-Mail (Einstellungen → Erinnerungen). Mietverträge: Kaltmiete, Befristung und Staffel-/Indexmiete am Mietverhältnis.
-
-**Erhaltungsrücklage (WEG):** Buchungen mit dem Ziel „Erhaltungsrücklage“ werden nicht umgelegt; Einnahmen (z. B. PV-Anlage) fließen hinein, Ausgaben werden entnommen. Die Zuführung kommt aus einer Kostenart mit Haken „Rücklage“. Anfangsbestand, Zuführung, Einnahmen, Entnahmen und Endbestand stehen auf der Immobilie und in der Eigentümer-Abrechnung. Dazu Kontostände je Konto (z. B. Girokonto, Tagesgeld) zum Stichtag laut Kontoauszug, mit Abgleich gegen die Rücklage.
-
-Auf Leerstand entfallende und nicht umlagefähige Kosten trägt der Eigentümer. Der Wasserverbrauch ergibt sich aus den Zählerständen. Bei einem Zählertausch bleibt der alte Zähler mit seinen Ständen erhalten.
-
-### Export
-
-Pro Mietobjekt gibt es eine **Mieter-Abrechnung** und eine **Eigentümer-Abrechnung** (z. B. für eine WEG). Der Export erzeugt ein PDF mit Deckblatt; wählbar sind die Erhaltungsrücklage, eine Belegliste nach Kostenart (Mieter sehen nur umlagefähige Kosten) und die hochgeladenen Belege als Anlagen. Vorher siehst du eine Vorschau.
-
-### Benutzergruppen
-
-| Gruppe | Rechte |
-|---|---|
-| Administrator | alles |
-| Vermieter + | sieht die eigenen Mietobjekte und darf dort Mieter, Zählerstände, Kosten und Vorauszahlungen eintragen |
-| Vermieter | sieht die eigenen Mietobjekte, nur lesend |
+- **Immobilien und Mietobjekte** mit Wohnfläche, MEA, Eigentümer, mehreren Häusern je Immobilie und Archiv.
+- **Umlageschlüssel je Immobilie** (MEA, Wohnfläche, Einheiten, Wasserverbrauch) mit Grundlage, z. B. aus der Teilungserklärung;
+  cent-genaue Verteilung. Kostenarten nach § 2 BetrKV pflegt der Administrator.
+- **Buchungen** statt Kostensummen: eine Zeile je Rechnung, mit Beleg, Barauslagen, Filter und Suche.
+  **Daueraufträge** je Jahr (Jahressumme oder einzeln).
+- **Mieter** mit Ein- und Auszug, Vorauszahlungen, Mietvertragsangaben; Kosten zeitanteilig nach Monaten,
+  Leerstand und nicht umlagefähige Kosten trägt der Eigentümer.
+- **WEG:** Eigentümer-Abrechnung gegen das Hausgeld, Hausgeld als Buchung, Eigentümer ohne Zugang,
+  **Erhaltungsrücklage** als Kontoblatt mit Kontoständen.
+- **Zähler** für Wasser, Strom, Gas und Wärme mit Ablesungen und Zählertausch; Wasser nach Verbrauch verteilen.
+- **Verträge** mit Kündigungsterminen, Preisgarantie, Zählern und Unterlagen; **Erinnerungen per E-Mail**.
+- **Prüfliste „Bitte prüfen“** vor dem Export: fehlende MEA, ungespeicherte Vorauszahlungen, doppelte Kosten,
+  Kosten aus dem Vorjahr, die noch fehlen, und mehr.
+- **Export als PDF:** Brief nach DIN 5008 für Fensterumschläge mit GiroCode, Belegliste und Belegen als Anlagen;
+  Mieter- und Eigentümer-Abrechnung je Mietobjekt.
+- **Dokumente:** Belege je Jahr und eine Ablage (Protokolle, Pläne, Verträge) mit zentraler Suche.
+- **Benutzer:** Administrator, Vermieter + (darf Zahlen eintragen), Vermieter (nur lesen), Ohne Zugang;
+  Zwei-Faktor-Anmeldung.
 
 ## Daten & Backup
 
@@ -100,7 +83,7 @@ Volume an. Bei einer Neuinstallation ist nichts zu tun, die Volumes entstehen be
 
 ## Sicherheit
 
-Gedacht für das Heimnetz. Bevor die App ins Internet geht, sind HTTPS (Reverse Proxy) und ein CSRF-Schutz für die Formulare nötig.
+Gedacht für das Heimnetz. Bevor die App ins Internet geht, sind HTTPS (Reverse Proxy) und ein CSRF-Schutz für die Formulare nötig. Für Administratoren empfiehlt sich die Zwei-Faktor-Anmeldung (Profil → Sicherheit).
 
 ## Entwicklung
 
