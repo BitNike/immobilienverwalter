@@ -20,8 +20,16 @@ Die Liste zeigt je Vertrag den Status, die Kosten im Jahr, die verbundenen Zähl
 und die Unterlagen. Angehängte Dateien landen in der Ablage unter „Verträge & Versicherungen“ und bleiben dort,
 auch wenn der Vertrag gelöscht wird.
 
-Bei Verträgen der Immobilie mit Kostenart schlägt der Knopf **„Dauerauftrag fürs angezeigte Jahr“** einen
-passenden Dauerauftrag vor. Gebucht wird weiterhin im Reiter Buchungen.
+**Vertrag und Buchungen:** Der Betrag im Vertrag ist der vereinbarte Preis, er bucht noch nichts.
+Gebucht wird im Reiter Buchungen nach Rechnung bzw. Kontoauszug, denn die tatsächlichen Beträge weichen oft ab
+(Beitragsanpassung, Nachzahlung). Hat ein Vertrag der Immobilie eine **Kostenart**, zeigt die Liste unter den Kosten:
+
+- „gebucht 2026: …“, wenn es Buchungen dieser Kostenart im Jahr gibt
+- „Dauerauftrag 2026 vorhanden, noch nicht gebucht“
+- „2026 noch nicht gebucht“ mit dem Knopf **„Dauerauftrag anlegen“**: legt einen passenden Dauerauftrag
+  fürs angezeigte Jahr an, den du im Reiter Buchungen prüfst und buchst
+
+Ohne Kostenart steht dort „ohne Kostenart“, dann ist der Vertrag nicht mit den Buchungen verbunden.
 
 ## Mietverträge
 

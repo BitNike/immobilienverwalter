@@ -635,8 +635,16 @@ def test_gesamter_ablauf():
     post(c, f"/vertraege/{vid}", data={"art": "Gebäudeversicherung", "anbieter": "Muster AG", "betrag": "1.250",
                                        "zahlweise": "jaehrlich", "beginn": "2020-01-01", "verlaengerung": "12", "frist": "3",
                                        "kostenart_id": ka["Gebäudeversicherung"], "erinnern": "on"})
+    # Vertragsliste zeigt, was zur Kostenart gebucht ist; ohne Buchung den beschrifteten Knopf
+    gebucht = dbcon.execute("SELECT COUNT(*) FROM buchung WHERE immobilie_id = 1 AND jahr = 2026 AND kostenart_id = ?",
+                            (ka["Gebäudeversicherung"],)).fetchone()[0]
+    seite = ok(c.get("/immobilien/1?reiter=vertraege&jahr=2026")).get_data(as_text=True)
+    assert ("gebucht 2026:" in seite) if gebucht else ("2026 noch nicht gebucht" in seite and "Dauerauftrag anlegen" in seite)
     r = post(c, f"/vertraege/{vid}/dauerauftrag")
     assert r.headers["Location"].endswith("reiter=buchungen#dauerauftraege")
+    if not gebucht:
+        assert "Dauerauftrag 2026 vorhanden, noch nicht gebucht" in \
+            ok(c.get("/immobilien/1?reiter=vertraege")).get_data(as_text=True)
     assert dbcon.execute("SELECT betrag, rhythmus, von, bis FROM dauerauftrag WHERE text = 'Gebäudeversicherung · Muster AG'"
                          ).fetchone() == (1250.0, "jahr", "2026-01-01", "2026-12-31")
     dbcon.execute("DELETE FROM dauerauftrag WHERE text = 'Gebäudeversicherung · Muster AG'")

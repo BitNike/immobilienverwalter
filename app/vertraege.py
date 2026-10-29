@@ -112,6 +112,14 @@ def vertraege(iid, wid=None, heute=None, nur_sichtbare=True, j=None):
                 z["staende"] = [(s["datum"], s["stand"]) for s in
                                 rows("SELECT datum, stand FROM zaehlerstand WHERE zaehler_id = ?", (z["id"],))]
             v["zaehler_verbrauch"] = verbrauch_zeitraum(v["zaehler"], date(j, 1, 1), date(j, 12, 31))
+        # Vertrag der Immobilie mit Kostenart: was im Jahr dazu gebucht ist (der Vertragsbetrag selbst bucht nichts)
+        v["gebucht"] = v["dauerauftrag"] = None
+        if j and not v["wohnung_id"] and v["kostenart_id"]:
+            v["gebucht"] = rund(one("SELECT COALESCE(SUM(CASE art WHEN 'einnahme' THEN -betrag ELSE betrag END), 0) AS s "
+                                    "FROM buchung WHERE immobilie_id = ? AND jahr = ? AND kostenart_id = ?",
+                                    (iid, j, v["kostenart_id"]))["s"])
+            v["dauerauftrag"] = bool(one("SELECT 1 FROM dauerauftrag WHERE immobilie_id = ? AND jahr = ? AND kostenart_id = ?",
+                                         (iid, j, v["kostenart_id"])))
         v["unterlagen"] = rows("SELECT * FROM ablage WHERE vertrag_id = ?" + ("" if ist_admin() else " AND intern = 0")
                                + " ORDER BY titel COLLATE NATUERLICH", (v["id"],)) if nur_sichtbare else []
     return erg

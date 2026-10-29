@@ -9,10 +9,10 @@
     <label>Anbieter<input name="anbieter" value="{{ v.anbieter or '' }}" placeholder="z. B. Stadtwerke"></label>
     <label>Vertragsnummer<input name="vertragsnummer" value="{{ v.vertragsnummer or '' }}"></label>
     <label>Kundennummer<input name="kundennummer" value="{{ v.kundennummer or '' }}"></label>
-    <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" value="{{ v.betrag|num if v.betrag else '' }}"></label>
+    <label><span>Betrag (€) {{ info("Der vertraglich vereinbarte Preis. Er bucht noch nichts: Gebucht wird im Reiter Buchungen nach Rechnung bzw. Kontoauszug.\n\nMit einer Kostenart zeigt die Vertragsliste, was im Jahr gebucht ist, und bietet „Dauerauftrag anlegen“ an.") }}</span><input class="betrag" name="betrag" inputmode="decimal" value="{{ v.betrag|num if v.betrag else '' }}"></label>
     <label>Zahlweise<select name="zahlweise">{% for z, (t, _, _) in ZAHLWEISEN.items() %}<option value="{{ z }}" {{ 'selected' if (v.zahlweise or 'monatlich') == z }}>{{ t }}</option>{% endfor %}</select></label>
     {% if ist_immobilie %}
-    <label><span>Kostenart {{ info("Optional. Nur nötig, wenn du aus dem Vertrag per Knopf einen Dauerauftrag für die Buchungen anlegen willst.") }}</span><select name="kostenart_id"><option value="">– keine –</option>
+    <label><span>Kostenart {{ info("Verbindet den Vertrag mit den Buchungen dieser Kostenart: Die Liste zeigt dann, was im Jahr gebucht ist, und bietet „Dauerauftrag anlegen“ an.") }}</span><select name="kostenart_id"><option value="">– keine –</option>
       {% for k in kostenarten %}<option value="{{ k.id }}" {{ 'selected' if v.kostenart_id == k.id }}>{{ k.name }}</option>{% endfor %}</select></label>
     {% endif %}
   </div>
@@ -96,7 +96,17 @@
       {% if v.zaehler_verbrauch is not none %}<br>Verbrauch {{ jahr }} laut Zähler: {{ v.zaehler_verbrauch|num(0) }} {{ EINHEITEN[v.zaehler[0].art] }}{% endif %}
       {% if v.notiz %}<br><span class="notiz">{{ v.notiz }}</span>{% endif %}</small></td>
     <td class="zahl">{{ v.betrag|eur }}<br><small class="leise">{{ ZAHLWEISEN[v.zahlweise][0] }}{% if ZAHLWEISEN[v.zahlweise][1] > 1 %} · {{ v.jahr|eur }}/Jahr{% endif %}</small>
-      {% if v.tarif is not none %}<br><small class="leise" title="Verbrauch × Arbeitspreis + 12 × Grundpreis">Tarif: {{ v.tarif|eur }}/Jahr</small>{% endif %}</td>
+      {% if v.tarif is not none %}<br><small class="leise" title="Verbrauch × Arbeitspreis + 12 × Grundpreis">Tarif: {{ v.tarif|eur }}/Jahr</small>{% endif %}
+      {% if v.gebucht is not none and t.status != 'beendet' %}
+        {% if v.gebucht %}<br><small class="leise" title="Buchungen {{ jahr }} mit der Kostenart {{ v.kostenart }}">gebucht {{ jahr }}: {{ v.gebucht|eur }}</small>
+        {% elif v.dauerauftrag %}<br><small class="leise">Dauerauftrag {{ jahr }} vorhanden, noch nicht gebucht</small>
+        {% else %}<br><small class="warnung">{{ jahr }} noch nicht gebucht</small>
+          {% if ist_admin and v.betrag and ZAHLWEISEN[v.zahlweise][2] %}
+          <br><form method="post" action="{{ url_for('vertrag_dauerauftrag', vid=v.id) }}" class="inline">
+            <button class="btn klein" title="Dauerauftrag für {{ jahr }} anlegen, danach bei den Buchungen prüfen und buchen">{{ icon('list', 14) }}<span>Dauerauftrag anlegen</span></button></form>
+          {% endif %}
+        {% endif %}
+      {% elif not v.wohnung_id and v.betrag and not v.kostenart_id %}<br><small class="leise" title="Ohne Kostenart ist der Vertrag nicht mit den Buchungen verbunden">ohne Kostenart</small>{% endif %}</td>
     <td>{% if t.ende %}{{ t.ende|datum(True) }}{% else %}<span class="leise">–</span>{% endif %}
       <br><small class="leise">{% if t.status in ('gekuendigt', 'beendet', 'endet') %}endet{% elif t.flexibel %}laufend kündbar{% else %}verlängert sich {{ VERLAENGERUNG[v.verlaengerung] }}{% endif %}</small></td>
     <td>{% if t.kuendigen_bis and not t.flexibel %}{{ t.kuendigen_bis|datum(True) }}<br><small class="{{ 'warnung' if t.status == 'bald' else 'leise' }}">noch {{ t.tage }} Tage</small>
@@ -104,9 +114,6 @@
       {% if v.preis and not v.preis.vorbei %}<br><small class="{{ 'warnung' if v.preis.bald else 'leise' }}">Preisgarantie bis {{ v.preis.datum|datum(True) }}</small>{% endif %}</td>
     <td><span class="marke status-{{ t.status }}">{{ VERTRAG_STATUS[t.status] }}</span>{% if not v.erinnern %}<br><small class="leise">ohne Erinnerung</small>{% endif %}</td>
     <td class="aktionen">
-      {% if ist_admin and not v.wohnung_id and v.kostenart_id and ZAHLWEISEN[v.zahlweise][2] and t.status != 'beendet' %}
-      <form method="post" action="{{ url_for('vertrag_dauerauftrag', vid=v.id) }}" class="inline">
-        <button class="btn-icon" title="Dauerauftrag für {{ jahr }} anlegen (danach bei den Buchungen prüfen und buchen)">{{ icon('list', 16) }}</button></form>{% endif %}
       {% if (v.wohnung_id and wohnung_bearbeitbar({'eigentuemer_id': v.eigentuemer_id})) or ist_admin %}
       <a class="btn-icon" href="{{ request.base_url }}?reiter=vertraege&vertrag={{ v.id }}#vertrag-formular" title="Bearbeiten">{{ icon('edit', 16) }}</a>
       <form method="post" action="{{ url_for('vertrag_loeschen', vid=v.id) }}" class="inline" onsubmit="return confirm({{ ('Vertrag „%s“ löschen?' % v.art)|tojson|forceescape }})">
