@@ -194,6 +194,21 @@ def vorhandene_kostenarten(iid, j, wid=None):
     return orte
 
 
+def fehlende_kostenarten(iid, j, wid=None):
+    """Kostenarten, die im Vorjahr Kosten hatten und im Jahr j noch nicht – ohne wid die Gebäudekosten (ohne die
+    „nicht genutzten“), sonst die Kosten der Wohnung. Erinnert an feste Kosten; fällt eine weg, meldet sie sich nur ein Jahr."""
+    ort, args = ("k.wohnung_id IS NULL", (iid,)) if wid is None else ("k.wohnung_id = ?", (iid, wid))
+
+    def arten(jahr_):
+        return {r["id"]: r["name"] for r in rows(
+            f"SELECT DISTINCT ka.id, ka.name FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id "
+            f"WHERE k.immobilie_id = ? AND {ort} AND k.jahr = ? AND k.betrag <> 0 AND ka.aktiv = 1",
+            args + (jahr_,))}
+    vorher, jetzt = arten(j - 1), arten(j)
+    ungenutzt = {k for k, r in kostenart_regeln(iid).items() if r["ungenutzt"]} if wid is None else set()
+    return sorted((name for k, name in vorher.items() if k not in jetzt and k not in ungenutzt), key=str.lower)
+
+
 def pruefungen(immo, erg, wids, ganze_immobilie=False):
     """Offene Punkte vor dem Export: 'fehler' verfälschen die Abrechnung, 'hinweis' sollte man ansehen."""
     punkte = []
@@ -228,6 +243,10 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         if rl["vorhanden"] and rl["anfang"] is None:
             punkt("Erhaltungsrücklage: Der Anfangsbestand fehlt, der Endbestand stimmt deshalb nicht.",
                   url_for("immobilie", iid=immo["id"], reiter="ruecklage"), "hinweis")
+    j = jahr()
+    for name in fehlende_kostenarten(immo["id"], j):
+        punkt(f"{name}: {j - 1} gab es Gebäudekosten, {j} noch nicht. Fällt sie weg, im Reiter Umlageschlüssel "
+              "„nicht genutzt“ anhaken.", url_for("immobilie", iid=immo["id"], reiter="buchungen"), "hinweis")
     schluessel = {gk["kosten"]["schluessel"] for gk in erg["gebaeude"] if not gk["warnung"]}
     if not immo["iban"] and any(not erg["wohnungen"][i]["wohnung"]["iban"] for i in wids if i in erg["wohnungen"]):
         punkt("Bei der Immobilie ist keine IBAN hinterlegt; im Brief fehlt dann die Bankverbindung.",
@@ -256,6 +275,9 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
             if (wid, p["mv"]["id"]) not in erg["vz_gespeichert"]:
                 punkt(f"{w['bezeichnung']}: Die Vorauszahlung von {mv_name(p['mv'])} ist nur vorgeschlagen "
                       f"({de_num(p['vorauszahlung_soll'])} €) und noch nicht gespeichert.", abrechnung)
+        for name in fehlende_kostenarten(immo["id"], j, wid):
+            punkt(f"{w['bezeichnung']}: „{name}“ war {j - 1} bei den Kosten der Wohnung, {j} noch nicht.",
+                  abrechnung, "hinweis")
         gezaehlt = {}
         for po in r["posten"]:
             gezaehlt[po["kostenart"]] = gezaehlt.get(po["kostenart"], 0) + 1

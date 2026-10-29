@@ -546,6 +546,25 @@ def test_gesamter_ablauf():
                                         (tid, instand))} == {"flaeche"}
     assert "Regel der Immobilie" not in ok(c.get(f"/immobilien/{tid}")).get_data(as_text=True)
     assert dbcon.execute("SELECT COUNT(*) FROM immobilie_kostenart WHERE immobilie_id = ?", (tid,)).fetchone()[0] == 2
+    # Feste Kosten: im Vorjahr vorhanden, im Jahr noch nicht → Hinweis (ungenutzte nicht, Gebäudekosten auch beim Mietobjekt)
+    vers = dbcon.execute("SELECT id FROM kostenart WHERE name = 'Gebäudeversicherung'").fetchone()[0]
+    muell = dbcon.execute("SELECT id FROM kostenart WHERE name = 'Müllentsorgung'").fetchone()[0]
+    dbcon.executemany("INSERT INTO kosten (immobilie_id, jahr, wohnung_id, kostenart_id, betrag) VALUES (?, 2025, ?, ?, ?)",
+                      [(tid, None, vers, 500), (tid, None, int(aufzug), 80), (tid, None, int(hm), 100), (tid, h1, muell, 90)])
+    dbcon.commit()
+    seite = ok(c.get(f"/immobilien/{tid}?jahr=2026")).get_data(as_text=True)
+    assert "Gebäudeversicherung: 2025 gab es Gebäudekosten, 2026 noch nicht" in seite and "Aufzug: 2025" in seite
+    assert "Hausmeister: 2025" not in seite
+    post(c, f"/immobilien/{tid}/umlageschluessel", data={f"s_{instand}": "flaeche", f"s_{hm}": "einheiten",
+                                                         f"u_{aufzug}": "on"})
+    seite = ok(c.get(f"/immobilien/{tid}?jahr=2026")).get_data(as_text=True)
+    assert "Aufzug: 2025" not in seite and "Gebäudeversicherung: 2025" in seite
+    assert "H1: „Müllentsorgung“ war 2025 bei den Kosten der Wohnung, 2026 noch nicht." in seite
+    seite = ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)
+    assert "Gebäudeversicherung: 2025 gab es" in seite and "„Müllentsorgung“ war 2025" in seite
+    assert "„Müllentsorgung“ war" not in ok(c.get(f"/wohnungen/{h2}")).get_data(as_text=True)
+    post(c, f"/wohnungen/{h1}/kosten", data={"kostenart_id": str(muell), "betrag": "95"})
+    assert "„Müllentsorgung“ war" not in ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)
     post(c, f"/immobilien/{tid}/loeschen")
     assert dbcon.execute("SELECT COUNT(*) FROM immobilie_kostenart").fetchone()[0] == 0
     c.get("/immobilien/1?jahr=2026")
