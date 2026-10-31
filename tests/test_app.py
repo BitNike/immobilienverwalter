@@ -9,6 +9,7 @@ TMP = tempfile.mkdtemp()
 os.environ["NK_DATA"] = os.path.join(TMP, "data")
 os.environ["NK_DOKUMENTE"] = os.path.join(TMP, "dokumente")
 os.environ["NK_ERINNERUNG"] = "aus"  # keine Hintergrund-Prüfung im Test
+os.environ["NK_CSRF"] = "aus"  # CSRF-Feld nur in test_csrf, sonst müsste jeder POST es mitschicken
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 from PIL import Image  # noqa: E402
@@ -941,3 +942,29 @@ def test_gesamter_ablauf():
     assert "Protokoll Versammlung" in html and "Angebot Dach" not in html
     ok(a.post("/immobilien/1/ablage", data={"kategorie": "sonstiges", "dateien": pdf_datei()},
               content_type="multipart/form-data"), 403)
+
+
+def test_csrf():
+    """POST ohne das versteckte Feld der Sitzung wird abgewiesen, mit Feld angenommen; Feld steckt in jedem POST-Formular."""
+    import core
+    core.CSRF_AKTIV = True
+    try:
+        c = app.test_client()
+        seite = ok(c.get("/login")).get_data(as_text=True)
+        assert re.search(r'<form[^>]*method="post"[^>]*><input type="hidden" name="_csrf" value="[^"]+">', seite)
+        with c.session_transaction() as s:
+            s["uid"] = 1
+        r = ok(c.get("/profil"))
+        assert r.headers["X-Frame-Options"] == "SAMEORIGIN" and r.headers["X-Content-Type-Options"] == "nosniff"
+        token = re.search(r'name="_csrf" value="([^"]+)"', r.get_data(as_text=True)).group(1)
+        daten = {"vorname": "Max", "name": "Vermieter", "email": ""}
+        ok(c.post("/profil", data=daten), 302)
+        with c.session_transaction() as s:
+            assert any("Bitte noch einmal absenden" in m for _, m in s.pop("_flashes", []))
+        ok(c.post("/profil", data={**daten, "_csrf": "falsch"}), 302)
+        with c.session_transaction() as s:
+            assert any("Bitte noch einmal absenden" in m for _, m in s.pop("_flashes", []))
+        post(c, "/profil", data={**daten, "_csrf": token})
+        assert ok(c.get("/health")).get_json()["status"] == "ok"
+    finally:
+        core.CSRF_AKTIV = False

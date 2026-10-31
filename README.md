@@ -29,7 +29,7 @@ der [`docker-compose.yml`](docker-compose.yml) einfügen. Mehr braucht es nicht,
 Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.26.1` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.27.0` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen, Erinnerungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.
@@ -85,7 +85,7 @@ Volume an. Bei einer Neuinstallation ist nichts zu tun, die Volumes entstehen be
 
 ## Sicherheit
 
-Gedacht für das Heimnetz. Bevor die App ins Internet geht, sind HTTPS (Reverse Proxy) und ein CSRF-Schutz für die Formulare nötig. Für Administratoren empfiehlt sich die Zwei-Faktor-Anmeldung (Profil → Sicherheit).
+Gedacht für das Heimnetz. Formulare sind gegen untergeschobene Anfragen (CSRF) geschützt, dazu kommen übliche Sicherheits-Header. Bevor die App aus dem Internet erreichbar ist, gehört sie hinter einen Reverse Proxy mit HTTPS; für Administratoren empfiehlt sich die Zwei-Faktor-Anmeldung (Profil → Sicherheit). Mehr im [Handbuch](docs/13-betrieb.md#sicherheit).
 
 ## Entwicklung
 

@@ -35,5 +35,9 @@ unter Einstellungen → Erinnerungen setzen. „Jetzt prüfen und senden“ vers
 **Das Anschriftfeld sitzt nicht im Fenster des Umschlags.**
 Einstellungen → Logo & Brief → „Anschrift nach oben verschieben (mm)“.
 
+**Beim Speichern erscheint „Bitte noch einmal absenden“.**
+Die Seite war sehr lange geöffnet, oder du warst inzwischen ab- und wieder angemeldet. Das ist der Schutz gegen
+untergeschobene Formulare. Seite neu laden und die Eingabe wiederholen.
+
 **Ist das eine Rechtsberatung?**
 Nein. Die App ist eine Arbeitshilfe. Für die Richtigkeit der Abrechnung bist du selbst verantwortlich.

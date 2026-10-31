@@ -1,5 +1,6 @@
 """Flask-App, Datenbank-Helfer, Anmeldung, Rechte und Template-Filter."""
 import os
+import re
 import secrets
 from datetime import date
 from functools import wraps
@@ -10,7 +11,7 @@ import db
 from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
-VERSION = "0.26.1"
+VERSION = "0.27.0"
 NAME = "Immobilienverwalter"
 URL = "https://github.com/BitNike/immobilienverwalter"  # Projektseite (Fußzeile des Briefs, Seite „Über“)
 ENTWICKLER = "Sascha Benecke"
@@ -98,6 +99,44 @@ def gesundheit():
     """Für den Docker-Healthcheck: antwortet ohne Anmeldung, wenn App und Datenbank erreichbar sind."""
     one("SELECT 1 AS ok")
     return {"status": "ok", "version": VERSION}
+
+
+# ---------- Schutz gegen untergeschobene Formulare (CSRF) ----------
+# Jede Sitzung bekommt ein Geheimnis; after_request setzt es als verstecktes Feld in jedes POST-Formular,
+# before_request weist POSTs ohne passendes Feld ab. NK_CSRF=aus schaltet das ab (Tests).
+CSRF_AKTIV = os.environ.get("NK_CSRF", "an") != "aus"
+_POST_FORM = re.compile(r"<form\b[^>]*\bmethod=[\"']?post\b[^>]*>", re.I)
+
+
+def csrf_token():
+    if "_csrf" not in session:
+        session["_csrf"] = secrets.token_urlsafe(32)
+    return session["_csrf"]
+
+
+@app.before_request
+def csrf_pruefen():
+    if not CSRF_AKTIV or request.method != "POST":
+        return None
+    gesendet = request.form.get("_csrf") or request.headers.get("X-CSRF-Token") or ""
+    if session.get("_csrf") and secrets.compare_digest(gesendet, session["_csrf"]):
+        return None
+    flash("Die Seite war zu lange geöffnet oder das Formular kam von außerhalb. Bitte noch einmal absenden.", "fehler")
+    ziel = request.referrer if request.referrer and request.referrer.startswith(request.host_url) else url_for("start")
+    return redirect(ziel)
+
+
+@app.after_request
+def csrf_einsetzen(antwort):
+    if CSRF_AKTIV and antwort.mimetype == "text/html" and not antwort.direct_passthrough:
+        html = antwort.get_data(as_text=True)
+        if _POST_FORM.search(html):
+            feld = f'<input type="hidden" name="_csrf" value="{csrf_token()}">'
+            antwort.set_data(_POST_FORM.sub(lambda m: m.group(0) + feld, html))
+    antwort.headers.setdefault("X-Content-Type-Options", "nosniff")
+    antwort.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    antwort.headers.setdefault("Referrer-Policy", "same-origin")
+    return antwort
 
 
 @app.before_request

@@ -43,5 +43,19 @@ E-Mail-Versand ist optional und wird in der `.env` eingerichtet (`SMTP_HOST`, `S
 
 ## Sicherheit
 
-Die App ist für das Heimnetz gedacht. Bevor sie aus dem Internet erreichbar ist: HTTPS über einen Reverse Proxy,
-starke Passwörter und Zwei-Faktor-Anmeldung für Administratoren.
+Eingebaut:
+
+- **Schutz vor untergeschobenen Formularen (CSRF):** Jedes Formular enthält ein geheimes Feld der Sitzung.
+  Fehlt es oder passt es nicht, wird nichts gespeichert und es erscheint „Bitte noch einmal absenden“.
+  Das passiert auch, wenn eine Seite sehr lange offen war. Dann die Seite neu laden und noch einmal speichern.
+- Sitzungs-Cookie nur für die eigene Seite (`SameSite=Lax`, nicht per JavaScript lesbar).
+- Sicherheits-Header gegen Einbetten in fremde Seiten und falsch erkannte Dateitypen.
+- Passwörter nur als Hash, optional Zwei-Faktor-Anmeldung.
+
+Die App ist für das Heimnetz gedacht. Bevor sie aus dem Internet erreichbar ist:
+
+1. **HTTPS** über einen Reverse Proxy (z. B. Nginx Proxy Manager, Traefik, Caddy) und `APP_URL` auf die https-Adresse setzen.
+2. **Starke Passwörter** und **Zwei-Faktor-Anmeldung** für Administratoren.
+3. Regelmäßige **Sicherungen** und Updates.
+
+Für Entwickler: `NK_CSRF=aus` schaltet den CSRF-Schutz ab (nur für Tests gedacht).
