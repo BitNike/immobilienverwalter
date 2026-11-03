@@ -1132,3 +1132,26 @@ def test_vertrag_beleg():
     seite = ok(c.get(f"/immobilien/{iid}?reiter=vertraege&jahr=2026")).get_data(as_text=True)
     assert "Beleg 2026: Beitrag Versicherung" in seite and "Beitragsrechnung" in seite
     assert 'name="beleg_buchung"' not in ok(c.get(f"/immobilien/{iid}?reiter=vertraege&vertrag={vid}")).get_data(as_text=True)
+    # Buchung ohne Beleg (z. B. aus dem Dauerauftrag): Unterlage des Vertrags als Beleg übernehmen
+    neu = {"datum": "2026-06-01", "text": "Nachtrag Versicherung", "art": "ausgabe", "ziel": str(ka), "betrag": "50",
+           "bezahlt": "konto"}
+    post(c, f"/immobilien/{iid}/buchungen?jahr=2026", data=neu)
+    with app.app_context():
+        bid2 = core.one("SELECT id FROM buchung WHERE text = 'Nachtrag Versicherung'")["id"]
+    seite = ok(c.get(f"/immobilien/{iid}?reiter=buchungen&jahr=2026")).get_data(as_text=True)
+    assert "aus Vertrag" in seite
+    seite = ok(c.get(f"/immobilien/{iid}?reiter=buchungen&jahr=2026&buchung={bid2}&beleg=a{abl['id']}")).get_data(as_text=True)
+    assert 'name="beleg_vorhanden"' in seite and f'value="a{abl["id"]}" selected' in seite
+    assert f'value="d{dok["id"]}"' in seite  # Beleg der anderen Buchung mitbenutzbar
+    post(c, f"/buchungen/{bid2}", data={**neu, "beleg_vorhanden": f"a{abl['id']}"})
+    with app.app_context():
+        dok2 = core.one("SELECT d.* FROM buchung b JOIN dokument d ON d.id = b.dokument_id WHERE b.id = ?", (bid2,))
+    assert dok2 and dok2["pfad"] != abl["pfad"] and os.path.exists(os.path.join(TMP, "dokumente", dok2["pfad"]))
+    assert "aus Vertrag" not in ok(c.get(f"/immobilien/{iid}?reiter=buchungen&jahr=2026")).get_data(as_text=True)
+    # Ein Schreiben für mehrere Kosten: vorhandenen Beleg des Jahres mitbenutzen (keine Kopie)
+    post(c, f"/immobilien/{iid}/buchungen?jahr=2026", data={**neu, "text": "Straßenreinigung", "betrag": "4,20"})
+    with app.app_context():
+        bid3 = core.one("SELECT id FROM buchung WHERE text = 'Straßenreinigung'")["id"]
+    post(c, f"/buchungen/{bid3}", data={**neu, "text": "Straßenreinigung", "betrag": "4,20", "beleg_vorhanden": f"d{dok['id']}"})
+    with app.app_context():
+        assert core.one("SELECT dokument_id FROM buchung WHERE id = ?", (bid3,))["dokument_id"] == dok["id"]

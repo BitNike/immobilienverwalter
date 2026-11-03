@@ -2,6 +2,7 @@
 import io
 import os
 import re
+import shutil
 import unicodedata
 
 from PIL import Image, ImageOps
@@ -45,6 +46,16 @@ def dokument_speichern(datei, relativer_ordner):
     pfad = os.path.join(ziel, name)
     datei.save(pfad)
     return os.path.relpath(pfad, DOK_DIR), DOKUMENT_TYPEN[endung], os.path.getsize(pfad)
+
+
+def dokument_kopieren(relativ, relativer_ordner):
+    """Kopie eines vorhandenen Dokuments in einen anderen Ordner; gibt (relativer Pfad, Größe) zurück."""
+    quelle = dokument_pfad(relativ)
+    ziel = os.path.join(DOK_DIR, relativer_ordner)
+    os.makedirs(ziel, exist_ok=True)
+    pfad = os.path.join(ziel, eindeutig(ziel, os.path.basename(quelle)))
+    shutil.copyfile(quelle, pfad)
+    return os.path.relpath(pfad, DOK_DIR), os.path.getsize(pfad)
 
 
 def dokument_pfad(relativ):

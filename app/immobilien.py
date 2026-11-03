@@ -504,7 +504,8 @@ def immobilie(iid):
                                              (iid, j - 1))["n"],
                            offen_bar=[b for b in alle_buchungen if b["art"] == "ausgabe" and b["bezahlt"] == "bar"
                                       and not b["erstattet"]],
-                           rl=ruecklage(iid, j),
+                           rl=ruecklage(iid, j), vertrag_unterlagen=vertrag_unterlagen(iid) if ist_admin() else {},
+                           belege_jahr=belege_des_jahres(iid, j) if ist_admin() else [],
                            vorjahr_vorhanden=vorjahr_vorhanden, kostenarten=kostenarten_immobilie(immo),
                            regeln=kostenart_regeln(iid), alle_kostenarten=kostenarten_aktiv(),
                            vorgaben={k["id"]: schluessel_vorgabe(immo, k, umfang["wohnungen"]) for k in kostenarten_aktiv()},
@@ -771,9 +772,42 @@ def _buchung_reiter():
     return "ruecklage" if request.form.get("reiter") == "ruecklage" else "buchungen"
 
 
+def vertrag_unterlagen(iid):
+    """{kostenart_id: [Ablage-Einträge]} der Verträge der Immobilie mit Kostenart – zur Auswahl als Beleg einer Buchung."""
+    erg = {}
+    for a in rows("SELECT a.*, v.kostenart_id AS v_kostenart, v.art AS v_art FROM ablage a JOIN vertrag v ON v.id = a.vertrag_id "
+                  "WHERE v.immobilie_id = ? AND v.wohnung_id IS NULL AND v.kostenart_id IS NOT NULL "
+                  "ORDER BY a.jahr IS NULL, a.jahr DESC, a.id DESC", (iid,)):
+        erg.setdefault(a["v_kostenart"], []).append(a)
+    return erg
+
+
+def belege_des_jahres(iid, j):
+    """Belege (Dokumente) der Immobilie im Jahr – ein Schreiben kann mehrere Buchungen belegen (z. B. Grundsteuer und
+    Straßenreinigung auf einem Bescheid)."""
+    return rows("SELECT d.id, d.titel, ka.name AS kostenart FROM dokument d LEFT JOIN kostenart ka ON ka.id = d.kostenart_id "
+                "WHERE d.immobilie_id = ? AND d.jahr = ? AND d.wohnung_id IS NULL ORDER BY d.titel COLLATE NATUERLICH", (iid, j))
+
+
 def _beleg_speichern(immo, j, vals):
-    """Optionaler Beleg (Foto oder PDF) landet als Vermieter-Dokument des Jahres."""
+    """Optionaler Beleg (Foto oder PDF) landet als Vermieter-Dokument des Jahres. Statt einer Datei geht (Feld
+    beleg_vorhanden) ein vorhandener Beleg des Jahres („d<id>“, wird mitbenutzt) oder eine Unterlage eines Vertrags
+    derselben Kostenart („a<id>“, wird als eigene Kopie übernommen)."""
     d = request.files.get("beleg")
+    wahl = request.form.get("beleg_vorhanden", "")
+    if (not d or not d.filename) and wahl[1:].isdigit():
+        nr = int(wahl[1:])
+        if wahl[0] == "d":
+            if not any(x["id"] == nr for x in belege_des_jahres(immo["id"], j)):
+                raise ValueError("Der gewählte Beleg gehört nicht zu dieser Immobilie und diesem Jahr.")
+            return nr
+        a = next((x for x in vertrag_unterlagen(immo["id"]).get(vals["kostenart_id"], []) if x["id"] == nr), None)
+        if wahl[0] != "a" or not a:
+            raise ValueError("Die gewählte Unterlage gehört zu keinem Vertrag dieser Kostenart.")
+        pfad, groesse = dateien.dokument_kopieren(a["pfad"], os.path.join(immo["ordner"], str(j), "Vermieter"))
+        return exe("INSERT INTO dokument (immobilie_id, jahr, bereich, kostenart_id, titel, pfad, mime, groesse, "
+                   "hochgeladen_von) VALUES (?, ?, 'vermieter', ?, ?, ?, ?, ?, ?)",
+                   (immo["id"], j, vals["kostenart_id"], vals["text"], pfad, a["mime"], groesse, g.user["id"]))
     if not d or not d.filename:
         return None
     pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(immo["ordner"], str(j), "Vermieter"))

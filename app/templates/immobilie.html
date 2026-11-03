@@ -175,6 +175,12 @@
     <tr class="in-bearbeitung">
       {{ buchung_felder('b%d' % b.id, b, kostenarten, BEZAHLT) }}
       <td class="aktionen">{{ beleg_knopf('b%d' % b.id, b) }}
+        {% set vu = vertrag_unterlagen.get(b.kostenart_id, []) %}{% set bj = belege_jahr|rejectattr('id', 'equalto', b.dokument_id)|list %}
+        {% if (vu or bj) and not b.dokument_id %}<select name="beleg_vorhanden" form="b{{ b.id }}" class="beleg-ablage" title="Statt einer Datei einen vorhandenen Beleg oder eine Unterlage des Vertrags verwenden">
+          <option value="">oder vorhandenen …</option>
+          {% if bj %}<optgroup label="Belege {{ b.jahr }} (mitbenutzen)">{% for d in bj %}<option value="d{{ d.id }}" {{ 'selected' if request.args.get('beleg') == 'd%d' % d.id }}>{{ d.titel }}{% if d.kostenart %} – {{ d.kostenart }}{% endif %}</option>{% endfor %}</optgroup>{% endif %}
+          {% if vu %}<optgroup label="Unterlagen des Vertrags">{% for a in vu %}<option value="a{{ a.id }}" {{ 'selected' if request.args.get('beleg') == 'a%d' % a.id }}>{{ a.titel }}{% if a.jahr %} ({{ a.jahr }}){% endif %} – {{ a.v_art }}</option>{% endfor %}</optgroup>{% endif %}
+        </select>{% endif %}
         <form id="b{{ b.id }}" method="post" action="{{ url_for('buchung_speichern', bid=b.id) }}" enctype="multipart/form-data" class="inline"
           onsubmit="return jahrPruefen(this, {{ b.jahr }})"><input type="hidden" name="buchungsjahr">
           <button class="btn-icon" title="Speichern">{{ icon('save', 16) }}</button></form>
@@ -198,7 +204,9 @@
             <button class="link-knopf" title="Heute von der WEG erstattet">erstattet</button></form>{% endif %}
         {% endif %}{% endif %}</td>
       <td class="aktionen">{% if b.dokument_id %}{% if ist_admin %}<a class="btn-icon" href="{{ url_for('dokument_anzeigen', did=b.dokument_id) }}" target="_blank" title="Beleg ansehen">{{ icon('klammer', 16) }}</a>{% else %}<span class="leise" title="Beleg vorhanden">{{ icon('klammer', 16) }}</span>{% endif %}
-        {% elif not b.hausgeld_eigentuemer_id %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>{% endif %}
+        {% elif not b.hausgeld_eigentuemer_id %}<small class="warnung" title="Kein Beleg angehängt">fehlt</small>
+          {% set vu = vertrag_unterlagen.get(b.kostenart_id, []) %}
+          {% if vu or belege_jahr %}<br><a class="klein-link" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', buchung=b.id, beleg=('a%d' % vu[0].id) if vu|length == 1 else None) }}" title="Einen vorhandenen Beleg (z. B. ein Bescheid für mehrere Kosten) oder eine Unterlage des Vertrags verwenden">{{ 'aus Vertrag' if vu else 'zuordnen' }}</a>{% endif %}{% endif %}
         {% if ist_admin %}
         <a class="btn-icon" href="{{ url_for('immobilie', iid=immo.id, reiter='buchungen', buchung=b.id) }}" title="Bearbeiten">{{ icon('edit', 16) }}</a>
         {{ loeschen(url_for('buchung_loeschen', bid=b.id), 'Buchung „%s“ löschen? Ein angehängter Beleg bleibt unter Dokumente erhalten.' % b.text) }}

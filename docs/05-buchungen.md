@@ -20,6 +20,14 @@ Das ist keine Buchhaltung: Die Kontobewegungen selbst stehen auf den Kontoauszü
 **Enter** speichert. Datum, Art, Ziel und Bezahlt der letzten Buchung werden für die nächste vorbelegt.
 Bar Ausgelegtes bleibt als **„offen“** markiert, bis du die Erstattung einträgst.
 
+**Vorhandenen Beleg verwenden:** Fehlt der Beleg einer Buchung, führt der Link **„zuordnen“** bzw. **„aus Vertrag“** unter
+„fehlt“ in die Bearbeitung. Dort wählst du statt einer Datei unter **„oder vorhandenen …“**:
+
+- einen **Beleg des Jahres**, den eine andere Buchung schon hat, z. B. den Grundsteuerbescheid, der auch die
+  Straßenreinigung enthält. Beide Buchungen zeigen auf denselben Beleg; in den Anlagen steht er nur einmal.
+- eine **Unterlage des Vertrags** derselben Kostenart, z. B. die Beitragsrechnung der Versicherung (etwa bei Buchungen aus
+  einem Dauerauftrag). Sie wird als eigene Kopie übernommen.
+
 **Anderes Jahr:** Liegt das Belegdatum nicht im angezeigten Jahr, fragt die App, in welches Abrechnungsjahr die Buchung gehört.
 Rechnungen für das Vorjahr kommen oft erst im Januar. Eine versehentlich falsch einsortierte Buchung zeigt das Jahr ihres
 Datums mit dem Knopf „nach <Jahr> holen“ an.
