@@ -370,6 +370,10 @@ MIGRATIONEN = [
     );
     CREATE UNIQUE INDEX mietzahlung_monat ON mietzahlung (mv_id, jahr, monat) WHERE monat IS NOT NULL;
     """,
+    # 24: Kaution beim Mietverhältnis (zum Im-Blick-Behalten)
+    """
+    ALTER TABLE mietverhaeltnis ADD COLUMN kaution REAL NOT NULL DEFAULT 0;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

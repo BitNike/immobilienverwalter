@@ -1305,7 +1305,7 @@ def wohnung(wid):
     reiter = [("abrechnung", "Abrechnung"), ("mieter", "Mieter"), ("zaehler", "Zähler"), ("vertraege", "Verträge"),
               ("dokumente", "Dokumente"), ("stammdaten", "Stammdaten")]
     import mietkonto  # erst hier: mietkonto importiert dieses Modul
-    pruefung = pruefungen(immo, erg, {wid}) + mietkonto.rueckstaende([w])
+    pruefung = pruefungen(immo, erg, {wid}) + mietkonto.rueckstaende([w]) + mietkonto.nk_offen(w, j)
     if not w["mieter_extern"]:
         reiter.insert(2, ("mietkonto", "Mietkonto"))
     aktiv = reiter_waehlen(reiter)
@@ -1349,7 +1349,7 @@ def mv_werte():
         mietart = f.get("mietart", "")
         if mietart not in MIETARTEN:
             raise ValueError("Unbekannte Mietart.")
-        vals.update(kaltmiete=parse_num(f.get("kaltmiete")), mietart=mietart,
+        vals.update(kaltmiete=parse_num(f.get("kaltmiete")), kaution=parse_num(f.get("kaution")), mietart=mietart,
                     befristet_bis=f.get("befristet_bis") or None, anpassung_am=f.get("anpassung_am") or None)
     return vals
 

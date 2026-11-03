@@ -123,6 +123,24 @@ def rueckstaende(wohnungen):
     return punkte
 
 
+def nk_offen(w, j):
+    """Prüfpunkte: Ergebnis der Betriebskostenabrechnung j−1 noch nicht im Mietkonto – nur für Mieter, deren Mietkonto
+    geführt wird (sonst wäre der Hinweis bei jedem, der das Mietkonto nicht nutzt, nur Lärm)."""
+    if w["mieter_extern"] or j > date.today().year:
+        return []
+    punkte = []
+    for mv in rows("SELECT m.* FROM mietverhaeltnis m WHERE m.wohnung_id = ? "
+                   "AND EXISTS (SELECT 1 FROM mietzahlung z WHERE z.mv_id = m.id)", (w["id"],)):
+        v = nk_ergebnis(mv, w, j - 1)
+        if not v or one("SELECT 1 FROM mietzahlung WHERE mv_id = ? AND monat IS NULL AND text = ?", (mv["id"], v["text"])):
+            continue
+        mv["personen"] = mv_personen(mv["id"])
+        punkte.append({"text": f"{w['bezeichnung']}: {v['text']} {de_num(abs(v['betrag']))} € von {mv_name(mv)} steht noch "
+                               "nicht im Mietkonto. Nach dem Versand der Abrechnung übernehmen.", "art": "hinweis",
+                       "link": url_for("wohnung", wid=w["id"], reiter="mietkonto", jahr=j) + f"#mk{mv['id']}"})
+    return punkte
+
+
 def soll_festhalten(mv_alt, vals):
     """Ändert sich die Miete im Vertrag, behalten die bereits fälligen Monate seit Kontobeginn ihr bisheriges Soll."""
     if "kaltmiete" not in vals or (_gleich(vals["kaltmiete"], mv_alt["kaltmiete"])

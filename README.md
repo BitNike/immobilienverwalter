@@ -30,7 +30,7 @@ Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angele
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
 Neue Versionen zeigt die App Administratoren links unten an (einmal täglich geprüft, abschaltbar).
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.30.0` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.31.0` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen, Erinnerungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.

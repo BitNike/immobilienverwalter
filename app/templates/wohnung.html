@@ -213,13 +213,14 @@
         <label>Mietart<select name="mietart">{% for k, t in MIETARTEN.items() %}<option value="{{ k }}" {{ 'selected' if mv.mietart == k }}>{{ t }}</option>{% endfor %}</select></label>
         <label>Nächste Mietanpassung<input type="date" name="anpassung_am" value="{{ mv.anpassung_am or '' }}"></label>
         <label>Befristet bis<input type="date" name="befristet_bis" value="{{ mv.befristet_bis or '' }}"></label>
+        <label>Kaution (€)<input name="kaution" inputmode="decimal" value="{{ mv.kaution|num if mv.kaution else '' }}"></label>
         <label class="breit">Neue Anschrift nach Auszug (für die Abschlussrechnung)<textarea name="neue_anschrift" rows="2">{{ mv.neue_anschrift }}</textarea></label>
-        <label class="breit">Notiz<input name="notiz" value="{{ mv.notiz }}"></label>
+        <label class="breit">Notiz<textarea name="notiz" rows="2">{{ mv.notiz }}</textarea></label>
       </div>
       <div class="knopfleiste">{{ speichern() }}</div>
     </form>
     {% else %}
-    <p>Vorauszahlung {{ mv.vorauszahlung_monat|eur }} / Monat{% if mv.kaltmiete %} · Kaltmiete {{ mv.kaltmiete|eur }}{% endif %}{% if mv.neue_anschrift %} · Neue Anschrift: {{ mv.neue_anschrift }}{% endif %}</p>
+    <p>Vorauszahlung {{ mv.vorauszahlung_monat|eur }} / Monat{% if mv.kaltmiete %} · Kaltmiete {{ mv.kaltmiete|eur }}{% endif %}{% if mv.kaution %} · Kaution {{ mv.kaution|eur }}{% endif %}{% if mv.neue_anschrift %} · Neue Anschrift: {{ mv.neue_anschrift }}{% endif %}</p>
     {% endif %}
   </div>
   {% else %}
@@ -240,6 +241,7 @@
         <label>Mietart<select name="mietart">{% for k, t in MIETARTEN.items() %}<option value="{{ k }}" {{ 'selected' if not k }}>{{ t }}</option>{% endfor %}</select></label>
         <label>Nächste Mietanpassung<input type="date" name="anpassung_am" value="{{ '' }}"></label>
         <label>Befristet bis<input type="date" name="befristet_bis" value="{{ '' }}"></label>
+        <label>Kaution (€)<input name="kaution" inputmode="decimal"></label>
       </div>
       <p class="leise">Weitere Personen (z. B. Partner, WG) kannst du danach über + hinzufügen.
         Das Mietverhältnis erhält eine fortlaufende Nummer und einen eigenen Dokumentenordner.</p>
@@ -375,7 +377,7 @@
   {% if mietvertraege %}
   <div class="tabelle">
   <table>
-    <thead><tr><th>Mieter</th><th>Zeitraum</th><th class="zahl">Kaltmiete</th><th class="zahl">NK-Abschlag</th><th>Befristet bis</th><th>Nächste Anpassung</th></tr></thead>
+    <thead><tr><th>Mieter</th><th>Zeitraum</th><th class="zahl">Kaltmiete</th><th class="zahl">NK-Abschlag</th><th class="zahl">Kaution</th><th>Befristet bis</th><th>Nächste Anpassung</th></tr></thead>
     <tbody>
     {% for mv in mietvertraege %}
     <tr class="{{ 'leise' if not mv.laufend }}">
@@ -383,6 +385,7 @@
       <td>{{ mv.von|datum(True) }} – {{ mv.bis|datum(True) if mv.bis else 'laufend' }}</td>
       <td class="zahl">{{ mv.kaltmiete|eur if mv.kaltmiete else '–' }}</td>
       <td class="zahl">{{ mv.vorauszahlung_monat|eur }}</td>
+      <td class="zahl">{{ mv.kaution|eur if mv.kaution else '–' }}</td>
       <td>{% if mv.befristet_bis %}{{ mv.befristet_bis|datum(True) }}{% if mv.befristung %}<br><small class="{{ 'warnung' if mv.befristung.bald else 'leise' }}">{{ 'vorbei' if mv.befristung.vorbei else 'noch %d Tage' % mv.befristung.tage }}</small>{% endif %}{% else %}–{% endif %}</td>
       <td>{% if mv.anpassung_am %}{{ MIETARTEN[mv.mietart] }} ab {{ mv.anpassung_am|datum(True) }}{% if mv.anpassung %}<br><small class="{{ 'warnung' if mv.anpassung.bald else 'leise' }}">{{ 'fällig' if mv.anpassung.vorbei else 'noch %d Tage' % mv.anpassung.tage }}</small>{% endif %}{% else %}{{ MIETARTEN[mv.mietart] if mv.mietart else '–' }}{% endif %}</td>
     </tr>

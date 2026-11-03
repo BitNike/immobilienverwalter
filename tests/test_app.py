@@ -1059,7 +1059,11 @@ def test_mietkonto():
         assert kto()["stand"] == 250 and kto()["jahre"][2026]["zeilen"][0]["gezahlt"] == 750
 
     # Mieterhöhung: gespeicherte Monate behalten 600 €, künftige nutzen 650 €
-    post(c, f"/mieter/{mid}", data={"von": "2025-11-15", "vorauszahlung_monat": "150", "kaltmiete": "650", "mietart": ""})
+    post(c, f"/mieter/{mid}", data={"von": "2025-11-15", "vorauszahlung_monat": "150", "kaltmiete": "650", "mietart": "",
+                                    "kaution": "1.800", "notiz": "Kaution als Sparbuch\nbei der Bank"})
+    seite = ok(c.get(f"/wohnungen/{wid}?reiter=vertraege")).get_data(as_text=True)
+    assert "1.800,00 €" in seite
+    assert '<textarea name="notiz" rows="2">Kaution als Sparbuch' in ok(c.get(f"/wohnungen/{wid}?reiter=mieter")).get_data(as_text=True)
     with app.app_context():
         k = kto(bis=2027)
         assert k["jahre"][2025]["zeilen"][1]["kaltmiete"] == 600 and k["jahre"][2026]["zeilen"][0]["kaltmiete"] == 600
@@ -1070,7 +1074,9 @@ def test_mietkonto():
     post(c, f"/wohnungen/{wid}/kosten?jahr=2025", data={"kostenart_id": "1", "betrag": "400", "mv_id": str(mid)})
     seite = ok(c.get(f"/wohnungen/{wid}?reiter=mietkonto&jahr=2026")).get_data(as_text=True)
     assert "Betriebskostenabrechnung 2025: Nachzahlung" in seite and "Ins Mietkonto übernehmen" in seite
+    assert "steht noch nicht im Mietkonto" in ok(c.get(f"/wohnungen/{wid}?jahr=2026")).get_data(as_text=True)
     post(c, f"/mieter/{mid}/mietkonto/neu", data={"jahr": "2026", "aktion": "abrechnung"})
+    assert "steht noch nicht im Mietkonto" not in ok(c.get(f"/wohnungen/{wid}?jahr=2026")).get_data(as_text=True)
     seite = ok(c.get(f"/wohnungen/{wid}?reiter=mietkonto&jahr=2026")).get_data(as_text=True)
     assert "Ins Mietkonto übernehmen" not in seite and "Mahngebühr" in seite
     with app.app_context():

@@ -10,6 +10,7 @@ Mietobjekt → Reiter **Mieter**:
 | Einzug, Auszug | Die Kosten werden nach **Monaten** aufgeteilt. |
 | NK-Vorauszahlung / Monat | Vorschlag für die Abrechnung |
 | Kaltmiete, Mietart, Nächste Mietanpassung, Befristet bis | Angaben zum Mietvertrag, mit Erinnerung (siehe [Verträge](09-vertraege.md)) |
+| Kaution | zum Im-Blick-Behalten; steht auch in der Übersicht Mietverträge (Reiter Verträge) |
 | Neue Anschrift nach Auszug | für die Abschlussrechnung |
 
 Jedes Mietverhältnis bekommt eine fortlaufende Nummer und einen Ordner, z. B. `001 - Muster`.
@@ -70,6 +71,8 @@ So funktioniert es:
 - **Weitere Forderung oder Gutschrift:** z. B. eine Mahngebühr. Das Ergebnis der Betriebskostenabrechnung des Vorjahres
   übernimmst du mit einem Klick („Ins Mietkonto übernehmen“); ein Guthaben steht mit Minus darin.
 - Der Saldo wird ins nächste Jahr übertragen.
+- Wird das Mietkonto geführt und steht das Ergebnis der Betriebskostenabrechnung des Vorjahres noch nicht darin, erinnert
+  die Liste **„Bitte prüfen“** daran.
 - Besteht ein Rückstand, meldet ihn die Liste **„Bitte prüfen“** bei Mietobjekt und Immobilie. Ab zwei Monatsmieten steht
   dort zusätzlich ein Hinweis auf § 543 BGB (fristlose Kündigung). Vorher bitte rechtlich beraten lassen.
 - **Ansicht** und **PDF** erzeugen eine Aufstellung für das gewählte Jahr, **„PDF seit …“** über alle Jahre seit Beginn des
