@@ -49,7 +49,9 @@ Aktualisieren kann sich die App nicht selbst, das Update startest du mit dem Bef
 ## E-Mail
 
 E-Mail-Versand ist optional und wird in der `.env` eingerichtet (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USER`,
-`SMTP_PASSWORD`, `SMTP_FROM`, siehe [`.env.example`](../.env.example)). Unter **Einstellungen → SMTP / E-Mail** kannst du eine Testmail schicken.
+`SMTP_PASSWORD`, `SMTP_FROM`, siehe [`.env.example`](../.env.example)).
+`SMTP_FROM` ist der Absender und muss eine echte Adresse sein, am besten dieselbe wie `SMTP_USER`, sonst lehnen viele
+Anbieter die Mails ab. Ein Anzeigename davor ist optional: `SMTP_FROM=Immobilienverwalter <name@example.de>`. Unter **Einstellungen → SMTP / E-Mail** kannst du eine Testmail schicken.
 
 ## Sicherheit
 
