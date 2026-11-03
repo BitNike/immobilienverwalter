@@ -27,6 +27,13 @@ Es fehlt der Zählerstand zum Jahresende (oder zum Auszug). Trag ihn im Reiter Z
 Sie hatte im Vorjahr Kosten und im aktuellen Jahr noch nicht. Erfassen, oder bei der Immobilie auf „nicht genutzt“ setzen,
 wenn sie weggefallen ist.
 
+**Muss ich die Miete eintragen?**
+Nein. Die Nebenkostenabrechnung braucht nur die NK-Vorauszahlung. Das [Mietkonto](06-mieter.md#mietkonto-miete-und-zahlungen-monat-für-monat)
+ist für den Überblick über Zahlungen und Rückstände da und beginnt erst mit der ersten eingetragenen Zahlung.
+
+**Der Mieter überweist Miete und Nebenkosten in einer Summe.**
+Im Reiter Mietkonto die Summe unter „gezahlt“ eintragen. Das Soll setzt sich aus Kaltmiete und NK-Vorauszahlung zusammen.
+
 **Erinnerungsmails kommen nicht an.**
 E-Mail-Versand einrichten (Testmail unter Einstellungen → SMTP / E-Mail), beim Empfänger eine E-Mail-Adresse und den Haken
 unter Einstellungen → Erinnerungen setzen. „Jetzt prüfen und senden“ verschickt nur fällige Termine.

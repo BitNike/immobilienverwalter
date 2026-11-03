@@ -489,7 +489,9 @@ def immobilie(iid):
     if ist_admin():
         reiter += [("stammdaten", "Stammdaten"), ("schluessel", "Umlageschlüssel")]
     vliste = vertraege(iid, j=j)
-    pruefung = pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin())
+    import mietkonto  # erst hier: mietkonto importiert dieses Modul
+    pruefung = pruefungen(immo, erg, eigene, ganze_immobilie=ist_admin()) + \
+        mietkonto.rueckstaende(wohnungen_der_immobilie(iid))
     return render_template("immobilie.html", **spalte(immo), erg=erg, verteilung=verteilung, mea_summe=mea_summe,
                            reiter=reiter, aktiv=reiter_waehlen(reiter), vliste=vliste, vk=vertrag_kennzahlen(vliste),
                            umfang=umfang, hauptverbrauch=hauptverbrauch, wohnungen_wasser=wohnungen_wasser,
@@ -1302,13 +1304,18 @@ def wohnung(wid):
     direkt = {k["id"]: k for k in rows("SELECT * FROM kosten WHERE wohnung_id = ? AND jahr = ?", (wid, j))}
     reiter = [("abrechnung", "Abrechnung"), ("mieter", "Mieter"), ("zaehler", "Zähler"), ("vertraege", "Verträge"),
               ("dokumente", "Dokumente"), ("stammdaten", "Stammdaten")]
+    import mietkonto  # erst hier: mietkonto importiert dieses Modul
+    pruefung = pruefungen(immo, erg, {wid}) + mietkonto.rueckstaende([w])
+    if not w["mieter_extern"]:
+        reiter.insert(2, ("mietkonto", "Mietkonto"))
+    aktiv = reiter_waehlen(reiter)
     vliste = vertraege(immo["id"], wid, j=j)
     return render_template(
         "wohnung.html", **spalte(immo, wid), w=w, r=r, erg=erg, mvs=mvs, direkt=direkt,
-        reiter=reiter, aktiv=reiter_waehlen(reiter), vliste=vliste, vk=vertrag_kennzahlen(vliste),
-        mietvertraege=mietvertraege(wid),
+        reiter=reiter, aktiv=aktiv, vliste=vliste, vk=vertrag_kennzahlen(vliste),
+        mietvertraege=mietvertraege(wid), mietkonten=mietkonto.reiter_daten(w, mvs, j) if aktiv == "mietkonto" else [],
         benutzer=rows("SELECT * FROM benutzer ORDER BY name, vorname") if ist_admin() else [],
-        pruefung=pruefungen(immo, erg, {wid}), vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
+        pruefung=pruefung, vorhanden=vorhandene_kostenarten(immo["id"], j, wid),
         darf=wohnung_bearbeitbar(w), kostenarten=kostenarten_aktiv(),  # „nicht genutzt“ gilt nur für die Gebäudekosten
         eigentuemer=one("SELECT * FROM benutzer WHERE id = ?", (w["eigentuemer_id"],)),
         zaehler=zaehler_mit_staenden("SELECT * FROM zaehler WHERE wohnung_id = ? "
@@ -1374,6 +1381,8 @@ def _mv_laden(mid):
 def mv_speichern(mid):
     mv = _mv_laden(mid)
     vals = mv_werte()
+    import mietkonto
+    mietkonto.soll_festhalten(mv, vals)
     exe(f"UPDATE mietverhaeltnis SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), mid])
     flash("Mietverhältnis gespeichert.")
     return redirect(url_for("wohnung", wid=mv["wohnung_id"], reiter="mieter"))

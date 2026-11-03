@@ -5,7 +5,7 @@
 | Gruppe | Darf |
 |---|---|
 | **Administrator** | alles: Immobilien anlegen, Gebäudekosten, Einstellungen, Benutzer |
-| **Vermieter +** | sieht seine Mietobjekte und trägt dort Mieter, Zählerstände, Kosten, Vorauszahlungen und Verträge ein |
+| **Vermieter +** | sieht seine Mietobjekte und trägt dort Mieter, Mietkonto, Zählerstände, Kosten, Vorauszahlungen und Verträge ein |
 | **Vermieter** | sieht seine Mietobjekte, nur lesend |
 | **Ohne Zugang** | kann sich nicht anmelden; dient als Eigentümer bzw. Empfänger von Abrechnungen |
 

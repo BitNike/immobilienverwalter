@@ -1,4 +1,4 @@
-# Mieter und Kosten der Wohnung
+# Mieter, Mietkonto und Kosten der Wohnung
 
 ## Mietverhältnis anlegen
 
@@ -45,6 +45,38 @@ In der Zeile Eigentümer-Abrechnung steht dann „ohne … € direkt gezahlt“
 
 Kosten, die das ganze Haus betreffen, gehören zu den **Gebäudekosten** der Immobilie (Reiter Buchungen), nicht hierher.
 Die Kostenaufstellung zeigt sie mit dem Zusatz „Gebäudekosten der Immobilie“.
+
+## Mietkonto: Miete und Zahlungen Monat für Monat
+
+Für die Nebenkostenabrechnung brauchst du das Mietkonto nicht. Es hilft, wenn Mieter **Miete und Nebenkosten in einer
+Summe** überweisen und du den Überblick über **Rückstände** behalten oder sie belegen musst, z. B. gegenüber einem Anwalt.
+
+Mietobjekt → Reiter **Mietkonto**, je Mieter und Jahr:
+
+| Spalte | Inhalt |
+|---|---|
+| Soll | Kaltmiete + NK-Vorauszahlung aus dem Mietverhältnis. Über den Stift für einen Monat änderbar, z. B. bei Einzug zur Monatsmitte |
+| gezahlt, am | was eingegangen ist; mehrere Teilbeträge eines Monats zusammenzählen und unter Bemerkung festhalten |
+| offen, Saldo | Differenz des Monats und laufender Stand; Saldo > 0 = Rückstand, < 0 = Guthaben des Mieters |
+| Bemerkung | z. B. „Rest angekündigt“, „Mahnung 10.06.“ |
+
+So funktioniert es:
+
+- Das Konto **beginnt mit dem ersten Monat, für den du eine Zahlung einträgst**. Ab dann gelten fällige Monate ohne Eintrag
+  als nicht bezahlt; frühere Monate zählen nicht. Du musst also nicht rückwirkend alle Jahre nachtragen.
+- **„Fällige Monate als bezahlt eintragen“** trägt bei allen fälligen Monaten ohne Zahlung das Soll ein. Danach pflegst du nur
+  noch die Ausreißer. Vorhandene Einträge bleiben unverändert.
+- Ändert sich die Miete im Mietverhältnis, behalten die bereits fälligen Monate ihr bisheriges Soll.
+- **Weitere Forderung oder Gutschrift:** z. B. eine Mahngebühr. Das Ergebnis der Betriebskostenabrechnung des Vorjahres
+  übernimmst du mit einem Klick („Ins Mietkonto übernehmen“); ein Guthaben steht mit Minus darin.
+- Der Saldo wird ins nächste Jahr übertragen.
+- Besteht ein Rückstand, meldet ihn die Liste **„Bitte prüfen“** bei Mietobjekt und Immobilie. Ab zwei Monatsmieten steht
+  dort zusätzlich ein Hinweis auf § 543 BGB (fristlose Kündigung). Vorher bitte rechtlich beraten lassen.
+- **Ansicht** und **PDF** erzeugen eine Aufstellung für das gewählte Jahr, **„PDF seit …“** über alle Jahre seit Beginn des
+  Kontos: Monat, Soll, Zahlung mit Datum, offen, Saldo und Bemerkung, am Ende der offene Betrag.
+
+Das Mietkonto sehen Administratoren und der Eigentümer des Mietobjekts; eintragen dürfen Administratoren und Vermieter +.
+Bei „Mieter rechnet der Eigentümer selbst ab“ gibt es den Reiter nicht.
 
 ## Was trägt der Mieter, was der Eigentümer?
 

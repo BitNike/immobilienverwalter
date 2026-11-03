@@ -8,7 +8,7 @@ Alle Beispiele verwenden erfundene Musterdaten.
 3. [Immobilien und Mietobjekte](03-immobilien-mietobjekte.md): Stammdaten, MEA, Häuser, Archiv
 4. [Umlageschlüssel und Kostenarten](04-umlageschluessel.md): welche Kosten wie verteilt werden
 5. [Buchungen, Daueraufträge, Hausgeld](05-buchungen.md): Gebäudekosten erfassen
-6. [Mieter und Kosten der Wohnung](06-mieter.md): Mietverhältnisse, Vorauszahlungen, direkte Kosten
+6. [Mieter, Mietkonto und Kosten der Wohnung](06-mieter.md): Mietverhältnisse, Vorauszahlungen, Mietrückstände, direkte Kosten
 7. [Rücklage und Konten](07-ruecklage.md): Erhaltungsrücklage und Kontostände
 8. [Zähler](08-zaehler.md): Ablesungen, Zählertausch, Wasserverteilung
 9. [Verträge und Erinnerungen](09-vertraege.md): Laufzeiten, Kündigungsfristen, E-Mails

@@ -42,7 +42,7 @@ Der Zustand wird im Browser gemerkt.
 
 **Reiter einer Immobilie:** Übersicht · Buchungen · Rücklage · Zähler · Verträge · Dokumente · Stammdaten · Umlageschlüssel
 
-**Reiter eines Mietobjekts:** Abrechnung · Mieter · Zähler · Verträge · Dokumente · Stammdaten
+**Reiter eines Mietobjekts:** Abrechnung · Mieter · Mietkonto · Zähler · Verträge · Dokumente · Stammdaten
 
 Das Symbol ⓘ neben vielen Feldern erklärt kurz, was einzutragen ist. Fahre mit der Maus darüber oder tippe es an.
 

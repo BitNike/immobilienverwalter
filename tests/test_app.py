@@ -1017,3 +1017,78 @@ def test_update(monkeypatch):
     post(c, "/einstellungen/update", data={"pruefen": "on"})
     seite = ok(c.get("/einstellungen/info")).get_data(as_text=True)
     assert "Update verfügbar" not in seite and "NK_UPDATE_CHECK=aus" in seite
+
+
+def test_mietkonto():
+    """Mietkonto: Beginn mit der ersten Zahlung, Teilzahlung, „alle bezahlt“, Soll bleibt bei Mietänderung,
+    sonstige Forderung, Übernahme der NK-Abrechnung, Hinweis in der Prüfliste, Druck und PDF."""
+    from datetime import date
+    import core
+    import mietkonto
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["uid"] = 1
+    r = c.post("/immobilien/neu", data={"name": "Musterhaus 3", "strasse": "Musterweg", "hausnummer": "3",
+                                        "plz": "12345", "ort": "Musterstadt"}, content_type="multipart/form-data")
+    iid = int(ok(r, 302).headers["Location"].rstrip("/").split("/")[-1])
+    wid = int(post(c, f"/immobilien/{iid}/wohnungen/neu", data={"bezeichnung": "Haus", "wohnflaeche": "100"})
+              .headers["Location"].split("/")[-1])
+    post(c, f"/wohnungen/{wid}/mieter", data={"vorname": "Lea", "name": "Beispiel", "von": "2025-11-15",
+                                             "vorauszahlung_monat": "150", "kaltmiete": "600", "mietart": ""})
+    with app.app_context():
+        mid = core.one("SELECT id FROM mietverhaeltnis WHERE wohnung_id = ?", (wid,))["id"]
+
+        def kto(heute=date(2026, 1, 15), bis=None):
+            return mietkonto.konto(core.one("SELECT * FROM mietverhaeltnis WHERE id = ?", (mid,)), bis, heute)
+    seite = ok(c.get(f"/wohnungen/{wid}?reiter=mietkonto&jahr=2026")).get_data(as_text=True)
+    assert "Mietkonto 2026" in seite and "Noch keine Zahlung eingetragen" in seite and "750,00" in seite
+    with app.app_context():
+        assert kto()["stand"] == 0 and kto()["beginn"] is None  # ohne Zahlung zählt nichts
+
+    # Zahlungen 2025: November voll, Dezember nur teilweise
+    post(c, f"/mieter/{mid}/mietkonto", data={"jahr": "2025", "m11_kalt": "600", "m11_nk": "150", "m11_gezahlt": "750",
+                                              "m11_datum": "2025-11-17", "m12_kalt": "600", "m12_nk": "150",
+                                              "m12_gezahlt": "500", "m12_notiz": "Rest angekündigt"})
+    with app.app_context():
+        k = kto()
+        assert k["beginn"] == (2025, 11) and k["jahre"][2025]["ende"] == 250
+        assert k["stand"] == 1000  # Januar 2026 fällig und offen
+        assert [z["monat"] for z in k["jahre"][2025]["zeilen"]] == [11, 12]
+    post(c, f"/mieter/{mid}/mietkonto", data={"jahr": "2026", "aktion": "alle"})
+    with app.app_context():
+        assert kto()["stand"] == 250 and kto()["jahre"][2026]["zeilen"][0]["gezahlt"] == 750
+
+    # Mieterhöhung: gespeicherte Monate behalten 600 €, künftige nutzen 650 €
+    post(c, f"/mieter/{mid}", data={"von": "2025-11-15", "vorauszahlung_monat": "150", "kaltmiete": "650", "mietart": ""})
+    with app.app_context():
+        k = kto(bis=2027)
+        assert k["jahre"][2025]["zeilen"][1]["kaltmiete"] == 600 and k["jahre"][2026]["zeilen"][0]["kaltmiete"] == 600
+        assert k["jahre"][2027]["zeilen"][0]["kaltmiete"] == 650
+
+    # Sonstige Forderung und Ergebnis der Betriebskostenabrechnung 2025
+    post(c, f"/mieter/{mid}/mietkonto/neu", data={"jahr": "2026", "text": "Mahngebühr", "betrag": "5"})
+    post(c, f"/wohnungen/{wid}/kosten?jahr=2025", data={"kostenart_id": "1", "betrag": "400", "mv_id": str(mid)})
+    seite = ok(c.get(f"/wohnungen/{wid}?reiter=mietkonto&jahr=2026")).get_data(as_text=True)
+    assert "Betriebskostenabrechnung 2025: Nachzahlung" in seite and "Ins Mietkonto übernehmen" in seite
+    post(c, f"/mieter/{mid}/mietkonto/neu", data={"jahr": "2026", "aktion": "abrechnung"})
+    seite = ok(c.get(f"/wohnungen/{wid}?reiter=mietkonto&jahr=2026")).get_data(as_text=True)
+    assert "Ins Mietkonto übernehmen" not in seite and "Mahngebühr" in seite
+    with app.app_context():
+        k = kto()
+        nk = next(z for z in k["jahre"][2026]["zeilen"] if z["name"].startswith("Betriebskosten"))
+        assert nk["soll"] > 0 and k["stand"] == round(255 + nk["soll"], 2)
+    assert "Mietrückstand Lea Beispiel" in ok(c.get(f"/wohnungen/{wid}")).get_data(as_text=True)
+    assert "Mietrückstand Lea Beispiel" in ok(c.get(f"/immobilien/{iid}")).get_data(as_text=True)
+
+    druck = ok(c.get(f"/mieter/{mid}/mietkonto/druck?jahr=2026")).get_data(as_text=True)
+    assert "Mietkonto 2026" in druck and "Mahngebühr" in druck and "Übertrag aus 2025" in druck
+    alle = ok(c.get(f"/mieter/{mid}/mietkonto/druck?jahr=2026&alle=1")).get_data(as_text=True)
+    assert "Mietkonto 2025 – 2026" in alle and "Rest angekündigt" in alle
+    pdf = ok(c.get(f"/mieter/{mid}/mietkonto/druck?jahr=2026&alle=1&pdf=1"))
+    assert pdf.data[:4] == b"%PDF" and "Mietkonto 2025-2026" in pdf.headers["Content-Disposition"]
+
+    with app.app_context():
+        zid = core.one("SELECT id FROM mietzahlung WHERE text = 'Mahngebühr'")["id"]
+    post(c, f"/mietzahlung/{zid}/loeschen")
+    with app.app_context():
+        assert not core.one("SELECT 1 FROM mietzahlung WHERE text = 'Mahngebühr'")

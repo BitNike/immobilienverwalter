@@ -352,6 +352,24 @@ MIGRATIONEN = [
     """
     ALTER TABLE kosten ADD COLUMN eigentuemer_direkt INTEGER NOT NULL DEFAULT 0;
     """,
+    # 23: Mietkonto je Mietverhältnis: eine Zeile je Monat (Soll aus Kaltmiete und NK-Vorauszahlung, beim Anlegen
+    #     festgehalten) und sonstige Forderungen ohne Monat (z. B. Nachzahlung aus der Betriebskostenabrechnung)
+    """
+    CREATE TABLE mietzahlung (
+        id INTEGER PRIMARY KEY,
+        mv_id INTEGER NOT NULL REFERENCES mietverhaeltnis(id) ON DELETE CASCADE,
+        jahr INTEGER NOT NULL,
+        monat INTEGER,
+        text TEXT NOT NULL DEFAULT '',
+        kaltmiete REAL NOT NULL DEFAULT 0,
+        nebenkosten REAL NOT NULL DEFAULT 0,
+        sonstiges REAL NOT NULL DEFAULT 0,
+        gezahlt REAL,
+        datum TEXT,
+        notiz TEXT NOT NULL DEFAULT ''
+    );
+    CREATE UNIQUE INDEX mietzahlung_monat ON mietzahlung (mv_id, jahr, monat) WHERE monat IS NOT NULL;
+    """,
 ]
 
 # Vorbelegte Kostenarten (Name, Nr. § 2 BetrKV, umlagefähig, Standardschlüssel)

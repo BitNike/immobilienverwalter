@@ -252,6 +252,104 @@
 
 {% endif %}
 
+{# ---------- Mietkonto ---------- #}
+{% if aktiv == 'mietkonto' %}
+<section class="block" id="mietkonto">
+  <h2>Mietkonto {{ jahr }} {{ info("Soll und Zahlungen Monat für Monat, z. B. wenn Mieter Miete und Nebenkosten in einer Summe überweisen.\n\nDas Konto beginnt mit dem ersten Monat, für den du eine Zahlung einträgst. Ab dann gelten fällige Monate ohne Eintrag als nicht bezahlt; davor zählt nichts.\n\nDas Soll kommt aus dem Mietverhältnis (Kaltmiete und NK-Vorauszahlung) und lässt sich je Monat ändern. Ändert sich die Miete später, behalten die bereits fälligen Monate ihr Soll.") }}</h2>
+  {% set soll_bearbeiten = request.args.get('soll', '') %}
+  {% for k in mietkonten %}{% set mv = k.mv %}{% set kj = k.jahr %}
+  <div class="karte-flach" id="mk{{ mv.id }}">
+    <div class="karte-kopf">
+      <strong>{{ mv_name(mv) }}</strong>
+      <span class="leise">{{ mv.von|datum }} – {{ mv.bis|datum if mv.bis else 'laufend' }} · Soll laut Vertrag {{ k.monatsmiete|eur }}
+        ({{ mv.kaltmiete|eur }} Kaltmiete + {{ mv.vorauszahlung_monat|eur }} Nebenkosten)</span>
+      <span class="rechts">
+        <a class="btn klein hell" href="{{ url_for('mietkonto_druck', mid=mv.id, jahr=jahr) }}" target="_blank" title="Druckansicht {{ jahr }}">{{ icon('eye', 16) }}<span>Ansicht</span></a>
+        <a class="btn klein" href="{{ url_for('mietkonto_druck', mid=mv.id, jahr=jahr, pdf=1) }}" title="PDF {{ jahr }}">{{ icon('download', 16) }}<span>PDF {{ jahr }}</span></a>
+        {% if k.beginn and k.beginn[0] < jahr %}<a class="btn klein" href="{{ url_for('mietkonto_druck', mid=mv.id, jahr=jahr, pdf=1, alle=1) }}" title="Alle Jahre seit Beginn des Mietkontos">{{ icon('download', 16) }}<span>PDF seit {{ k.beginn[0] }}</span></a>{% endif %}
+      </span>
+    </div>
+    {% if not mv.kaltmiete %}<p class="warnung">Beim Mietverhältnis ist keine Kaltmiete eingetragen (Reiter <a href="{{ url_for('wohnung', wid=w.id, reiter='mieter') }}">Mieter</a>). Das Soll enthält dann nur die Nebenkosten.</p>{% endif %}
+    {% if not k.beginn and not kj.zeilen|selectattr('monat', 'none')|list %}<p class="leise">Noch keine Zahlung eingetragen. Trag die erste Zahlung ein oder nutze „Fällige Monate als bezahlt eintragen“.</p>{% endif %}
+    <div class="kennzahlen">
+      <div><span>Übertrag aus Vorjahren</span><strong>{{ kj.vortrag|eur }}</strong></div>
+      <div><span>Soll {{ jahr }} (fällig)</span><strong>{{ kj.soll|eur }}</strong></div>
+      <div><span>Gezahlt {{ jahr }}</span><strong>{{ kj.gezahlt|eur }}</strong></div>
+      <div class="betont"><span>Stand heute</span><strong class="{{ 'nachzahlung' if k.stand > 0.005 else ('gutschrift' if k.stand < -0.005) }}">{{ k.stand|abs|eur }}</strong>
+        <small class="leise">{{ 'Rückstand' if k.stand > 0.005 else ('Guthaben des Mieters' if k.stand < -0.005 else 'ausgeglichen') }}</small></div>
+    </div>
+    {% set fid = 'mkf%d' % mv.id %}
+    <form method="post" action="{{ url_for('mietkonto_speichern', mid=mv.id) }}" id="{{ fid }}"><input type="hidden" name="jahr" value="{{ jahr }}"></form>
+    <div class="tabelle">
+    <table class="mietkonto">
+      <thead><tr><th>Monat</th><th class="zahl">Soll</th>
+        <th class="zahl">gezahlt</th><th>am</th><th class="zahl">offen</th><th class="zahl">Saldo</th><th>Bemerkung</th></tr></thead>
+      <tbody>
+      {% if kj.vortrag %}<tr class="leise"><td colspan="5">Übertrag aus {{ jahr - 1 }}</td><td class="zahl">{{ kj.vortrag|eur }}</td><td></td></tr>{% endif %}
+      {% for z in kj.zeilen %}{% set p = ('m%d_' % z.monat) if z.monat else ('s%d_' % z.id) %}
+      <tr class="{{ 'leise' if not z.zaehlt }}">
+        {% if z.monat %}{% set soll_offen = darf and soll_bearbeiten == '%d-%d' % (mv.id, z.monat) %}
+        <td>{{ z.name }}</td>
+        <td class="zahl">{% if soll_offen %}
+          <label class="klein-feld">Kaltmiete<input class="betrag" form="{{ fid }}" name="{{ p }}kalt" inputmode="decimal" value="{{ z.kaltmiete|num }}"></label>
+          <label class="klein-feld">Nebenkosten<input class="betrag" form="{{ fid }}" name="{{ p }}nk" inputmode="decimal" value="{{ z.nebenkosten|num }}"></label>
+          {% else %}{% if darf %}<a class="soll-stift" href="{{ url_for('wohnung', wid=w.id, reiter='mietkonto', soll='%d-%d' % (mv.id, z.monat)) }}#mk{{ mv.id }}" title="Soll dieses Monats ändern (z. B. angebrochener Monat)">{{ icon('edit', 13) }}</a>{% endif %}{{ z.soll|eur }}<br><small class="leise">{{ z.kaltmiete|num }} + {{ z.nebenkosten|num }}</small>{% endif %}</td>
+        {% else %}
+        <td>{% if darf %}<span class="mk-text"><input form="{{ fid }}" name="{{ p }}text" value="{{ z.text }}" required class="voll">{{ loeschen(url_for('mietzahlung_loeschen', zid=z.id), 'Eintrag „%s“ löschen?' % z.text) }}</span>{% else %}{{ z.text }}{% endif %}</td>
+        <td class="zahl">{% if darf %}<input class="betrag" form="{{ fid }}" name="{{ p }}betrag" inputmode="decimal" value="{{ z.soll|num }}">{% else %}{{ z.soll|eur }}{% endif %}</td>
+        {% endif %}
+        {% if darf %}
+        <td class="zahl"><input class="betrag" form="{{ fid }}" name="{{ p }}gezahlt" inputmode="decimal" value="{{ z.gezahlt|num if z.gezahlt is not none else '' }}"></td>
+        <td><input type="date" form="{{ fid }}" name="{{ p }}datum" value="{{ z.datum or '' }}"></td>
+        {% else %}
+        <td class="zahl">{{ z.gezahlt|eur if z.gezahlt is not none else '–' }}</td><td>{{ z.datum|datum }}</td>
+        {% endif %}
+        <td class="zahl">{% if z.offen is not none %}<span class="{{ 'nachzahlung' if z.offen > 0.005 else ('gutschrift' if z.offen < -0.005) }}">{{ z.offen|eur }}</span>{% elif z.monat %}<small>{{ 'noch nicht fällig' if k.beginn else '' }}</small>{% endif %}</td>
+        <td class="zahl">{{ z.saldo|eur if z.saldo is not none }}</td>
+        <td>{% if darf %}<input class="voll" form="{{ fid }}" name="{{ p }}notiz" value="{{ z.notiz }}" placeholder="{{ 'z. B. Rest angekündigt' if loop.first }}">{% else %}<span class="notiz">{{ z.notiz }}</span>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="leise">Das Mietverhältnis läuft {{ jahr }} nicht.</td></tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><th>Summe {{ jahr }}</th><th class="zahl">{{ kj.soll|eur }}</th><th class="zahl">{{ kj.gezahlt|eur }}</th><td></td>
+        <th class="zahl">{{ kj.offen|eur }}</th><th class="zahl">{{ kj.ende|eur }}</th><td></td></tr></tfoot>
+    </table>
+    </div>
+    {% if darf %}
+    <div class="knopfleiste">
+      {{ speichern(form=fid) }}
+      <button class="btn hell" form="{{ fid }}" name="aktion" value="alle" title="Trägt bei allen fälligen Monaten ohne Zahlung das Soll als gezahlt ein. Vorhandene Einträge bleiben unverändert.">{{ icon('check') }}<span>Fällige Monate als bezahlt eintragen</span></button>
+    </div>
+    <details>
+      <summary>{{ icon('plus') }} Weitere Forderung oder Gutschrift</summary>
+      {% if k.vorschlag %}
+      <form method="post" action="{{ url_for('mietkonto_neu', mid=mv.id) }}" class="zeile">
+        <input type="hidden" name="jahr" value="{{ jahr }}"><input type="hidden" name="aktion" value="abrechnung">
+        <span>{{ k.vorschlag.text }}: {{ k.vorschlag.betrag|abs|eur }}</span>
+        <button class="btn hell">{{ icon('plus') }}<span>Ins Mietkonto übernehmen</span></button>
+      </form>
+      {% endif %}
+      <p class="leise">Zum Beispiel die Nachzahlung aus der Betriebskostenabrechnung oder eine Mahngebühr. Ein Guthaben des
+        Mieters mit Minus eintragen (−50,00).</p>
+      <form method="post" action="{{ url_for('mietkonto_neu', mid=mv.id) }}" class="zeile">
+        <input type="hidden" name="jahr" value="{{ jahr }}">
+        <label>Bezeichnung<input name="text" required placeholder="z. B. Mahngebühr"></label>
+        <label>Betrag (€)<input class="betrag" name="betrag" inputmode="decimal" required></label>
+        <label>gezahlt (€)<input class="betrag" name="gezahlt" inputmode="decimal"></label>
+        <label>am<input type="date" name="datum"></label>
+        <label class="notizfeld">Bemerkung<input name="notiz"></label>
+        <button class="btn">{{ icon('plus') }}<span>Hinzufügen</span></button>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="leise">Kein Mietverhältnis in {{ jahr }}. Mieter legst du im Reiter <a href="{{ url_for('wohnung', wid=w.id, reiter='mieter') }}">Mieter</a> an.</p>
+  {% endfor %}
+</section>
+{% endif %}
+
 {# ---------- Zähler ---------- #}
 {% if aktiv == 'zaehler' %}
 <section class="block" id="zaehler">
