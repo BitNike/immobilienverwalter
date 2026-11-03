@@ -12,7 +12,7 @@
 
 <table class="schmal ueber">
   <tr id="update"><th>Version</th><td>{{ version }}
-    {% if update %}<p><strong class="warnung">Neue Version {{ update.version }} verfügbar.</strong>
+    {% if update %}<p><span class="warnung">Neue Version {{ update.version }} verfügbar.</span>
       {% if update.url %}<a href="{{ update.url }}" target="_blank" rel="noopener">Was ist neu?</a>{% endif %}</p>
       <p class="leise">Update auf dem Server (im Ordner mit der <code>docker-compose.yml</code>), vorher am besten sichern:</p>
       <pre class="befehl">docker compose pull && docker compose up -d</pre>
