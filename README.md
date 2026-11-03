@@ -30,7 +30,7 @@ Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angele
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
 Neue Versionen zeigt die App Administratoren links unten an (einmal täglich geprüft, abschaltbar).
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.29.0` eintragen.
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.30.0` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen, Erinnerungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.
@@ -60,7 +60,8 @@ Ausführlich im **[Handbuch](docs/README.md)**.
   Kosten der Wohnung „über die WEG“ oder „vom Eigentümer direkt“ bezahlt (z. B. Müll, Grundsteuer),
   **Erhaltungsrücklage** als Kontoblatt mit Kontoständen.
 - **Zähler** für Wasser, Strom, Gas und Wärme mit Ablesungen und Zählertausch; Wasser nach Verbrauch verteilen.
-- **Verträge** mit Kündigungsterminen, Preisgarantie, Zählern und Unterlagen, Abgleich mit den Buchungen;
+- **Verträge** mit Kündigungsterminen, Preisgarantie, Zählern und Unterlagen, Abgleich mit den Buchungen,
+  jährliche Rechnung beim Vertrag hochladen und zugleich als Beleg der Buchung verwenden;
   **Erinnerungen per E-Mail**.
 - **Prüfliste „Bitte prüfen“** vor dem Export: fehlende MEA, ungespeicherte Vorauszahlungen, doppelte Kosten,
   Kosten aus dem Vorjahr, die noch fehlen, und mehr.

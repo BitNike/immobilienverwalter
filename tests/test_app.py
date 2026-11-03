@@ -1092,3 +1092,37 @@ def test_mietkonto():
     post(c, f"/mietzahlung/{zid}/loeschen")
     with app.app_context():
         assert not core.one("SELECT 1 FROM mietzahlung WHERE text = 'Mahngebühr'")
+
+
+def test_vertrag_beleg():
+    """Unterlage am Vertrag zugleich als Beleg an eine Buchung; Belege der Buchungen erscheinen beim Vertrag."""
+    import core
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["uid"] = 1
+    r = c.post("/immobilien/neu", data={"name": "Musterhof 5", "strasse": "Musterweg", "hausnummer": "5",
+                                        "plz": "12345", "ort": "Musterstadt"}, content_type="multipart/form-data")
+    iid = int(ok(r, 302).headers["Location"].rstrip("/").split("/")[-1])
+    with app.app_context():
+        ka = core.one("SELECT id FROM kostenart WHERE name = 'Gebäudeversicherung'")["id"]
+    post(c, f"/immobilien/{iid}/buchungen?jahr=2026", data={"datum": "2026-02-01", "text": "Beitrag Versicherung",
+                                                            "art": "ausgabe", "ziel": str(ka), "betrag": "900", "bezahlt": "konto"})
+    vertrag = {"art": "Gebäudeversicherung", "anbieter": "Muster AG", "betrag": "900", "zahlweise": "jaehrlich",
+               "verlaengerung": "12", "frist": "3", "kostenart_id": str(ka), "seite": "immobilie"}
+    post(c, f"/immobilien/{iid}/vertraege", data=vertrag)
+    with app.app_context():
+        vid = core.one("SELECT id FROM vertrag WHERE immobilie_id = ?", (iid,))["id"]
+        bid = core.one("SELECT id FROM buchung WHERE immobilie_id = ?", (iid,))["id"]
+    seite = ok(c.get(f"/immobilien/{iid}?reiter=vertraege&vertrag={vid}&jahr=2026")).get_data(as_text=True)
+    assert 'name="beleg_buchung"' in seite and "Beitrag Versicherung (900,00 €)" in seite
+    post(c, f"/vertraege/{vid}", data={**vertrag, "beleg_buchung": str(bid), "unterlagen_neu": pdf_datei("Beitragsrechnung.pdf")},
+         content_type="multipart/form-data")
+    with app.app_context():
+        b = core.one("SELECT * FROM buchung WHERE id = ?", (bid,))
+        dok = core.one("SELECT * FROM dokument WHERE id = ?", (b["dokument_id"],))
+        abl = core.one("SELECT * FROM ablage WHERE vertrag_id = ?", (vid,))
+    assert dok and dok["jahr"] == 2026 and abl and dok["pfad"] != abl["pfad"]
+    assert os.path.getsize(os.path.join(TMP, "dokumente", dok["pfad"])) == os.path.getsize(os.path.join(TMP, "dokumente", abl["pfad"]))
+    seite = ok(c.get(f"/immobilien/{iid}?reiter=vertraege&jahr=2026")).get_data(as_text=True)
+    assert "Beleg 2026: Beitrag Versicherung" in seite and "Beitragsrechnung" in seite
+    assert 'name="beleg_buchung"' not in ok(c.get(f"/immobilien/{iid}?reiter=vertraege&vertrag={vid}")).get_data(as_text=True)

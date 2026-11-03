@@ -11,7 +11,7 @@ import db
 from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
-VERSION = "0.29.0"
+VERSION = "0.30.0"
 NAME = "Immobilienverwalter"
 URL = "https://github.com/BitNike/immobilienverwalter"  # Projektseite (Fußzeile des Briefs, Seite „Über“)
 ENTWICKLER = "Sascha Benecke"

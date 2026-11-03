@@ -324,10 +324,11 @@
     <details>
       <summary>{{ icon('plus') }} Weitere Forderung oder Gutschrift</summary>
       {% if k.vorschlag %}
-      <form method="post" action="{{ url_for('mietkonto_neu', mid=mv.id) }}" class="zeile">
+      <form method="post" action="{{ url_for('mietkonto_neu', mid=mv.id) }}" class="meldung mk-vorschlag">
         <input type="hidden" name="jahr" value="{{ jahr }}"><input type="hidden" name="aktion" value="abrechnung">
-        <span>{{ k.vorschlag.text }}: {{ k.vorschlag.betrag|abs|eur }}</span>
-        <button class="btn hell">{{ icon('plus') }}<span>Ins Mietkonto übernehmen</span></button>
+        <span><strong>{{ k.vorschlag.text }}: {{ k.vorschlag.betrag|abs|eur }}</strong><br>
+          <small class="leise">Erst übernehmen, wenn die Abrechnung beim Mieter ist. Die Zahlung trägst du dann in dieser Zeile ein.</small></span>
+        <button class="btn hell klein">{{ icon('plus') }}<span>Ins Mietkonto übernehmen</span></button>
       </form>
       {% endif %}
       <p class="leise">Zum Beispiel die Nachzahlung aus der Betriebskostenabrechnung oder eine Mahngebühr. Ein Guthaben des

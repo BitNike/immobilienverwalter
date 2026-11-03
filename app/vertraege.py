@@ -120,9 +120,23 @@ def vertraege(iid, wid=None, heute=None, nur_sichtbare=True, j=None):
                                     (iid, j, v["kostenart_id"]))["s"])
             v["dauerauftrag"] = bool(one("SELECT 1 FROM dauerauftrag WHERE immobilie_id = ? AND jahr = ? AND kostenart_id = ?",
                                          (iid, j, v["kostenart_id"])))
+        # Belege der Buchungen dieser Kostenart (nur Admin, wie bei den Buchungen) und Buchungen des Jahres ohne Beleg
+        v["belege"] = v["ohne_beleg"] = []
+        if nur_sichtbare and ist_admin() and not v["wohnung_id"] and v["kostenart_id"]:
+            v["belege"] = rows("SELECT b.jahr, b.datum, d.id AS dokument_id, d.titel FROM buchung b "
+                               "JOIN dokument d ON d.id = b.dokument_id WHERE b.immobilie_id = ? AND b.kostenart_id = ? "
+                               "ORDER BY b.jahr DESC, b.datum DESC, b.id DESC LIMIT 3", (iid, v["kostenart_id"]))
+            if j:
+                v["ohne_beleg"] = buchungen_ohne_beleg(iid, v["kostenart_id"], j)
         v["unterlagen"] = rows("SELECT * FROM ablage WHERE vertrag_id = ?" + ("" if ist_admin() else " AND intern = 0")
                                + " ORDER BY titel COLLATE NATUERLICH", (v["id"],)) if nur_sichtbare else []
     return erg
+
+
+def buchungen_ohne_beleg(iid, kostenart_id, j):
+    """Buchungen einer Kostenart im Jahr j ohne Beleg – Auswahl „Auch als Beleg für …“ beim Hochladen am Vertrag."""
+    return rows("SELECT * FROM buchung WHERE immobilie_id = ? AND kostenart_id = ? AND jahr = ? AND dokument_id IS NULL "
+                "ORDER BY datum, id", (iid, kostenart_id, j))
 
 
 def ablage_zur_auswahl(iid, wid):
@@ -197,9 +211,11 @@ def _zurueck(v):
     return redirect(url_for("immobilie", iid=v["immobilie_id"], reiter="vertraege"))
 
 
-def _unterlagen_speichern(vid, iid, wid, art):
+def _unterlagen_speichern(vid, iid, wid, art, kostenart_id=None):
     """Hochgeladene Dateien als Ablage-Einträge (Kategorie „Verträge & Versicherungen“) mit dem Vertrag verbinden;
-    angehakte vorhandene Ablage-Einträge zuordnen, abgewählte lösen (sie bleiben in der Ablage)."""
+    angehakte vorhandene Ablage-Einträge zuordnen, abgewählte lösen (sie bleiben in der Ablage). Mit „beleg_buchung“
+    wird die erste Datei zusätzlich als Beleg an diese Buchung gehängt (eigene Kopie, damit Löschen an einer Stelle
+    die andere nicht trifft)."""
     f = request.form
     if "unterlagen_auswahl" in f:
         gewaehlt = {int(a) for a in f.getlist("unterlagen") if a.isdigit()}
@@ -220,11 +236,26 @@ def _unterlagen_speichern(vid, iid, wid, art):
     if wid:
         ordner.append(dateien.ordnername(row("SELECT bezeichnung FROM wohnung WHERE id = ?", (wid,))["bezeichnung"]))
     ordner.append(dateien.ordnername(ablage_kategorien()[kategorie]))
+    buchung = None
+    if f.get("beleg_buchung", "").isdigit() and ist_admin() and not wid and kostenart_id:
+        buchung = one("SELECT * FROM buchung WHERE id = ? AND immobilie_id = ? AND kostenart_id = ? AND dokument_id IS NULL",
+                      (int(f["beleg_buchung"]), iid, kostenart_id))
+        if not buchung:
+            raise ValueError("Die gewählte Buchung passt nicht zu diesem Vertrag oder hat schon einen Beleg.")
     for d in dateiliste:
         pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(*ordner))
         exe("INSERT INTO ablage (immobilie_id, wohnung_id, kategorie, titel, notiz, pfad, mime, groesse, hochgeladen_von, "
             "vertrag_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (iid, wid, kategorie, os.path.splitext(d.filename)[0], f"Vertrag: {art}", pfad, mime, groesse, g.user["id"], vid))
+        if buchung:
+            d.stream.seek(0)
+            pfad, mime, groesse = dateien.dokument_speichern(d, os.path.join(immo["ordner"], str(buchung["jahr"]), "Vermieter"))
+            dok = exe("INSERT INTO dokument (immobilie_id, jahr, bereich, kostenart_id, titel, pfad, mime, groesse, "
+                      "hochgeladen_von) VALUES (?, ?, 'vermieter', ?, ?, ?, ?, ?, ?)",
+                      (iid, buchung["jahr"], kostenart_id, buchung["text"], pfad, mime, groesse, g.user["id"]))
+            exe("UPDATE buchung SET dokument_id = ? WHERE id = ?", (dok, buchung["id"]))
+            flash(f"„{d.filename}“ ist auch als Beleg an der Buchung „{buchung['text']}“ ({buchung['jahr']}) gespeichert.")
+            buchung = None
     return len(dateiliste)
 
 
@@ -254,7 +285,7 @@ def vertrag_neu(iid):
     vid = exe(f"INSERT INTO vertrag (immobilie_id, wohnung_id, {', '.join(vals)}) VALUES (?, ?, {', '.join('?' * len(vals))})",
               [iid, wid, *vals.values()])
     _zaehler_setzen(vid, iid, wid)
-    n = _unterlagen_speichern(vid, iid, wid, vals["art"])
+    n = _unterlagen_speichern(vid, iid, wid, vals["art"], vals.get("kostenart_id"))
     flash(f"Vertrag „{vals['art']}“ angelegt." + (f" {n} Unterlage(n) in der Ablage gespeichert." if n else ""))
     return _zurueck({"immobilie_id": iid, "wohnung_id": wid})
 
@@ -266,7 +297,7 @@ def vertrag_speichern(vid):
     vals = _werte()
     exe(f"UPDATE vertrag SET {', '.join(k + ' = ?' for k in vals)} WHERE id = ?", [*vals.values(), vid])
     _zaehler_setzen(vid, v["immobilie_id"], v["wohnung_id"])
-    n = _unterlagen_speichern(vid, v["immobilie_id"], v["wohnung_id"], vals["art"])
+    n = _unterlagen_speichern(vid, v["immobilie_id"], v["wohnung_id"], vals["art"], vals.get("kostenart_id"))
     if n:
         flash(f"{n} Unterlage(n) in der Ablage gespeichert und mit dem Vertrag verbunden.")
     return _zurueck(v)

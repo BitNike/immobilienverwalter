@@ -167,6 +167,7 @@ table.mietkonto input.voll { width: 100%; min-width: 100px; }
 table.mietkonto .soll-stift { color: var(--leise); margin-right: 4px; }
 table.mietkonto .soll-stift:hover { color: var(--primaer); }
 table.mietkonto .mk-text { display: flex; align-items: center; gap: 4px; }
+.mk-vorschlag { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 table.mietkonto .klein-feld { display: block; font-size: 11px; color: var(--leise); text-align: right; }
 table.mietkonto .klein-feld + .klein-feld { margin-top: 4px; }
 table.buchungen label.erstattet { margin-top: 6px; font-size: 11.5px; }

@@ -20,6 +20,14 @@ Die Liste zeigt je Vertrag den Status, die Kosten im Jahr, die verbundenen Zähl
 und die Unterlagen. Angehängte Dateien landen in der Ablage unter „Verträge & Versicherungen“ und bleiben dort,
 auch wenn der Vertrag gelöscht wird.
 
+**Jährliche Rechnung nur einmal hochladen:** Hat der Vertrag der Immobilie eine Kostenart, bietet das Formular beim
+Bearbeiten unter „Unterlagen“ die Auswahl **„Auch als Beleg für“** an: die Buchungen dieser Kostenart im gewählten Jahr,
+die noch keinen Beleg haben. Die erste angehängte Datei kommt dann zusätzlich als Beleg an diese Buchung (als eigene Kopie,
+Löschen an einer Stelle lässt die andere bestehen). Umgekehrt zeigt die Vertragsliste die Belege der Buchungen dieser
+Kostenart („Beleg 2026: …“, die letzten drei) auch dann, wenn du sie bei den Buchungen hochgeladen hast.
+Beispiel Gebäudeversicherung: Police und Bedingungen einmal beim Vertrag, die Beitragsrechnung jedes Jahr beim Vertrag
+mit „Auch als Beleg für“ oder direkt an der Buchung.
+
 **Vertrag und Buchungen:** Der Betrag im Vertrag ist der vereinbarte Preis, er bucht noch nichts.
 Gebucht wird im Reiter Buchungen nach Rechnung bzw. Kontoauszug, denn die tatsächlichen Beträge weichen oft ab
 (Beitragsanpassung, Nachzahlung). Hat ein Vertrag der Immobilie eine **Kostenart**, zeigt die Liste unter den Kosten:
