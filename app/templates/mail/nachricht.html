@@ -1,0 +1,16 @@
+{% extends "mail/_rahmen.html" %}
+{% block inhalt %}
+  <tr><td style="padding:26px 28px 6px;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;">{{ ueberschrift }}</div>
+    {% if anrede %}<div style="font-size:15px;line-height:1.55;margin-top:14px;">{{ anrede }},</div>{% endif %}
+    {% for a in absaetze %}<div style="font-size:15px;line-height:1.55;margin-top:10px;">{{ a }}</div>{% endfor %}
+  </td></tr>
+  {% if knopf %}
+  <tr><td align="left" style="padding:20px 28px 4px;">
+    <a href="{{ knopf[1] }}" style="display:inline-block;background:#17325c;color:#ffffff;text-decoration:none;font-size:15px;padding:12px 22px;border-radius:3px;">{{ knopf[0] }}</a>
+    <div style="font-size:12px;line-height:1.5;color:#8a9099;margin-top:10px;word-break:break-all;">Falls der Knopf nicht funktioniert: {{ knopf[1] }}</div>
+  </td></tr>
+  {% endif %}
+  <tr><td style="padding:14px 28px 0;"></td></tr>
+{% endblock %}
+{% block fuss %}{% if hinweis %}{{ hinweis }}<br>{% endif %}{% endblock %}

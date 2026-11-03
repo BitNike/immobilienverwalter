@@ -385,29 +385,9 @@ def empfaenger(posten):
     return an
 
 
-def logo_fuer_mail():
-    """Logo wie oben links in der App (Einstellungen → Logo & Brief): eingebautes Standard-Logo, hochgeladenes Bild
-    oder – bei „Text“ – keins. Ergebnis: (bytes, Untertyp, Breite in px) oder None."""
-    import dateien
-    typ = einstellung("logo_typ", "standard")
-    if typ == "standard":
-        pfad = os.path.join(os.path.dirname(__file__), "static", "logo.png")
-    elif typ == "bild" and einstellung("logo_datei"):
-        pfad = os.path.join(dateien.BILD_DIR, einstellung("logo_datei"))
-    else:
-        return None
-    if not os.path.exists(pfad):
-        return None
-    with open(pfad, "rb") as f:
-        daten = f.read()
-    untertyp = {".png": "png", ".jpg": "jpeg", ".jpeg": "jpeg", ".gif": "gif", ".webp": "webp"}.get(
-        os.path.splitext(pfad)[1].lower(), "png")
-    return daten, untertyp, 260 if typ == "standard" else 200
-
-
 def mail_inhalt(empfaenger_b, liste, url=""):
     """(Betreff, Text, HTML, Bilder) für eine Erinnerungsmail."""
-    logo = logo_fuer_mail()
+    logo = mail.logo_fuer_mail()
     anzahl = len(liste)
     betreff = f"Erinnerung: {anzahl} Termin{'e' if anzahl != 1 else ''} bei Verträgen"
     anrede = f"Hallo {empfaenger_b['vorname']}" if empfaenger_b and empfaenger_b.get("vorname") else "Guten Tag"

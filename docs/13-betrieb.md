@@ -52,6 +52,8 @@ E-Mail-Versand ist optional und wird in der `.env` eingerichtet (`SMTP_HOST`, `S
 `SMTP_PASSWORD`, `SMTP_FROM`, siehe [`.env.example`](../.env.example)).
 `SMTP_FROM` ist der Absender und muss eine echte Adresse sein, am besten dieselbe wie `SMTP_USER`, sonst lehnen viele
 Anbieter die Mails ab. Ein Anzeigename davor ist optional: `SMTP_FROM=Immobilienverwalter <name@example.de>`. Unter **Einstellungen → SMTP / E-Mail** kannst du eine Testmail schicken.
+Alle Mails (Testmail, Einladung, Passwort-Link, Erinnerungen) kommen im selben Stil mit dem Logo aus
+**Einstellungen → Logo & Brief** und zusätzlich als reiner Text für Mailprogramme ohne HTML.
 
 ## Sicherheit
 

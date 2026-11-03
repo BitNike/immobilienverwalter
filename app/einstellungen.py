@@ -361,7 +361,11 @@ def smtp_admin():
     if request.method == "POST":
         an = request.form.get("an", "").strip() or g.user["email"]
         try:
-            mail.senden(an, "Testnachricht Immobilienverwalter", "Der E-Mail-Versand funktioniert.")
+            mail.nachricht(an, "Testnachricht Immobilienverwalter", "Der E-Mail-Versand funktioniert", [
+                "diese Testnachricht wurde über deine SMTP-Einstellungen verschickt. Passwort-Links, Einladungen und "
+                "Erinnerungen an Verträge kommen auf demselben Weg an."],
+                anrede=f"Hallo {g.user['vorname']}" if g.user["vorname"] else "Guten Tag",
+                hinweis="Diese Nachricht hast du unter Einstellungen → SMTP / E-Mail angefordert.")
             flash(f"Testmail an {an} gesendet.")
         except Exception as e:  # noqa: BLE001
             flash(f"Versand fehlgeschlagen: {e}", "fehler")

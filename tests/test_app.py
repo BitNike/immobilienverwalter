@@ -681,6 +681,17 @@ def test_gesamter_ablauf():
         post(c, "/einstellungen/admin/erinnerungen", data={"aktion": "beispiel"})  # Vorschau, markiert nichts
         assert len(gesendet) == 2 and gesendet[1][1].startswith("[Beispiel] Erinnerung:") and "Muster-Energie" in gesendet[1][2]
         post(c, "/einstellungen/admin/erinnerungen", data={"vorlauf": "30", "empfaenger": "1"})  # ausgeschaltet
+        # Testmail und Passwort-Link im selben Stil (Logo, Überschrift, Knopf), mit Textfassung
+        post(c, "/einstellungen/admin/smtp", data={"an": "test@example.org"})
+        an, betreff, text, mail_html, bilder = gesendet[-1]
+        assert an == "test@example.org" and "Der E-Mail-Versand funktioniert" in mail_html and 'src="cid:logo"' in mail_html
+        assert "Testnachricht wurde über deine SMTP-Einstellungen" in text and "logo" in bilder
+        from auth import link_senden
+        with app.test_request_context():
+            link_senden({"id": 1, "vorname": "Max", "benutzername": "admin", "email": "max@example.org",
+                         "passwort_hash": "x"})
+        an, betreff, text, mail_html, bilder = gesendet[-1]
+        assert betreff == "Passwort zurücksetzen" and "Neues Passwort festlegen</a>" in mail_html and "/passwort-setzen/" in text
     finally:
         mailmodul.konfiguriert, mailmodul.senden = alt
     vid = dbcon.execute("SELECT id FROM vertrag WHERE art = 'Strom (Allgemeinstrom)'").fetchone()[0]

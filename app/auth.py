@@ -34,17 +34,18 @@ def link_basis():
 
 def link_senden(benutzer, einladung=False):
     link = link_basis() + url_for("passwort_setzen", token=token_erstellen(benutzer))
+    anrede = f"Hallo {benutzer['vorname'] or benutzer['benutzername']}"
     if einladung:
-        betreff = "Einladung zum Immobilienverwalter"
-        text = (f"Hallo {benutzer['vorname'] or benutzer['benutzername']},\n\n"
-                f"für dich wurde ein Zugang angelegt. Benutzername: {benutzer['benutzername']}\n"
-                f"Bitte lege über diesen Link dein Passwort fest (7 Tage gültig):\n{link}\n")
+        mail.nachricht(benutzer["email"], "Einladung zum Immobilienverwalter", "Dein Zugang ist eingerichtet", [
+            "für dich wurde ein Zugang zum Immobilienverwalter angelegt.",
+            f"Dein Benutzername: {benutzer['benutzername']}",
+            "Lege über den Link unten dein Passwort fest. Er ist 7 Tage gültig."],
+            knopf=("Passwort festlegen", link), anrede=anrede)
     else:
-        betreff = "Passwort zurücksetzen"
-        text = (f"Hallo {benutzer['vorname'] or benutzer['benutzername']},\n\n"
-                f"über diesen Link kannst du ein neues Passwort festlegen (7 Tage gültig):\n{link}\n\n"
-                "Falls du das nicht angefordert hast, ignoriere diese E-Mail.\n")
-    mail.senden(benutzer["email"], betreff, text)
+        mail.nachricht(benutzer["email"], "Passwort zurücksetzen", "Neues Passwort festlegen", [
+            "über den Link unten kannst du ein neues Passwort festlegen. Er ist 7 Tage gültig."],
+            knopf=("Neues Passwort festlegen", link), anrede=anrede,
+            hinweis="Falls du das nicht angefordert hast, ignoriere diese E-Mail. Dein Passwort bleibt dann unverändert.")
 
 
 @app.route("/einrichtung", methods=["GET", "POST"])
