@@ -38,6 +38,9 @@
     {% if ist_admin %}
     <a class="kachel plus {{ 'aktiv' if request.endpoint == 'immobilie_neu' }}" href="{{ url_for('immobilie_neu') }}" title="Immobilie anlegen">{{ icon('plus', 20) }}</a>
     {% endif %}
+    {% if update %}
+    <a class="update-hinweis" href="{{ url_for('info') }}#update" title="Neue Version {{ update.version }} – Hinweise zum Update">{{ icon('download', 16) }}<span>Update verfügbar: {{ update.version }}</span></a>
+    {% endif %}
     {% if archiv_anzahl %}
     <a class="archiv-link {{ 'aktiv' if request.endpoint == 'archiv' or (immo and immo.archiviert) }}" href="{{ url_for('archiv') }}">{{ icon('folder', 16) }}<span>Archiv ({{ archiv_anzahl }})</span></a>
     {% endif %}

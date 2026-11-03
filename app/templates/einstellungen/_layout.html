@@ -32,6 +32,7 @@
     {% endif %}
     {{ eintrag('info', 'Über', 'info', bereich == 'info') }}
     <a class="baum-version" href="{{ url_for('info') }}">Version {{ version }}</a>
+    {% if update %}<a class="baum-version update-hinweis" href="{{ url_for('info') }}#update">Update verfügbar: {{ update.version }}</a>{% endif %}
   </nav>
   <div class="panel">{% block panel %}{% endblock %}</div>
 </div>

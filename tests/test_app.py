@@ -9,6 +9,7 @@ TMP = tempfile.mkdtemp()
 os.environ["NK_DATA"] = os.path.join(TMP, "data")
 os.environ["NK_DOKUMENTE"] = os.path.join(TMP, "dokumente")
 os.environ["NK_ERINNERUNG"] = "aus"  # keine Hintergrund-Prüfung im Test
+os.environ["NK_UPDATE_CHECK"] = "aus"  # keine Abfrage bei GitHub (nur in test_update)
 os.environ["NK_CSRF"] = "aus"  # CSRF-Feld nur in test_csrf, sonst müsste jeder POST es mitschicken
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
@@ -968,3 +969,40 @@ def test_csrf():
         assert ok(c.get("/health")).get_json()["status"] == "ok"
     finally:
         core.CSRF_AKTIV = False
+
+
+def test_update(monkeypatch):
+    """Hinweis auf neue Versionen: nur für Admins, nur wenn neuer, abschaltbar; ohne Netz (Abfrage ersetzt)."""
+    import time
+    import core
+    import update
+    assert update.versionsteile("v0.28.1") == (0, 28, 1) and update.versionsteile("1.0") is None
+    assert update.versionsteile("0.10.0") > update.versionsteile("0.9.9")
+    monkeypatch.setenv("NK_UPDATE_CHECK", "an")
+    abgefragt = []
+
+    def abfragen():
+        abgefragt.append(1)
+        core.einstellung_setzen("update_neueste", "99.0.0")
+        core.einstellung_setzen("update_url", "https://example.org/release")
+        core.einstellung_setzen("update_geprueft", str(int(time.time())))
+    monkeypatch.setattr(update, "abfragen", abfragen)
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["uid"] = 1
+    with app.app_context():
+        core.einstellung_setzen("update_pruefen", "1")
+        core.einstellung_setzen("update_geprueft", str(int(time.time())))  # keine Hintergrund-Abfrage
+        core.einstellung_setzen("update_neueste", core.VERSION)
+    assert "Update verfügbar" not in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    post(c, "/einstellungen/update", data={"aktion": "jetzt", "pruefen": "on"})
+    assert abgefragt
+    assert "Update verfügbar: 99.0.0" in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    seite = ok(c.get("/einstellungen/info")).get_data(as_text=True)
+    assert "Neue Version 99.0.0 verfügbar" in seite and "docker compose pull" in seite and "example.org/release" in seite
+    post(c, "/einstellungen/update", data={})  # Haken aus
+    assert "Update verfügbar" not in ok(c.get("/immobilien/1")).get_data(as_text=True)
+    monkeypatch.setenv("NK_UPDATE_CHECK", "aus")
+    post(c, "/einstellungen/update", data={"pruefen": "on"})
+    seite = ok(c.get("/einstellungen/info")).get_data(as_text=True)
+    assert "Update verfügbar" not in seite and "NK_UPDATE_CHECK=aus" in seite

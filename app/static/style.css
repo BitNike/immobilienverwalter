@@ -245,6 +245,11 @@ form.schmal { max-width: 360px; display: flex; flex-direction: column; gap: 12px
 [hidden] { display: none !important; }
 .archiv-link { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 6px 4px; font-size: 13px; color: var(--leise); }
 .archiv-link.aktiv, .archiv-link:hover { color: var(--primaer); text-decoration: none; }
+.update-hinweis { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 6px 4px; font-size: 13px;
+  font-weight: 600; color: var(--warnung); }
+.update-hinweis:hover { color: var(--primaer); text-decoration: none; }
+.baum a.baum-version.update-hinweis { margin-top: 4px; font-weight: 600; color: var(--warnung); }
+pre.befehl { background: var(--flaeche); padding: 8px 10px; font-size: 13px; overflow-x: auto; margin: 4px 0 10px; }
 .filter .suche { flex: 1 1 260px; }
 .filter .suche input { width: 100%; }
 table.dokumente th a { color: inherit; }
@@ -311,14 +316,14 @@ table.rl-blatt th:nth-child(4), table.rl-blatt th:nth-child(5) { min-width: 130p
 @media (min-width: 1001px) {
   .spalte.zu, .spalte.zu + .spalte.zu { width: 60px; padding: 16px 8px; }
   .spalte.zu .spalten-titel { justify-content: center; margin: 2px 0 4px; }
-  .spalte.zu .spalten-titel > span, .spalte.zu .kachel span, .spalte.zu .archiv-link span { display: none; }
+  .spalte.zu .spalten-titel > span, .spalte.zu .kachel span, .spalte.zu .archiv-link span, .spalte.zu .update-hinweis span { display: none; }
   .spalte.zu .spalten-knopf .i { display: none; }
   .spalte.zu .spalten-knopf .i + .i { display: block; }
   .spalte.zu .kachel { justify-content: center; padding: 10px 0; }
   .spalte.zu .kachel.klein { padding: 7px 0; }
   .spalte.zu[data-name="mietobjekte"] .kachel:has(.kurz) .i { display: none; }
   .spalte.zu .kachel .kurz { display: block; font-size: 13px; font-weight: 600; }
-  .spalte.zu .archiv-link { justify-content: center; }
+  .spalte.zu .archiv-link, .spalte.zu .update-hinweis { justify-content: center; }
 }
 @media (max-width: 1000px) { .spalten-knopf { display: none; } }
 /* Status der Verträge */

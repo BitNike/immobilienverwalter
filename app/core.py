@@ -11,7 +11,7 @@ import db
 from calc import SCHLUESSEL, de_monate, de_num, parse_date
 from icons import ICONS
 
-VERSION = "0.27.0"
+VERSION = "0.28.0"
 NAME = "Immobilienverwalter"
 URL = "https://github.com/BitNike/immobilienverwalter"  # Projektseite (Fußzeile des Briefs, Seite „Über“)
 ENTWICKLER = "Sascha Benecke"
@@ -306,7 +306,13 @@ def kontext():
         "user": g.user, "ist_admin": ist_admin(), "logo": logo_info(), "version": VERSION,
         "sidebar_immobilien": sichtbare_immobilien(), "archiv_anzahl": len(sichtbare_immobilien(archiv=True)),
         "jahr": jahr(),
+        "update": _update_hinweis() if ist_admin() else None,
     }
+
+
+def _update_hinweis():
+    import update  # erst hier: update.py importiert core
+    return update.neue_version()
 
 
 def logo_info():

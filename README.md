@@ -29,7 +29,8 @@ der [`docker-compose.yml`](docker-compose.yml) einfügen. Mehr braucht es nicht,
 Danach im Browser: `http://<IP-des-Rechners>:8080`. Der erste Zugang, der angelegt wird, ist Administrator.
 
 **Update:** `docker compose pull && docker compose up -d` – die Daten liegen in den Volumes und bleiben erhalten.
-Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.27.0` eintragen.
+Neue Versionen zeigt die App Administratoren links unten an (einmal täglich geprüft, abschaltbar).
+Für eine feste Version statt `latest` z. B. `ghcr.io/bitnike/immobilienverwalter:0.28.0` eintragen.
 
 E-Mail-Versand (Passwort vergessen, Einladungen, Erinnerungen) ist optional: Vorlage [`.env.example`](.env.example) als `.env`
 neben die Compose-Datei legen und ausfüllen.

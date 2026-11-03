@@ -1,6 +1,7 @@
 """Einstellungen (Vermieter, Administration) und Profil."""
 import os
 import secrets
+from datetime import datetime
 
 from flask import abort, flash, g, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -47,8 +48,13 @@ def vermieter_liste():
 @app.get("/einstellungen/info")
 def info():
     from core import ENTWICKLER, LIZENZ, NAME, SPENDEN_URL, URL
+    import update
+    geprueft = int(einstellung("update_geprueft", "0") or 0)
+    pruefung = {"aktiv": update.aktiv(), "per_env_aus": os.environ.get("NK_UPDATE_CHECK", "an") == "aus",
+                "neueste": einstellung("update_neueste"),
+                "geprueft": datetime.fromtimestamp(geprueft) if geprueft else None}
     return render_template("einstellungen/info.html", bereich="info", name=NAME, entwickler=ENTWICKLER,
-                           lizenz=LIZENZ, projekt_url=URL, spenden_url=SPENDEN_URL)
+                           lizenz=LIZENZ, projekt_url=URL, spenden_url=SPENDEN_URL, pruefung=pruefung)
 
 
 # ---------- Administration: Vermieter ----------

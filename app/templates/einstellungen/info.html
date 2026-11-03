@@ -1,5 +1,5 @@
 {% extends "einstellungen/_layout.html" %}
-{% from "_ui.html" import icon %}
+{% from "_ui.html" import icon, info %}
 {% block title %}Über{% endblock %}
 {% block panel %}
 <div class="ueber-kopf">
@@ -11,6 +11,23 @@
 </div>
 
 <table class="schmal ueber">
+  <tr id="update"><th>Version</th><td>{{ version }}
+    {% if update %}<p><strong class="warnung">Neue Version {{ update.version }} verfügbar.</strong>
+      {% if update.url %}<a href="{{ update.url }}" target="_blank" rel="noopener">Was ist neu?</a>{% endif %}</p>
+      <p class="leise">Update auf dem Server (im Ordner mit der <code>docker-compose.yml</code>), vorher am besten sichern:</p>
+      <pre class="befehl">docker compose pull && docker compose up -d</pre>
+    {% elif pruefung.aktiv and pruefung.neueste %}<p class="leise">Das ist die neueste Version.</p>{% endif %}
+    {% if ist_admin %}
+    <p class="leise">{% if pruefung.per_env_aus %}Die Suche nach Updates ist in der <code>.env</code> abgeschaltet (<code>NK_UPDATE_CHECK=aus</code>).
+      {% elif pruefung.geprueft %}Zuletzt geprüft: {{ pruefung.geprueft.strftime('%d.%m.%Y, %H:%M') }} Uhr.{% endif %}</p>
+    {% if not pruefung.per_env_aus %}
+    <form method="post" action="{{ url_for('update_einstellen') }}" class="zeile">
+      <label class="haken"><input type="checkbox" name="pruefen" {{ 'checked' if pruefung.aktiv }} onchange="this.form.submit()">
+        <span>Täglich nach Updates suchen {{ info("Fragt einmal am Tag bei GitHub nach der neuesten Version. Dabei sieht GitHub nur die IP-Adresse des Servers; Daten aus der App werden nicht übertragen. Den Hinweis sehen nur Administratoren.") }}</span></label>
+      {% if pruefung.aktiv %}<button class="btn klein" name="aktion" value="jetzt">{{ icon('download', 14) }}<span>Jetzt prüfen</span></button>{% endif %}
+    </form>
+    {% endif %}{% endif %}
+  </td></tr>
   <tr><th>Entwickler</th><td>{{ entwickler }}</td></tr>
   <tr><th>Lizenz</th><td>
     <a class="lizenz-badge" href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener" title="GNU Affero General Public License v3.0">

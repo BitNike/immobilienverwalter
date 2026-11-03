@@ -25,6 +25,16 @@ docker compose pull && docker compose up -d
 Neue Versionen ändern die Datenbank nur, indem sie Spalten oder Tabellen ergänzen. Die Änderungen stehen in den
 [Release-Notizen](https://github.com/BitNike/immobilienverwalter/releases).
 
+### Hinweis auf neue Versionen
+
+Die App fragt einmal am Tag bei GitHub nach der neuesten Version. Gibt es eine neuere, sehen **Administratoren**
+links unten den Hinweis **„Update verfügbar: …“**. Unter **Einstellungen → Über** stehen dann der Link zu den
+Neuerungen und der Update-Befehl. Dort lässt sich auch „Jetzt prüfen“ anklicken.
+
+Bei der Abfrage sieht GitHub nur die IP-Adresse des Servers. Daten aus der App werden nicht übertragen.
+Abschalten: Haken „Täglich nach Updates suchen“ unter Einstellungen → Über, oder `NK_UPDATE_CHECK=aus` in der `.env`.
+Aktualisieren kann sich die App nicht selbst, das Update startest du mit dem Befehl oben.
+
 ## Rückweg auf eine ältere Version
 
 1. In der `docker-compose.yml` statt `latest` eine feste Version eintragen, z. B.
