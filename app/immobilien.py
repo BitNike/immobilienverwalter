@@ -8,7 +8,7 @@ from flask import abort, flash, g, redirect, render_template, request, send_file
 import dateien
 import db
 from vertraege import MIETARTEN, kennzahlen as vertrag_kennzahlen, mietvertraege, vertraege
-from calc import berechne, cent_genau, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
+from calc import berechne, cent_genau, de_monate, de_num, messbeginn, parse_date, parse_mea, parse_num, rund, verbrauch_zeitraum
 from core import (BEREICHE, SCHLUESSEL, ablage_kategorie_anlegen, ablage_kategorien, ZAEHLERARTEN, admin_noetig, app, eigentuemer_anlegen, exe, immobilie_laden, ist_admin, jahr, one,
                   person_name, row, rows, sichtbare_immobilien, wohnung_bearbeitbar, wohnung_laden,
                   wohnung_sichtbar, wohnungen_der_immobilie, zurueck)
@@ -209,6 +209,11 @@ def fehlende_kostenarten(iid, j, wid=None):
     return sorted((name for k, name in vorher.items() if k not in jetzt and k not in ungenutzt), key=str.lower)
 
 
+# Kostenarten (Nr. § 2 BetrKV), deren Bescheid meist direkt an den Eigentümer geht: Grundsteuer, Entwässerung,
+# Straßenreinigung und Müll (Grundbesitzabgaben)
+EIGENTUEMER_DIREKT_UEBLICH = {"1", "3", "8"}
+
+
 def pruefungen(immo, erg, wids, ganze_immobilie=False):
     """Offene Punkte vor dem Export: 'fehler' verfälschen die Abrechnung, 'hinweis' sollte man ansehen."""
     punkte = []
@@ -278,6 +283,23 @@ def pruefungen(immo, erg, wids, ganze_immobilie=False):
         for name in fehlende_kostenarten(immo["id"], j, wid):
             punkt(f"{w['bezeichnung']}: „{name}“ war {j - 1} bei den Kosten der Wohnung, {j} noch nicht.",
                   abrechnung, "hinweis")
+        # Typische Verwechslungen bei Kosten der Wohnung (häufig, wenn Jahreskosten aus einer WEG-Abrechnung von Hand
+        # übernommen werden): „direkt für Mieter“ trotz kürzerer Mietzeit, „Eigentümer direkt“ bei Kosten der Gemeinschaft
+        direkte = rows("SELECT k.*, ka.name AS kostenart, ka.betrkv_nr FROM kosten k JOIN kostenart ka ON ka.id = k.kostenart_id "
+                       "WHERE k.wohnung_id = ? AND k.jahr = ? AND k.betrag <> 0 ORDER BY ka.sortierung, ka.name", (wid, j))
+        for p in ([] if w["mieter_extern"] else r["parteien"]):
+            namen = [k["kostenart"] for k in direkte if k["mv_id"] == p["mv"]["id"]]
+            if namen and p["monate"] < erg["monate"] - 0.001:
+                punkt(f"{w['bezeichnung']}: {', '.join(namen)} {'ist' if len(namen) == 1 else 'sind'} direkt für "
+                      f"{mv_name(p['mv'])} (100 %) eingetragen, das Mietverhältnis lief {j} aber nur {de_monate(p['monate'])} "
+                      "Monate. Sind es Jahreskosten der Wohnung, beim Bearbeiten „Wohnung – zeitanteilig“ wählen. "
+                      "Eine Einzelabrechnung nur für seinen Zeitraum (z. B. vom Messdienst) bleibt so.", abrechnung, "hinweis")
+        if immo["weg"] or w["mieter_extern"]:
+            namen = [k["kostenart"] for k in direkte if k["eigentuemer_direkt"] and k["betrkv_nr"] not in EIGENTUEMER_DIREKT_UEBLICH]
+            if namen:
+                punkt(f"{w['bezeichnung']}: {', '.join(namen)} {'ist' if len(namen) == 1 else 'sind'} als „Eigentümer direkt“ "
+                      "bezahlt eingetragen und fehlen deshalb in der Eigentümer-Abrechnung. Diese Kosten zahlt meist die "
+                      "Gemeinschaft; dann „über die WEG“ wählen.", abrechnung, "hinweis")
         gezaehlt = {}
         for po in r["posten"]:
             gezaehlt[po["kostenart"]] = gezaehlt.get(po["kostenart"], 0) + 1

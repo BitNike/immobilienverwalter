@@ -53,6 +53,37 @@ Vorauszahlungen 9 × 90,00 € = 810,00 €, also **30,00 € Nachzahlung** des 
 
 Den Rest von 635,00 € trägt der Eigentümer: Leerstand Januar bis März (125,00 € + 75,00 € + 60,00 €) und die Rücklage (375,00 €).
 
+## Eigene Wohnung mit Mieter: Schritt für Schritt
+
+Am Beispiel oben: Dir gehört Wohnung 2 im Lindenhof 7, dein Mieter wohnt dort seit dem 01.04.
+
+1. **Gebäudekosten der Gemeinschaft** erfasst du einmal bei der Immobilie (Reiter **Buchungen**), nicht bei der Wohnung.
+   Die App verteilt sie nach MEA, Wohneinheiten oder Verbrauch auf alle Wohnungen und davon zeitanteilig auf deinen Mieter.
+2. **Mieter** anlegen (Wohnung 2 → Reiter **Mieter**): Einzug 01.04., NK-Vorauszahlung je Monat.
+3. **Kosten nur dieser Wohnung** (Reiter **Abrechnung** → „Kosten nur für diese Wohnung erfassen“). Zwei Fragen entscheiden:
+
+   | Frage | Antwort | Auswahl |
+   |---|---|---|
+   | Gilt der Betrag für das ganze Jahr der Wohnung? | ja, z. B. Grundsteuerbescheid | **Wohnung – zeitanteilig auf die Mieter** |
+   | | nein, nur für die Mietzeit, z. B. Einzelabrechnung des Messdienstes für den Mieter | **Für Mieter … (100 %)** |
+   | Wer bezahlt die Rechnung? | die Gemeinschaft (Heizung, Wasser, Strom, Versicherung, Hausmeister) | **Bezahlt: über die WEG** |
+   | | du selbst, der Bescheid geht an dich (Grundsteuer, Müll, Straßenreinigung) | **Bezahlt: Eigentümer direkt** |
+
+4. **Vorauszahlungen** des Mieters prüfen und speichern: was er im Jahr tatsächlich gezahlt hat, nicht die Kosten.
+5. **Hausgeld** deiner Wohnung als Buchung oder von Hand eintragen.
+6. **Prüfen:** Mieteranteil + „Leerstand / nicht umlagefähig – trägt der Eigentümer“ = Summe Wohnung. Die Liste
+   „Bitte prüfen“ meldet typische Verwechslungen, z. B. „direkt für Mieter“, obwohl er nicht das ganze Jahr da war, oder
+   „Eigentümer direkt“ bei Kosten, die meist die Gemeinschaft zahlt.
+7. Zwei Briefe exportieren: **Mieter** (an deinen Mieter) und **Eigentümer** (deine Abrechnung gegenüber der Gemeinschaft).
+
+**Typische Fehler:**
+
+- Jahreskosten der Wohnung aus einer alten WEG-Abrechnung von Hand übernommen und „Für Mieter (100 %)“ gewählt:
+  Der Mieter zahlt dann auch die Monate vor seinem Einzug.
+- Alle Posten auf „Eigentümer direkt“: Die Eigentümer-Abrechnung zeigt dann 0,00 € Kosten.
+- Kostensumme als Vorauszahlung eingetragen: Das Ergebnis ist dann immer 0,00 €.
+- Leerstand ist kein Fehler: Kosten für Monate ohne Mieter trägt der Eigentümer, sie stehen nicht im Mieterbrief.
+
 ## Gut zu wissen
 
 - Die Mieter-Vorauszahlungen gehören **nicht** in die Eigentümer-Abrechnung, sie stehen dem Eigentümer zu.

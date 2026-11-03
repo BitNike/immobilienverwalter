@@ -14,7 +14,7 @@ Alle Beispiele verwenden erfundene Musterdaten.
 9. [Verträge und Erinnerungen](09-vertraege.md): Laufzeiten, Kündigungsfristen, E-Mails
 10. [Abrechnung und Export](10-abrechnung.md): Prüfliste, Mieter- und Eigentümer-Abrechnung, PDF
 11. [Dokumente und Ablage](11-dokumente.md): Belege, Protokolle, Pläne
-12. [Wohnungseigentümergemeinschaft (WEG)](12-weg.md): Besonderheiten mit einem durchgerechneten Beispiel
+12. [Wohnungseigentümergemeinschaft (WEG)](12-weg.md): Besonderheiten, durchgerechnetes Beispiel, eigene Wohnung mit Mieter Schritt für Schritt
 13. [Betrieb: Sicherung, Update, Rückweg](13-betrieb.md)
 14. [Häufige Fragen](14-faq.md)
 

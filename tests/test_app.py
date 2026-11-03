@@ -116,6 +116,7 @@ def test_gesamter_ablauf():
     assert "1.350,00" in html  # Soll-Vorauszahlung 9 × 150 als Platzhalter
     # Prüfliste: Vorauszahlung nur vorgeschlagen; Gebäudekosten nicht vollständig verteilt (OG noch nicht zugeordnet)
     assert "Bitte prüfen" in html and "noch nicht gespeichert" in html
+    assert "Heizkosten ist direkt für Noah Gerber, Mia Muster (100 %) eingetragen" in html  # Mieter nur 9 Monate
     immo_html = ok(c.get("/immobilien/1")).get_data(as_text=True)
     assert "keinem Mietobjekt zugeordnet" in immo_html and "Summe MEA" in immo_html
     assert "Trotzdem speichern" in ok(c.get("/wohnungen/1/export?partei=1")).get_data(as_text=True)
@@ -587,6 +588,10 @@ def test_gesamter_ablauf():
     r2 = wohnung_h1()
     assert r2["summe"] == r["summe"] and r2["summe_weg"] == rund(r["summe_weg"] - 95)
     assert r2["saldo"] == rund(r2["summe_weg"] - r2["vorauszahlung"])
+    assert "als „Eigentümer direkt“" not in ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)  # Müll, Grundsteuer: üblich
+    hm = dbcon.execute("SELECT id FROM kostenart WHERE name = 'Hausmeister'").fetchone()[0]
+    post(c, f"/wohnungen/{h1}/kosten", data={"kostenart_id": str(hm), "betrag": "30", "eigentuemer_direkt": "1"})
+    assert "Hausmeister ist als „Eigentümer direkt“ bezahlt eingetragen" in ok(c.get(f"/wohnungen/{h1}")).get_data(as_text=True)
     post(c, f"/immobilien/{tid}/loeschen")
     assert dbcon.execute("SELECT COUNT(*) FROM immobilie_kostenart").fetchone()[0] == 0
     c.get("/immobilien/1?jahr=2026")

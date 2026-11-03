@@ -27,6 +27,10 @@ Es fehlt der Zählerstand zum Jahresende (oder zum Auszug). Trag ihn im Reiter Z
 Sie hatte im Vorjahr Kosten und im aktuellen Jahr noch nicht. Erfassen, oder bei der Immobilie auf „nicht genutzt“ setzen,
 wenn sie weggefallen ist.
 
+**Die Wohnung kostet mehr, als beim Mieter steht. Fehlt da etwas?**
+Nein, wenn er nicht das ganze Jahr da war. Kosten für Monate ohne Mieter (Leerstand) und nicht umlagefähige Kosten trägt
+der Eigentümer; sie stehen in der Zeile „Leerstand / nicht umlagefähig“. Siehe [Eigene Wohnung mit Mieter](12-weg.md#eigene-wohnung-mit-mieter-schritt-für-schritt).
+
 **Muss ich die Miete eintragen?**
 Nein. Die Nebenkostenabrechnung braucht nur die NK-Vorauszahlung. Das [Mietkonto](06-mieter.md#mietkonto-miete-und-zahlungen-monat-für-monat)
 ist für den Überblick über Zahlungen und Rückstände da und beginnt erst mit der ersten eingetragenen Zahlung.

@@ -7,7 +7,7 @@ Oben auf der Übersicht der Immobilie und im Reiter Abrechnung des Mietobjekts. 
 | Art | Beispiele |
 |---|---|
 | **Fehler** (verfälschen die Abrechnung) | Kosten ohne Verteilung, fehlende MEA oder Wohnfläche, Vorauszahlung nur vorgeschlagen |
-| **Hinweis** (bitte ansehen) | Rest nicht verteilt, Kostenart doppelt, keine IBAN, Hausgeld fehlt, Schlüssel weicht von der Regel ab, Wasserstand zum Jahresanfang fehlt, Anfangsbestand der Rücklage fehlt, **Kostenart aus dem Vorjahr fehlt noch** |
+| **Hinweis** (bitte ansehen) | Rest nicht verteilt, Kostenart doppelt, keine IBAN, Hausgeld fehlt, Schlüssel weicht von der Regel ab, Wasserstand zum Jahresanfang fehlt, Anfangsbestand der Rücklage fehlt, **Kostenart aus dem Vorjahr fehlt noch**, **„direkt für Mieter“ trotz kürzerer Mietzeit**, **„Eigentümer direkt“ bei Kosten, die meist die Gemeinschaft zahlt**, Mietrückstand, NK-Ergebnis noch nicht im Mietkonto |
 
 Jeder Punkt führt per Link an die richtige Stelle. Bei offenen Fehlern fragt „PDF speichern“ nach.
 
